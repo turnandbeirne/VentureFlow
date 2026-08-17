@@ -1,0 +1,130 @@
+.vf-setup {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem 1rem;
+}
+
+.vf-setup__inner {
+  width: 100%;
+  max-width: 640px;
+}
+
+.vf-setup__logo {
+  text-align: center;
+  margin-bottom: 0.4rem;
+}
+
+.vf-setup__logo h1 {
+  font-size: 2.6rem;
+  color: var(--vf-ink);
+}
+
+.vf-setup__logo span {
+  color: var(--vf-teal);
+}
+
+.vf-setup__tagline {
+  text-align: center;
+  color: var(--vf-ink-soft);
+  font-weight: 500;
+  margin-bottom: 1.75rem;
+}
+
+.vf-mode-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+
+@media (max-width: 560px) {
+  .vf-mode-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.vf-mode-card {
+  padding: 1.25rem;
+  cursor: pointer;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  background: var(--vf-white);
+}
+
+.vf-mode-card--active {
+  background: var(--vf-yellow);
+}
+
+.vf-mode-card__icon {
+  font-size: 2rem;
+}
+
+.vf-mode-card h3 {
+  font-size: 1.1rem;
+}
+
+.vf-mode-card p {
+  color: var(--vf-ink-soft);
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.vf-setup__options {
+  padding: 1.25rem;
+  margin-bottom: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.vf-field-label {
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: var(--vf-ink-soft);
+  margin-bottom: 0.4rem;
+  display: block;
+}
+
+.vf-count-toggle {
+  display: flex;
+  gap: 0.6rem;
+}
+
+.vf-name-inputs {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.vf-text-input {
+  font-family: 'Fredoka', system-ui, sans-serif;
+  font-size: 1rem;
+  font-weight: 500;
+  padding: 0.7rem 1rem;
+  border-radius: var(--vf-radius-md);
+  border: var(--vf-border-width) solid var(--vf-border);
+  background: var(--vf-white);
+  min-height: 48px;
+}
+
+.vf-text-input:focus {
+  outline: 3px solid var(--vf-teal);
+  outline-offset: 1px;
+}
+
+.vf-setup__starting-info {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  justify-content: center;
+  margin-bottom: 1.5rem;
+}
+
+.vf-setup__start {
+  display: flex;
+  justify-content: center;
+}
