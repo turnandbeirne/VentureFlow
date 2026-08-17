@@ -1,7 +1,14 @@
+import { playSound } from '../audio/soundEngine';
+
 export default function FortuneCardModal({ entry, onContinue }) {
   if (!entry) return null;
   const { playerName, avatar, deckId, card, description } = entry;
   const good = deckId === 'opportunity';
+
+  function handleContinue() {
+    playSound('click');
+    onContinue();
+  }
 
   return (
     <div className="vf-modal-overlay">
@@ -19,7 +26,7 @@ export default function FortuneCardModal({ entry, onContinue }) {
           <strong>Why?</strong>
           {card.why}
         </div>
-        <button type="button" className="vf-btn vf-btn--primary vf-btn--lg" onClick={onContinue}>
+        <button type="button" className="vf-btn vf-btn--primary vf-btn--lg" onClick={handleContinue}>
           Got it!
         </button>
       </div>

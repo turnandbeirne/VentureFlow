@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import '../styles/setup.css';
 import { STARTING_CASH, MONTHLY_ALLOWANCE, STARTING_SKILL_TOKENS, GAME_LENGTH_MONTHS } from '../data/gameConfig';
+import { playSound } from '../audio/soundEngine';
+import VolumeControl from './VolumeControl';
 
 const MODES = [
   {
@@ -31,7 +33,13 @@ export default function SetupScreen({ onStart }) {
     });
   }
 
+  function selectMode(id) {
+    playSound('click');
+    setModeId(id);
+  }
+
   function handleStart() {
+    playSound('business');
     if (modeId === 'solo') {
       onStart({ type: 'solo', aiCount }, [names[0] || 'You']);
     } else {
@@ -41,6 +49,9 @@ export default function SetupScreen({ onStart }) {
 
   return (
     <div className="vf-setup">
+      <div className="vf-topbar-corner">
+        <VolumeControl />
+      </div>
       <div className="vf-setup__inner">
         <div className="vf-setup__logo">
           <h1>
@@ -55,7 +66,7 @@ export default function SetupScreen({ onStart }) {
               key={mode.id}
               type="button"
               className={`vf-card vf-mode-card ${modeId === mode.id ? 'vf-mode-card--active' : ''}`}
-              onClick={() => setModeId(mode.id)}
+              onClick={() => selectMode(mode.id)}
             >
               <span className="vf-mode-card__icon">{mode.icon}</span>
               <h3>{mode.title}</h3>
@@ -75,7 +86,10 @@ export default function SetupScreen({ onStart }) {
                       key={n}
                       type="button"
                       className={`vf-btn ${aiCount === n ? 'vf-btn--primary' : 'vf-btn--ghost'}`}
-                      onClick={() => setAiCount(n)}
+                      onClick={() => {
+                        playSound('click');
+                        setAiCount(n);
+                      }}
                     >
                       {n} {n === 1 ? 'Robot' : 'Robots'}
                     </button>
@@ -104,7 +118,10 @@ export default function SetupScreen({ onStart }) {
                       key={n}
                       type="button"
                       className={`vf-btn ${humanCount === n ? 'vf-btn--primary' : 'vf-btn--ghost'}`}
-                      onClick={() => setHumanCount(n)}
+                      onClick={() => {
+                        playSound('click');
+                        setHumanCount(n);
+                      }}
                     >
                       {n} Players
                     </button>

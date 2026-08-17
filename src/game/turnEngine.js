@@ -18,7 +18,11 @@ export function endTurn(state, playerId) {
   const nextIndex = currentIndex + 1;
 
   if (nextIndex < state.players.length) {
-    return { state: { ...state, activePlayerIndex: nextIndex }, logEntries: [] };
+    const nextPlayer = state.players[nextIndex];
+    return {
+      state: { ...state, activePlayerIndex: nextIndex },
+      logEntries: [{ icon: '➡️', message: `Passed the turn to ${nextPlayer.name}.`, kind: 'endTurn' }],
+    };
   }
 
   return resolveMonthEnd(state);
@@ -33,7 +37,7 @@ function resolveMonthEnd(state) {
     const income = MONTHLY_ALLOWANCE + passiveIncome(p);
     return { ...p, cash: p.cash + income };
   });
-  logEntries.push({ icon: '💰', message: `Payday! Everyone collected their allowance and passive income.` });
+  logEntries.push({ icon: '💰', message: `Payday! Everyone collected their allowance and passive income.`, kind: 'payday' });
 
   // 2) Fortune cards — drawn using the weather that governed this month.
   const startingPrices = state.assetPrices;
@@ -45,7 +49,12 @@ function resolveMonthEnd(state) {
     const applied = applyCardEffect(player, prices, card);
     players[i] = applied.player;
     prices = applied.prices;
-    logEntries.push({ icon: card.icon, message: `${player.name}: ${card.title} (${applied.description})`, playerId: player.id });
+    logEntries.push({
+      icon: card.icon,
+      message: `${player.name}: ${card.title} (${applied.description})`,
+      playerId: player.id,
+      kind: deckId === 'opportunity' ? 'fortuneGood' : 'fortuneBad',
+    });
     fortuneRecap.push({
       playerId: player.id,
       playerName: player.name,
@@ -65,7 +74,7 @@ function resolveMonthEnd(state) {
   players = players.map((p) => {
     const { player, newlyEarned } = evaluateBadges(p, month);
     for (const badge of newlyEarned) {
-      newlyEarnedLog.push({ icon: badge.icon, message: `${p.name} earned the ${badge.name} badge!`, playerId: p.id });
+      newlyEarnedLog.push({ icon: badge.icon, message: `${p.name} earned the ${badge.name} badge!`, playerId: p.id, kind: 'badge' });
     }
     return player;
   });
@@ -75,7 +84,7 @@ function resolveMonthEnd(state) {
   const tick = tickWeather(state.weather);
   if (tick.changed) {
     const info = getStageInfo(tick.weather);
-    logEntries.push({ icon: info.icon, message: `The weather shifted to ${info.name}!` });
+    logEntries.push({ icon: info.icon, message: `The weather shifted to ${info.name}!`, kind: 'weather' });
   }
 
   // 6) Advance the calendar.
@@ -98,7 +107,7 @@ function resolveMonthEnd(state) {
   if (isGameOver) {
     const ranked = [...players].sort((a, b) => netWorth(b, prices) - netWorth(a, prices));
     nextState.winnerId = ranked[0].id;
-    logEntries.push({ icon: '🏆', message: `Game over! ${ranked[0].name} wins with $${netWorth(ranked[0], prices)}!` });
+    logEntries.push({ icon: '🏆', message: `Game over! ${ranked[0].name} wins with $${netWorth(ranked[0], prices)}!`, kind: 'gameover' });
   }
 
   return { state: nextState, logEntries };

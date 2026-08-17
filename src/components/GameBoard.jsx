@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import '../styles/game.css';
+import { playSound } from '../audio/soundEngine';
 import WeatherBadge from './WeatherBadge';
 import MonthProgress from './MonthProgress';
 import PlayerPanel from './PlayerPanel';
@@ -7,6 +8,7 @@ import AssetShop from './AssetShop';
 import ActionBar from './ActionBar';
 import EventLog from './EventLog';
 import FortuneCardModal from './FortuneCardModal';
+import VolumeControl from './VolumeControl';
 
 export default function GameBoard({ game }) {
   const { state } = game;
@@ -45,8 +47,16 @@ export default function GameBoard({ game }) {
             Venture<span>Flow</span>
           </div>
           <div className="vf-header__right">
+            <VolumeControl />
             <WeatherBadge weather={weather} />
-            <button type="button" className="vf-btn vf-btn--sm vf-btn--ghost" onClick={game.newGame}>
+            <button
+              type="button"
+              className="vf-btn vf-btn--sm vf-btn--ghost"
+              onClick={() => {
+                playSound('click');
+                game.newGame();
+              }}
+            >
               New Game
             </button>
           </div>

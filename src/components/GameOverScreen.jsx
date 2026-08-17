@@ -1,13 +1,23 @@
 import '../styles/game.css';
 import { netWorth } from '../game/players';
+import { playSound } from '../audio/soundEngine';
+import VolumeControl from './VolumeControl';
 
 export default function GameOverScreen({ state, onPlayAgain }) {
   const { players, assetPrices, winnerId } = state;
   const ranked = [...players].sort((a, b) => netWorth(b, assetPrices) - netWorth(a, assetPrices));
   const winner = players.find((p) => p.id === winnerId) || ranked[0];
 
+  function handlePlayAgain() {
+    playSound('click');
+    onPlayAgain();
+  }
+
   return (
     <div className="vf-gameover">
+      <div className="vf-topbar-corner">
+        <VolumeControl />
+      </div>
       <div className="vf-card vf-gameover__inner">
         <div className="vf-gameover__trophy">🏆</div>
         <h1>Game Over!</h1>
@@ -28,7 +38,7 @@ export default function GameOverScreen({ state, onPlayAgain }) {
           ))}
         </div>
 
-        <button type="button" className="vf-btn vf-btn--go vf-btn--lg" onClick={onPlayAgain}>
+        <button type="button" className="vf-btn vf-btn--go vf-btn--lg" onClick={handlePlayAgain}>
           Play Again 🔁
         </button>
       </div>

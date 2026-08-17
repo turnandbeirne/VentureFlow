@@ -39,7 +39,7 @@ export function buyAsset(state, playerId, assetId, qty = 1) {
   return {
     state: nextState,
     ok: true,
-    logEntry: { icon: asset.icon, message: `bought ${asset.name}` },
+    logEntry: { icon: asset.icon, message: `bought ${asset.name}`, kind: 'buy' },
   };
 }
 
@@ -63,7 +63,7 @@ export function sellAsset(state, playerId, assetId, qty = 1) {
   return {
     state: nextState,
     ok: true,
-    logEntry: { icon: asset.icon, message: `sold ${asset.name}` },
+    logEntry: { icon: asset.icon, message: `sold ${asset.name}`, kind: 'sell' },
   };
 }
 
@@ -86,7 +86,7 @@ export function startBusiness(state, playerId) {
   return {
     state: nextState,
     ok: true,
-    logEntry: { icon: '🚀', message: `started a business (+$${income}/mo)` },
+    logEntry: { icon: '🚀', message: `started a business (+$${income}/mo)`, kind: 'business' },
   };
 }
 
@@ -104,6 +104,6 @@ export function learnSkill(state, playerId) {
   return {
     state: nextState,
     ok: true,
-    logEntry: { icon: '📚', message: 'learned a new skill' },
+    logEntry: { icon: '📚', message: 'learned a new skill', kind: 'skill' },
   };
 }

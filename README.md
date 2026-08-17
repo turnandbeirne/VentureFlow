@@ -37,6 +37,11 @@ src/
     reducer.js                            # top-level (state, action) -> state
   hooks/
     useGame.js           # React glue: useReducer + persistence + AI auto-play
+    useGameSounds.js       # watches the event log, plays a sound per new entry
+    useAudioSettings.js      # volume/mute state, synced across components
+  audio/
+    soundLibrary.js       # tunable synthesized sound "recipes", one per effect
+    soundEngine.js           # Web Audio playback + volume/mute + persistence
   components/            # UI only — reads state, calls the hook's action fns
   styles/                # theme.css (design tokens) + setup.css / game.css
 ```
@@ -82,3 +87,25 @@ rule, it goes in `game/`. If it's pixels, it goes in `components/` +
 The whole game state is serialized to `localStorage` after every action
 (`game/persistence.js`). Reloading the page resumes straight into the board;
 "New Game" clears the save and returns to setup.
+
+## Sound
+
+Every action and reward has a sound — buying, selling, starting a business,
+learning a skill, ending your turn, payday, fortune cards (a bright chime for
+Opportunity, a gentle "womp" for Setback), badges, weather shifts, and the
+game-over fanfare. All of it is synthesized on the fly with the Web Audio
+API (`audio/soundLibrary.js` + `audio/soundEngine.js`) — no audio files to
+load, license, or go stale, and it works offline once the page has loaded
+(useful for classroom wifi).
+
+The game engine itself stays audio-agnostic: log entries just carry a `kind`
+(e.g. `'buy'`, `'badge'`, `'weather'`), and `hooks/useGameSounds.js` is the
+only thing that turns that into noise, watching the shared event log from
+`App.jsx` so it works the same whether a human or an AI robot triggered the
+event. Add a new sound by adding an entry to `SOUNDS` in
+`audio/soundLibrary.js` and tagging the relevant log entry with a matching
+`kind` — no other wiring needed.
+
+Volume is adjustable (and mutable) from a control in the corner of every
+screen; the setting persists in `localStorage` separately from game saves,
+so it carries over between games.

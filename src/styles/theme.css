@@ -199,6 +199,52 @@ button {
   background: transparent;
 }
 
+/* ---------------------------------------------------------------------- */
+/* Volume control                                                          */
+/* ---------------------------------------------------------------------- */
+.vf-volume {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: var(--vf-white);
+  border: var(--vf-border-width) solid var(--vf-border);
+  border-radius: var(--vf-radius-pill);
+  padding: 0.3rem 0.6rem 0.3rem 0.3rem;
+  box-shadow: var(--vf-shadow-sm);
+}
+
+.vf-volume__toggle {
+  box-shadow: none;
+  border: none;
+  padding: 0.35rem;
+  min-height: 34px;
+  min-width: 34px;
+  font-size: 1.1rem;
+  background: transparent;
+}
+
+.vf-volume__toggle:active {
+  transform: none;
+}
+
+.vf-volume__slider {
+  width: 70px;
+  accent-color: var(--vf-teal);
+  cursor: pointer;
+}
+
+.vf-volume__slider:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.vf-topbar-corner {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  z-index: 5;
+}
+
 @keyframes vf-pop-in {
   from {
     opacity: 0;
