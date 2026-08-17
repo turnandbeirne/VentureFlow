@@ -392,6 +392,97 @@
   color: var(--vf-teal-dark);
 }
 
+/* Leaderboard modal ------------------------------------------------------ */
+.vf-leaderboard {
+  width: 100%;
+  max-width: 560px;
+  max-height: 80vh;
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  animation: vf-pop-in 0.18s ease;
+}
+
+.vf-leaderboard__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-weight: 700;
+  font-size: 1.2rem;
+}
+
+.vf-leaderboard__list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  overflow-y: auto;
+  padding-right: 0.25rem;
+}
+
+.vf-leaderboard__row {
+  display: grid;
+  grid-template-columns: 1.6rem 1.6rem 1fr auto auto auto;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.55rem 0.8rem;
+  border: 2px solid var(--vf-border);
+  border-radius: var(--vf-radius-md);
+  background: var(--vf-white);
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.vf-leaderboard__row--highlight {
+  background: var(--vf-yellow);
+}
+
+.vf-leaderboard__rank {
+  text-align: center;
+  color: var(--vf-ink-soft);
+}
+
+.vf-leaderboard__mode,
+.vf-leaderboard__date {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--vf-ink-soft);
+  white-space: nowrap;
+}
+
+.vf-leaderboard__score {
+  color: var(--vf-teal-dark);
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+/* Save-to-leaderboard form (game over screen) --------------------------- */
+.vf-save-score {
+  padding: 1.1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+  background: var(--vf-cream);
+  text-align: left;
+}
+
+.vf-save-score__title {
+  font-weight: 700;
+  text-align: center;
+}
+
+.vf-save-score__hint {
+  font-size: 0.78rem;
+  color: var(--vf-ink-soft);
+  font-weight: 500;
+}
+
+.vf-save-score__success {
+  text-align: center;
+  font-weight: 600;
+  color: var(--vf-green-dark);
+}
+
 /* Game over ------------------------------------------------------------ */
 .vf-gameover {
   position: relative;

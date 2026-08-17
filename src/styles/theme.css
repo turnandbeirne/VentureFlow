@@ -243,6 +243,74 @@ button {
   top: 1rem;
   right: 1rem;
   z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* ---------------------------------------------------------------------- */
+/* Brand mark ("VentureFlow" + "A VentureMaker™ game")                    */
+/* ---------------------------------------------------------------------- */
+.vf-brand {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.vf-brand--center {
+  align-items: center;
+  text-align: center;
+}
+
+.vf-brand--left {
+  align-items: flex-start;
+  text-align: left;
+}
+
+.vf-brand__logo {
+  font-weight: 600;
+}
+
+.vf-brand__logo span {
+  color: var(--vf-teal);
+}
+
+.vf-brand__tag {
+  color: var(--vf-ink-soft);
+  font-weight: 500;
+  opacity: 0.85;
+}
+
+.vf-brand--lg .vf-brand__logo {
+  font-size: 2.6rem;
+}
+.vf-brand--lg .vf-brand__tag {
+  font-size: 0.95rem;
+}
+
+.vf-brand--md .vf-brand__logo {
+  font-size: 1.6rem;
+}
+.vf-brand--md .vf-brand__tag {
+  font-size: 0.75rem;
+}
+
+.vf-brand--sm .vf-brand__logo {
+  font-size: 1.4rem;
+}
+.vf-brand--sm .vf-brand__tag {
+  font-size: 0.65rem;
+}
+
+/* ---------------------------------------------------------------------- */
+/* Inline field errors (name validation, etc.)                             */
+/* ---------------------------------------------------------------------- */
+.vf-field-error {
+  display: block;
+  color: var(--vf-red-dark);
+  font-size: 0.8rem;
+  font-weight: 600;
+  margin-top: 0.3rem;
 }
 
 @keyframes vf-pop-in {

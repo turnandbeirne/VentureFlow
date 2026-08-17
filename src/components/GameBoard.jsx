@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import '../styles/game.css';
 import { playSound } from '../audio/soundEngine';
 import WeatherBadge from './WeatherBadge';
@@ -9,10 +9,13 @@ import ActionBar from './ActionBar';
 import EventLog from './EventLog';
 import FortuneCardModal from './FortuneCardModal';
 import VolumeControl from './VolumeControl';
+import Brand from './Brand';
+import LeaderboardModal from './LeaderboardModal';
 
 export default function GameBoard({ game }) {
   const { state } = game;
   const { players, activePlayerIndex, weather, assetPrices, previousAssetPrices, month, totalMonths, log, status } = state;
+  const [showLeaderboard, setShowLeaderboard] = useState(false);
   const activePlayer = players[activePlayerIndex];
   const isHumanTurn = status === 'playing' && activePlayer?.type === 'human';
   const currentFortuneEntry = status === 'monthRecap' ? state.fortuneRecap[state.fortuneRecapIndex] : null;
@@ -43,11 +46,19 @@ export default function GameBoard({ game }) {
     <div className="vf-page">
       <div className="vf-card vf-board">
         <div className="vf-header">
-          <div className="vf-header__logo">
-            Venture<span>Flow</span>
-          </div>
+          <Brand size="sm" align="left" />
           <div className="vf-header__right">
             <VolumeControl />
+            <button
+              type="button"
+              className="vf-btn vf-btn--sm vf-btn--ghost"
+              onClick={() => {
+                playSound('click');
+                setShowLeaderboard(true);
+              }}
+            >
+              🏆
+            </button>
             <WeatherBadge weather={weather} />
             <button
               type="button"
@@ -99,6 +110,8 @@ export default function GameBoard({ game }) {
       {showModalForHuman && (
         <FortuneCardModal entry={currentFortuneEntry} onContinue={game.ackFortuneCard} />
       )}
+
+      <LeaderboardModal open={showLeaderboard} onClose={() => setShowLeaderboard(false)} />
 
       {state.lastError && <div className="vf-toast">{state.lastError}</div>}
     </div>

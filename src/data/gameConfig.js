@@ -236,3 +236,16 @@ export const PLAYER_AVATARS = ['🦊', '🐼', '🐸', '🦁', '🐨', '🐯'];
 export const AI_NAMES = ['Robo', 'Chip', 'Byte'];
 
 export const LOCAL_STORAGE_KEY = 'ventureflow-save-v1';
+
+// ---------------------------------------------------------------------------
+// Branding
+// ---------------------------------------------------------------------------
+export const GAME_NAME = 'VentureFlow';
+export const PARENT_BRAND = 'VentureMaker';
+export const BRAND_TAGLINE = `A ${PARENT_BRAND}™ game`;
+
+// ---------------------------------------------------------------------------
+// Leaderboard
+// ---------------------------------------------------------------------------
+export const LEADERBOARD_STORAGE_KEY = 'ventureflow-leaderboard-v1';
+export const LEADERBOARD_MAX_ENTRIES = 50;

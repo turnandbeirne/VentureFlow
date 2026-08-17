@@ -42,6 +42,11 @@ src/
   audio/
     soundLibrary.js       # tunable synthesized sound "recipes", one per effect
     soundEngine.js           # Web Audio playback + volume/mute + persistence
+  game/
+    leaderboard.js          # localStorage-backed high-score list (own hook below)
+    nameFilter.js              # offensive-name blocklist, used at setup + leaderboard save
+  hooks/
+    useLeaderboard.js          # React glue for game/leaderboard.js
   components/            # UI only — reads state, calls the hook's action fns
   styles/                # theme.css (design tokens) + setup.css / game.css
 ```
@@ -109,3 +114,33 @@ event. Add a new sound by adding an entry to `SOUNDS` in
 Volume is adjustable (and mutable) from a control in the corner of every
 screen; the setting persists in `localStorage` separately from game saves,
 so it carries over between games.
+
+## Branding
+
+Every screen (setup, board, game over) renders the `Brand` component
+(`components/Brand.jsx`), which reads `GAME_NAME`/`PARENT_BRAND`/
+`BRAND_TAGLINE` from `gameConfig.js` — currently "VentureFlow" / "A
+VentureMaker™ game". Change the wording in one place and it updates
+everywhere.
+
+## Leaderboard
+
+A persistent high-score list, separate from any single game's save
+(`game/leaderboard.js`, its own `localStorage` key so "New Game" doesn't
+touch it). It's opt-in: nothing is recorded automatically when a game ends —
+on the game-over screen the winner can choose a display name (pre-filled
+with their in-game name, editable) and optionally attach an email, then
+"Save My Score." The email is stored on the entry for VentureMaker's own
+use (e.g. a future "you made the leaderboard!" follow-up) but no rendering
+code ever reads it back out — `LeaderboardModal.jsx` only ever displays
+name/avatar/net worth/mode/date. Open the leaderboard from the trophy button
+on any screen.
+
+Every name — at setup and again at leaderboard save — is checked by
+`game/nameFilter.js`, a small client-side blocklist (with basic leetspeak
+normalization, e.g. `b1tch` → `bitch`) tuned to avoid the classic
+profanity-filter false positive of blocking innocent names that merely
+*contain* a short blocked word. It's a reasonable first line of defense for
+a local/offline game; if the leaderboard ever becomes shared/online, names
+should be re-checked server-side too, since a client-side filter is
+inherently bypassable.

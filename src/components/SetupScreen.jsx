@@ -1,8 +1,11 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import '../styles/setup.css';
 import { STARTING_CASH, MONTHLY_ALLOWANCE, STARTING_SKILL_TOKENS, GAME_LENGTH_MONTHS } from '../data/gameConfig';
 import { playSound } from '../audio/soundEngine';
+import { isOffensiveName } from '../game/nameFilter';
 import VolumeControl from './VolumeControl';
+import Brand from './Brand';
+import LeaderboardModal from './LeaderboardModal';
 
 const MODES = [
   {
@@ -24,6 +27,14 @@ export default function SetupScreen({ onStart }) {
   const [aiCount, setAiCount] = useState(1);
   const [humanCount, setHumanCount] = useState(2);
   const [names, setNames] = useState(['', '', '']);
+  const [showLeaderboard, setShowLeaderboard] = useState(false);
+
+  const activeNameCount = modeId === 'solo' ? 1 : humanCount;
+  const nameErrors = useMemo(
+    () => names.map((n, i) => i < activeNameCount && n.trim() && isOffensiveName(n)),
+    [names, activeNameCount]
+  );
+  const hasInvalidName = nameErrors.some(Boolean);
 
   function updateName(index, value) {
     setNames((prev) => {
@@ -39,6 +50,10 @@ export default function SetupScreen({ onStart }) {
   }
 
   function handleStart() {
+    if (hasInvalidName) {
+      playSound('error');
+      return;
+    }
     playSound('business');
     if (modeId === 'solo') {
       onStart({ type: 'solo', aiCount }, [names[0] || 'You']);
@@ -47,16 +62,22 @@ export default function SetupScreen({ onStart }) {
     }
   }
 
+  function openLeaderboard() {
+    playSound('click');
+    setShowLeaderboard(true);
+  }
+
   return (
     <div className="vf-setup">
       <div className="vf-topbar-corner">
         <VolumeControl />
+        <button type="button" className="vf-btn vf-btn--sm vf-btn--ghost" onClick={openLeaderboard}>
+          🏆 Leaderboard
+        </button>
       </div>
       <div className="vf-setup__inner">
         <div className="vf-setup__logo">
-          <h1>
-            Venture<span>Flow</span>
-          </h1>
+          <Brand size="lg" align="center" />
         </div>
         <p className="vf-setup__tagline">Grow your money over {GAME_LENGTH_MONTHS} months. Highest total wins!</p>
 
@@ -106,6 +127,7 @@ export default function SetupScreen({ onStart }) {
                   onChange={(e) => updateName(0, e.target.value)}
                   maxLength={16}
                 />
+                {nameErrors[0] && <span className="vf-field-error">Please pick a different name.</span>}
               </div>
             </>
           ) : (
@@ -132,15 +154,17 @@ export default function SetupScreen({ onStart }) {
                 <span className="vf-field-label">Player names</span>
                 <div className="vf-name-inputs">
                   {Array.from({ length: humanCount }).map((_, i) => (
-                    <input
-                      key={i}
-                      className="vf-text-input"
-                      type="text"
-                      placeholder={`Player ${i + 1}`}
-                      value={names[i]}
-                      onChange={(e) => updateName(i, e.target.value)}
-                      maxLength={16}
-                    />
+                    <div key={i}>
+                      <input
+                        className="vf-text-input"
+                        type="text"
+                        placeholder={`Player ${i + 1}`}
+                        value={names[i]}
+                        onChange={(e) => updateName(i, e.target.value)}
+                        maxLength={16}
+                      />
+                      {nameErrors[i] && <span className="vf-field-error">Please pick a different name.</span>}
+                    </div>
                   ))}
                 </div>
               </div>
@@ -155,11 +179,13 @@ export default function SetupScreen({ onStart }) {
         </div>
 
         <div className="vf-setup__start">
-          <button type="button" className="vf-btn vf-btn--go vf-btn--lg" onClick={handleStart}>
+          <button type="button" className="vf-btn vf-btn--go vf-btn--lg" onClick={handleStart} disabled={hasInvalidName}>
             Let's Play! 🎉
           </button>
         </div>
       </div>
+
+      <LeaderboardModal open={showLeaderboard} onClose={() => setShowLeaderboard(false)} />
     </div>
   );
 }
