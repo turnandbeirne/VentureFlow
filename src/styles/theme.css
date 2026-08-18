@@ -246,6 +246,9 @@ button {
   display: flex;
   align-items: center;
   gap: 0.5rem;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  max-width: calc(100% - 2rem);
 }
 
 /* ---------------------------------------------------------------------- */

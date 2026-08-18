@@ -1,9 +1,13 @@
 import { netWorth, passiveIncome } from '../game/players';
 import { getBadgeInfo } from '../game/badges';
 
-function PlayerCard({ player, prices, isActive }) {
+function PlayerCard({ player, prices, isActive, onSelect }) {
   return (
-    <div className={`vf-card vf-player-card ${isActive ? 'vf-player-card--active' : ''}`}>
+    <button
+      type="button"
+      className={`vf-card vf-player-card ${isActive ? 'vf-player-card--active' : ''}`}
+      onClick={onSelect}
+    >
       <div className="vf-player-card__name">
         <span>{player.avatar}</span>
         <span>{player.name}</span>
@@ -27,15 +31,22 @@ function PlayerCard({ player, prices, isActive }) {
           })}
         </div>
       )}
-    </div>
+      <div className="vf-player-card__tap-hint">🔍 Tap for portfolio details</div>
+    </button>
   );
 }
 
-export default function PlayerPanel({ players, prices, activePlayerIndex }) {
+export default function PlayerPanel({ players, prices, activePlayerIndex, onSelectPlayer }) {
   return (
     <div className="vf-players">
       {players.map((player, i) => (
-        <PlayerCard key={player.id} player={player} prices={prices} isActive={i === activePlayerIndex} />
+        <PlayerCard
+          key={player.id}
+          player={player}
+          prices={prices}
+          isActive={i === activePlayerIndex}
+          onSelect={() => onSelectPlayer(player.id)}
+        />
       ))}
     </div>
   );

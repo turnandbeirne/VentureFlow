@@ -7,21 +7,36 @@ import {
   ASSETS,
   PLAYER_AVATARS,
   AI_NAMES,
+  BUSINESS_COST,
+  getDifficulty,
+  DEFAULT_DIFFICULTY_ID,
 } from '../data/gameConfig';
 
-export function createPlayer({ id, name, avatar, type }) {
+export function createPlayer({
+  id,
+  name,
+  avatar,
+  type,
+  startingCash = STARTING_CASH,
+  startingSkillTokens = STARTING_SKILL_TOKENS,
+}) {
   const holdings = {};
-  for (const asset of ASSETS) holdings[asset.id] = 0;
+  const purchaseStats = {};
+  for (const asset of ASSETS) {
+    holdings[asset.id] = 0;
+    purchaseStats[asset.id] = { qty: 0, spent: 0 };
+  }
 
   return {
     id,
     name,
     avatar,
     type, // 'human' | 'ai'
-    cash: STARTING_CASH,
-    holdings, // { assetId: quantity }
+    cash: startingCash,
+    holdings, // { assetId: quantity currently owned }
+    purchaseStats, // { assetId: { qty, spent } } — lifetime buys, for avg purchase price
     businesses: [], // [{ id, income }]
-    skillTokens: STARTING_SKILL_TOKENS,
+    skillTokens: startingSkillTokens,
     passiveBonus: 0, // permanent $/mo from fortune cards
     badges: [], // [badgeId]
     badgeEvents: [], // [{ badgeId, month }] — feeds future VentureScouts export
@@ -29,11 +44,29 @@ export function createPlayer({ id, name, avatar, type }) {
   };
 }
 
-/** Build the player roster for a given mode config. */
-export function createPlayerRoster(mode, humanNames = []) {
+/**
+ * Build the player roster for a given mode config. Every player — human or
+ * robot — starts from the same `difficulty` preset (see gameConfig.js
+ * DIFFICULTIES), so the challenge level is consistent across the table.
+ * Defaults to the standard difficulty if none is passed (e.g. any direct
+ * caller/test that predates difficulty presets).
+ */
+export function createPlayerRoster(mode, humanNames = [], difficulty = getDifficulty(DEFAULT_DIFFICULTY_ID)) {
+  const startingCash = difficulty.startingCash;
+  const startingSkillTokens = difficulty.startingSkillTokens;
+
   const players = [];
   if (mode.type === 'solo') {
-    players.push(createPlayer({ id: 'p1', name: humanNames[0] || 'You', avatar: PLAYER_AVATARS[0], type: 'human' }));
+    players.push(
+      createPlayer({
+        id: 'p1',
+        name: humanNames[0] || 'You',
+        avatar: PLAYER_AVATARS[0],
+        type: 'human',
+        startingCash,
+        startingSkillTokens,
+      })
+    );
     for (let i = 0; i < mode.aiCount; i++) {
       players.push(
         createPlayer({
@@ -41,6 +74,8 @@ export function createPlayerRoster(mode, humanNames = []) {
           name: AI_NAMES[i] || `Robot ${i + 1}`,
           avatar: '🤖',
           type: 'ai',
+          startingCash,
+          startingSkillTokens,
         })
       );
     }
@@ -52,6 +87,8 @@ export function createPlayerRoster(mode, humanNames = []) {
           name: humanNames[i] || `Player ${i + 1}`,
           avatar: PLAYER_AVATARS[i] || '🙂',
           type: 'human',
+          startingCash,
+          startingSkillTokens,
         })
       );
     }
@@ -65,7 +102,7 @@ export function assetValue(player, prices) {
 
 export function businessValue(player) {
   // Simple valuation: a business is "worth" what you put into it.
-  return player.businesses.length * 300;
+  return player.businesses.length * BUSINESS_COST;
 }
 
 export function netWorth(player, prices) {
@@ -79,4 +116,41 @@ export function passiveIncome(player) {
   );
   const businessIncome = player.businesses.reduce((sum, b) => sum + b.income, 0);
   return rent + businessIncome + (player.passiveBonus || 0);
+}
+
+/**
+ * Average price per unit a player has paid for an asset, across every
+ * purchase made so far this game (not adjusted for later sales — this is a
+ * "what have I typically paid" stat, not a remaining cost basis). Returns
+ * null if they've never bought that asset.
+ */
+export function avgPurchasePrice(player, assetId) {
+  const stats = player.purchaseStats?.[assetId];
+  if (!stats || stats.qty === 0) return null;
+  return stats.spent / stats.qty;
+}
+
+/**
+ * A frozen "hard copy" of a player's portfolio at this exact moment: how
+ * much of each asset they own and their lifetime average purchase price for
+ * it, plus every business and its individual cash flow. Used to attach a
+ * permanent snapshot to a leaderboard entry when a score is saved (see
+ * game/leaderboard.js + GameOverScreen) — once saved it never changes
+ * again, even if the player goes on to play (and sell everything in)
+ * another game.
+ */
+export function snapshotPortfolio(player, prices) {
+  return {
+    cash: Math.round(player.cash),
+    netWorth: netWorth(player, prices),
+    assets: ASSETS.map((asset) => ({
+      id: asset.id,
+      name: asset.name,
+      icon: asset.icon,
+      qty: player.holdings[asset.id] || 0,
+      avgPurchasePrice: avgPurchasePrice(player, asset.id),
+      priceAtSave: prices[asset.id],
+    })),
+    businesses: player.businesses.map((b, i) => ({ id: b.id, index: i + 1, income: b.income })),
+  };
 }

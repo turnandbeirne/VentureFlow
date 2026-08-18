@@ -34,7 +34,7 @@ function withResult(result) {
 export function gameReducer(state, action) {
   switch (action.type) {
     case 'START_GAME':
-      return createNewGame(action.mode, action.humanNames);
+      return createNewGame(action.mode, action.humanNames, action.difficultyId);
 
     case 'LOAD_GAME':
       return action.state;

@@ -1,12 +1,16 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import '../styles/game.css';
-import { netWorth } from '../game/players';
+import { LEADERBOARD_TOP_HIGHLIGHT } from '../data/gameConfig';
+import { netWorth, snapshotPortfolio } from '../game/players';
 import { isOffensiveName } from '../game/nameFilter';
 import { playSound } from '../audio/soundEngine';
+import { playMusicTrack } from '../audio/musicEngine';
 import { useLeaderboard } from '../hooks/useLeaderboard';
 import VolumeControl from './VolumeControl';
+import MusicControl from './MusicControl';
 import Brand from './Brand';
 import LeaderboardModal from './LeaderboardModal';
+import Fireworks from './Fireworks';
 
 export default function GameOverScreen({ state, onPlayAgain }) {
   const { players, assetPrices, winnerId, mode } = state;
@@ -18,7 +22,14 @@ export default function GameOverScreen({ state, onPlayAgain }) {
   const [scoreEmail, setScoreEmail] = useState('');
   const [nameError, setNameError] = useState(false);
   const [savedEntryId, setSavedEntryId] = useState(null);
+  const [savedRank, setSavedRank] = useState(null);
   const [showLeaderboard, setShowLeaderboard] = useState(false);
+
+  // Back to the opening theme for the big finish — same track SetupScreen
+  // uses, so "Play Again" (GameOver → Setup) doesn't restart it.
+  useEffect(() => {
+    playMusicTrack('theme');
+  }, []);
 
   function handlePlayAgain() {
     playSound('click');
@@ -39,15 +50,27 @@ export default function GameOverScreen({ state, onPlayAgain }) {
       netWorth: netWorth(winner, assetPrices),
       mode: mode?.type,
       email: scoreEmail,
+      // A frozen "hard copy" of exactly what the winner owned when they
+      // saved — see game/players.js snapshotPortfolio + game/leaderboard.js.
+      portfolio: snapshotPortfolio(winner, assetPrices),
     });
     setSavedEntryId(entry.id);
-    playSound('badge');
+    setSavedRank(entry.rank);
+    // A Top 20 finish gets the bigger celebration; everyone else still gets
+    // the regular save-confirmation chime.
+    if (entry.rank >= 1 && entry.rank <= LEADERBOARD_TOP_HIGHLIGHT) {
+      playSound('applause');
+    } else {
+      playSound('badge');
+    }
   }
 
   return (
     <div className="vf-gameover">
+      <Fireworks />
       <div className="vf-topbar-corner">
         <VolumeControl />
+        <MusicControl />
       </div>
       <div className="vf-card vf-gameover__inner">
         <Brand size="md" align="center" />
@@ -78,6 +101,11 @@ export default function GameOverScreen({ state, onPlayAgain }) {
           {savedEntryId ? (
             <>
               <p className="vf-save-score__success">Nice work, {scoreName}! Your score is saved.</p>
+              {savedRank >= 1 && savedRank <= LEADERBOARD_TOP_HIGHLIGHT && (
+                <p className="vf-save-score__top20">
+                  👏 Top {LEADERBOARD_TOP_HIGHLIGHT}! You landed at #{savedRank} on the Leaderboard!
+                </p>
+              )}
               <button
                 type="button"
                 className="vf-btn vf-btn--primary vf-btn--block"

@@ -11,13 +11,61 @@
 // ============================================================================
 
 // ---------------------------------------------------------------------------
+// Difficulty presets — chosen at setup, controls the player challenge level
+// ---------------------------------------------------------------------------
+// Every player in the game (human or robot) starts from the same preset, so
+// the challenge level is consistent across the whole table. Add a new
+// preset here and it automatically shows up as a card on the setup screen —
+// see components/SetupScreen.jsx.
+export const DIFFICULTIES = [
+  {
+    id: 'easy',
+    name: 'KidStuff',
+    icon: '🌈',
+    tagline: 'Extra cash to learn the ropes, stress-free.',
+    startingCash: 800,
+    monthlyAllowance: 220,
+    startingSkillTokens: 2,
+  },
+  {
+    id: 'medium',
+    name: 'Middle of the Pack',
+    icon: '⚖️',
+    tagline: 'The classic VentureFlow challenge.',
+    startingCash: 500,
+    monthlyAllowance: 150,
+    startingSkillTokens: 1,
+  },
+  {
+    id: 'hard',
+    name: 'Hard Knocks',
+    icon: '🥊',
+    tagline: 'A tight budget — every choice counts.',
+    startingCash: 300,
+    monthlyAllowance: 90,
+    startingSkillTokens: 0,
+  },
+];
+
+export const DEFAULT_DIFFICULTY_ID = 'medium';
+
+export function getDifficulty(id) {
+  return DIFFICULTIES.find((d) => d.id === id) || DIFFICULTIES.find((d) => d.id === DEFAULT_DIFFICULTY_ID);
+}
+
+// ---------------------------------------------------------------------------
 // Core economy
 // ---------------------------------------------------------------------------
 export const GAME_LENGTH_MONTHS = 24;
 
-export const STARTING_CASH = 500;
-export const MONTHLY_ALLOWANCE = 150;
-export const STARTING_SKILL_TOKENS = 1;
+// These reflect the "Middle of the Pack" difficulty and exist as a fallback
+// default — e.g. for a game saved before difficulty presets existed. Every
+// actual new game reads its numbers from the chosen DIFFICULTIES entry
+// instead (see game/newGame.js).
+const DEFAULT_DIFFICULTY = getDifficulty(DEFAULT_DIFFICULTY_ID);
+export const STARTING_CASH = DEFAULT_DIFFICULTY.startingCash;
+export const MONTHLY_ALLOWANCE = DEFAULT_DIFFICULTY.monthlyAllowance;
+export const STARTING_SKILL_TOKENS = DEFAULT_DIFFICULTY.startingSkillTokens;
 
 export const SKILL_COST = 100;
 
@@ -249,3 +297,7 @@ export const BRAND_TAGLINE = `A ${PARENT_BRAND}™ game`;
 // ---------------------------------------------------------------------------
 export const LEADERBOARD_STORAGE_KEY = 'ventureflow-leaderboard-v1';
 export const LEADERBOARD_MAX_ENTRIES = 50;
+
+// A saved score ranking at or above this position gets the extra "Top 20"
+// thunderous-applause celebration on the game-over screen.
+export const LEADERBOARD_TOP_HIGHLIGHT = 20;

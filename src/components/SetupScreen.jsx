@@ -1,9 +1,11 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import '../styles/setup.css';
-import { STARTING_CASH, MONTHLY_ALLOWANCE, STARTING_SKILL_TOKENS, GAME_LENGTH_MONTHS } from '../data/gameConfig';
+import { DIFFICULTIES, DEFAULT_DIFFICULTY_ID, GAME_LENGTH_MONTHS } from '../data/gameConfig';
 import { playSound } from '../audio/soundEngine';
+import { playMusicTrack } from '../audio/musicEngine';
 import { isOffensiveName } from '../game/nameFilter';
 import VolumeControl from './VolumeControl';
+import MusicControl from './MusicControl';
 import Brand from './Brand';
 import LeaderboardModal from './LeaderboardModal';
 
@@ -28,6 +30,15 @@ export default function SetupScreen({ onStart }) {
   const [humanCount, setHumanCount] = useState(2);
   const [names, setNames] = useState(['', '', '']);
   const [showLeaderboard, setShowLeaderboard] = useState(false);
+  const [difficultyId, setDifficultyId] = useState(DEFAULT_DIFFICULTY_ID);
+  const difficulty = DIFFICULTIES.find((d) => d.id === difficultyId) || DIFFICULTIES[0];
+
+  // The opening theme plays here at normal volume — same track picks back
+  // up (no restart) if you land back here via "Play Again" from the
+  // game-over screen, since that screen plays the same track.
+  useEffect(() => {
+    playMusicTrack('theme');
+  }, []);
 
   const activeNameCount = modeId === 'solo' ? 1 : humanCount;
   const nameErrors = useMemo(
@@ -49,6 +60,11 @@ export default function SetupScreen({ onStart }) {
     setModeId(id);
   }
 
+  function selectDifficulty(id) {
+    playSound('click');
+    setDifficultyId(id);
+  }
+
   function handleStart() {
     if (hasInvalidName) {
       playSound('error');
@@ -56,9 +72,9 @@ export default function SetupScreen({ onStart }) {
     }
     playSound('business');
     if (modeId === 'solo') {
-      onStart({ type: 'solo', aiCount }, [names[0] || 'You']);
+      onStart({ type: 'solo', aiCount }, [names[0] || 'You'], difficultyId);
     } else {
-      onStart({ type: 'hotseat', humanCount }, names.slice(0, humanCount));
+      onStart({ type: 'hotseat', humanCount }, names.slice(0, humanCount), difficultyId);
     }
   }
 
@@ -71,6 +87,7 @@ export default function SetupScreen({ onStart }) {
     <div className="vf-setup">
       <div className="vf-topbar-corner">
         <VolumeControl />
+        <MusicControl />
         <button type="button" className="vf-btn vf-btn--sm vf-btn--ghost" onClick={openLeaderboard}>
           🏆 Leaderboard
         </button>
@@ -172,10 +189,30 @@ export default function SetupScreen({ onStart }) {
           )}
         </div>
 
+        <div>
+          <span className="vf-field-label">Challenge level</span>
+          <div className="vf-difficulty-grid">
+            {DIFFICULTIES.map((d) => (
+              <button
+                key={d.id}
+                type="button"
+                className={`vf-card vf-difficulty-card ${difficultyId === d.id ? 'vf-difficulty-card--active' : ''}`}
+                onClick={() => selectDifficulty(d.id)}
+              >
+                <span className="vf-difficulty-card__icon">{d.icon}</span>
+                <h3>{d.name}</h3>
+                <p>{d.tagline}</p>
+              </button>
+            ))}
+          </div>
+        </div>
+
         <div className="vf-setup__starting-info">
-          <span className="vf-pill">💵 Start with ${STARTING_CASH}</span>
-          <span className="vf-pill">📅 ${MONTHLY_ALLOWANCE}/mo allowance</span>
-          <span className="vf-pill">💡 {STARTING_SKILL_TOKENS} skill token</span>
+          <span className="vf-pill">💵 Start with ${difficulty.startingCash}</span>
+          <span className="vf-pill">📅 ${difficulty.monthlyAllowance}/mo allowance</span>
+          <span className="vf-pill">
+            💡 {difficulty.startingSkillTokens} skill token{difficulty.startingSkillTokens === 1 ? '' : 's'}
+          </span>
         </div>
 
         <div className="vf-setup__start">

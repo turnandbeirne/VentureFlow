@@ -1,22 +1,22 @@
 import { useEffect, useRef } from 'react';
 import { playSound } from '../audio/soundEngine';
+import { SOUNDS } from '../audio/soundLibrary';
 
-// Log entry kind -> sound effect name. Anything not in this map (or with no
-// kind at all) just stays silent — the log is used for plenty of things
-// that don't need audio.
-const KIND_SOUND = {
-  buy: 'buy',
-  sell: 'sell',
-  business: 'business',
-  skill: 'skill',
-  endTurn: 'endTurn',
-  payday: 'payday',
-  fortuneGood: 'fortuneGood',
-  fortuneBad: 'fortuneBad',
-  badge: 'badge',
-  weather: 'weather',
-  gameover: 'gameover',
-};
+/**
+ * Resolve a log entry's `kind` to a sound name. Most kinds map straight to
+ * an identically-named entry in SOUNDS (e.g. 'badge', 'weather'). Buy/sell
+ * are asset-specific ('buy_piggy', 'sell_treasure', ...) so each asset gets
+ * its own personality; if a future asset added to gameConfig.js doesn't
+ * have a matching entry yet, this falls back to the generic 'buy'/'sell'
+ * sound rather than staying silent.
+ */
+function resolveSound(kind) {
+  if (!kind) return null;
+  if (SOUNDS[kind]) return kind;
+  if (kind.startsWith('buy_')) return 'buy';
+  if (kind.startsWith('sell_')) return 'sell';
+  return null;
+}
 
 /**
  * Reactive sound layer: watches the shared event log and plays a sound for
@@ -50,7 +50,7 @@ export function useGameSounds(log) {
     if (log.length > seenCountRef.current) {
       const newEntries = log.slice(seenCountRef.current);
       for (const entry of newEntries) {
-        const soundName = entry.kind && KIND_SOUND[entry.kind];
+        const soundName = resolveSound(entry.kind);
         if (soundName) playSound(soundName);
       }
       seenCountRef.current = log.length;

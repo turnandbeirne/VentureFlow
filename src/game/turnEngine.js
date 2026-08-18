@@ -32,9 +32,13 @@ function resolveMonthEnd(state) {
   const logEntries = [];
   const month = state.month;
 
-  // 1) Allowance + rent + business income + card bonuses.
+  // 1) Allowance + rent + business income + card bonuses. Allowance comes
+  // from the difficulty preset chosen at setup (state.monthlyAllowance);
+  // MONTHLY_ALLOWANCE is only a fallback for a game saved before difficulty
+  // presets existed.
+  const allowance = state.monthlyAllowance ?? MONTHLY_ALLOWANCE;
   let players = state.players.map((p) => {
-    const income = MONTHLY_ALLOWANCE + passiveIncome(p);
+    const income = allowance + passiveIncome(p);
     return { ...p, cash: p.cash + income };
   });
   logEntries.push({ icon: '💰', message: `Payday! Everyone collected their allowance and passive income.`, kind: 'payday' });

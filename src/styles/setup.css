@@ -82,6 +82,47 @@
   gap: 1rem;
 }
 
+.vf-difficulty-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+}
+
+@media (max-width: 560px) {
+  .vf-difficulty-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.vf-difficulty-card {
+  padding: 0.9rem;
+  cursor: pointer;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  background: var(--vf-white);
+}
+
+.vf-difficulty-card--active {
+  background: var(--vf-yellow);
+}
+
+.vf-difficulty-card__icon {
+  font-size: 1.5rem;
+}
+
+.vf-difficulty-card h3 {
+  font-size: 0.98rem;
+}
+
+.vf-difficulty-card p {
+  color: var(--vf-ink-soft);
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+
 .vf-field-label {
   font-weight: 600;
   font-size: 0.95rem;

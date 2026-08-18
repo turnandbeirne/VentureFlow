@@ -34,12 +34,19 @@ export function buyAsset(state, playerId, assetId, qty = 1) {
     ...p,
     cash: p.cash - cost,
     holdings: { ...p.holdings, [assetId]: (p.holdings[assetId] || 0) + qty },
+    purchaseStats: {
+      ...p.purchaseStats,
+      [assetId]: {
+        qty: (p.purchaseStats?.[assetId]?.qty || 0) + qty,
+        spent: (p.purchaseStats?.[assetId]?.spent || 0) + cost,
+      },
+    },
   }));
 
   return {
     state: nextState,
     ok: true,
-    logEntry: { icon: asset.icon, message: `bought ${asset.name}`, kind: 'buy' },
+    logEntry: { icon: asset.icon, message: `bought ${asset.name}`, kind: `buy_${assetId}` },
   };
 }
 
@@ -63,7 +70,7 @@ export function sellAsset(state, playerId, assetId, qty = 1) {
   return {
     state: nextState,
     ok: true,
-    logEntry: { icon: asset.icon, message: `sold ${asset.name}`, kind: 'sell' },
+    logEntry: { icon: asset.icon, message: `sold ${asset.name}`, kind: `sell_${assetId}` },
   };
 }
 

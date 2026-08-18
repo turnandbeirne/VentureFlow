@@ -1,10 +1,22 @@
+import { useCallback } from 'react';
 import { ASSETS } from '../data/gameConfig';
+import { useHoldRepeat } from '../hooks/useHoldRepeat';
 
 function AssetCard({ asset, price, previousPrice, owned, cash, onBuy, onSell, disabled }) {
   const trendUp = price >= previousPrice;
   const trendPct = previousPrice ? Math.round(((price - previousPrice) / previousPrice) * 100) : 0;
   const canBuy = !disabled && cash >= price;
   const canSell = !disabled && owned > 0;
+
+  // Buy/Sell support press-and-hold: hold past a second and it starts
+  // auto-repeating, accelerating the longer it's held, so scooping up (or
+  // unwinding) a big stack isn't a wall of individual taps. canBuy/canSell
+  // are read fresh on every repeat tick via these callbacks so it stops the
+  // instant cash or holdings run out, rather than hammering a no-op.
+  const canBuyRef = useCallback(() => canBuy, [canBuy]);
+  const canSellRef = useCallback(() => canSell, [canSell]);
+  const buyHold = useHoldRepeat(onBuy, canBuyRef);
+  const sellHold = useHoldRepeat(onSell, canSellRef);
 
   return (
     <div className="vf-card vf-asset-card">
@@ -22,10 +34,10 @@ function AssetCard({ asset, price, previousPrice, owned, cash, onBuy, onSell, di
       {asset.rentPerMonth > 0 && <span className="vf-asset-card__rent">+${asset.rentPerMonth}/mo each</span>}
       <span className="vf-asset-card__owned">You have: {owned}</span>
       <div className="vf-asset-card__actions">
-        <button type="button" className="vf-btn vf-btn--go" disabled={!canBuy} onClick={onBuy}>
+        <button type="button" className="vf-btn vf-btn--go" disabled={!canBuy} {...buyHold}>
           Buy
         </button>
-        <button type="button" className="vf-btn vf-btn--danger" disabled={!canSell} onClick={onSell}>
+        <button type="button" className="vf-btn vf-btn--danger" disabled={!canSell} {...sellHold}>
           Sell
         </button>
       </div>
@@ -39,6 +51,7 @@ export default function AssetShop({ prices, previousPrices, player, disabled, on
       <div className="vf-section-title">
         <span>🛒</span>
         <span>Buy things that grow</span>
+        <span className="vf-section-title__hint">Hold Buy/Sell to go faster</span>
       </div>
       <div className="vf-shop-grid">
         {ASSETS.map((asset) => (
