@@ -46,7 +46,7 @@ export default function GameOverScreen({ state, onPlayAgain, onRecordProfileResu
   const [selectedPlayerId, setSelectedPlayerId] = useState(null);
   const selectedPlayer = selectedPlayerId ? players.find((p) => p.id === selectedPlayerId) : null;
 
-  const insights = buildInsights(winner);
+  const insights = buildInsights(winner, assetPrices);
 
   // Whichever human player did best this game "counts" toward the lifetime
   // profile (see game/profile.js) — the natural choice in solo mode (only

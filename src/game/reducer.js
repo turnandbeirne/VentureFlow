@@ -56,18 +56,35 @@ function appendLog(state, entries) {
   // would turn a nice, occasional touch into clutter. seenLessons tracks
   // which concepts have already been shown this game so each one only
   // surfaces once.
-  let seenLessons = state.seenLessons || [];
-  let lessonUsed = false;
-  const withLessons = stamped.map((entry) => {
-    if (lessonUsed) return entry;
-    const found = maybeAttachLesson(seenLessons, entry);
-    if (!found) return entry;
-    lessonUsed = true;
-    seenLessons = [...seenLessons, found.conceptId];
-    return { ...entry, lesson: found.lesson };
-  });
+  //
+  // WHO gets that one slot isn't just plain array order, though: a badge
+  // ('badge' kind) only ever logs once, ever — evaluateBadges never
+  // re-earns one — so if its lesson loses the race to something else in
+  // the same batch, it's gone for good this game. A recurring kind
+  // (fortuneGood, weather, ...) gets another shot the next time it
+  // happens, so it's the one that should yield. Concretely: a month-end
+  // batch logs fortune cards BEFORE badges (see turnEngine.js), and
+  // 'opportunity'/'emergencyFund' are almost always still unseen on month
+  // 1 — without this priority, a badge earned that same first month (e.g.
+  // Balanced Investor, easily hit on turn one) would nearly always lose
+  // its one-shot lesson to whichever fortune card got drawn first.
+  const seenLessons = state.seenLessons || [];
+  const priorityOrder = [...stamped.filter((e) => e.kind === 'badge'), ...stamped.filter((e) => e.kind !== 'badge')];
+  let winner = null;
+  let nextSeenLessons = seenLessons;
+  for (const entry of priorityOrder) {
+    const found = maybeAttachLesson(nextSeenLessons, entry);
+    if (found) {
+      winner = { id: entry.id, lesson: found.lesson };
+      nextSeenLessons = [...seenLessons, found.conceptId];
+      break;
+    }
+  }
+  // Original array order is preserved for display — only WHICH entry wins
+  // the lesson slot was decided by the priority scan above.
+  const withLessons = stamped.map((entry) => (winner && entry.id === winner.id ? { ...entry, lesson: winner.lesson } : entry));
 
-  const withLog = { ...state, log: [...state.log, ...withLessons].slice(-200), seenLessons };
+  const withLog = { ...state, log: [...state.log, ...withLessons].slice(-200), seenLessons: nextSeenLessons };
   return appendChat(withLog, reactToLogEntries(withLog, stamped));
 }
 

@@ -136,9 +136,9 @@ export const FINANCIAL_LESSONS = {
   },
   riskReward: {
     icon: '💎',
-    title: 'Risk and reward',
+    title: 'Speculation vs. investing',
     blurb:
-      "Treasure Chest bounces around a lot more than Piggy Bank — that's called risk. Riskier things can grow faster, but they can also drop faster. A smart rule: only risk money you can afford to lose.",
+      "Treasure Chest never pays you anything the way Tree House rent or Lemonade Stand's earnings do — its whole value is just whatever someone else is willing to pay for it next. That's called speculation, the same idea behind a trendy collectible or a cryptocurrency: it can be exciting on the way up, but there's nothing backing the price except hope, so it can fall just as fast. A smart rule: only speculate with money you can afford to lose.",
   },
   marketCycles: {
     icon: '🌦️',
@@ -175,6 +175,12 @@ export const FINANCIAL_LESSONS = {
     title: 'Reinvesting in what you own',
     blurb:
       "Putting more money into something you already have — like upgrading a business instead of starting a brand new one — is called reinvesting. It's one of the most reliable ways to make something you own grow even more.",
+  },
+  diversification: {
+    icon: '🧺',
+    title: "Don't put all your eggs in one basket",
+    blurb:
+      "Spreading your money across a few different things instead of going all-in on one is called diversification. If one thing drops, the others can help balance it out — it's one of the simplest ways to lower your risk without giving up on growth.",
   },
 };
 
@@ -335,14 +341,23 @@ export const ASSETS = [
   },
   {
     id: 'treasure',
-    name: 'Treasure Chest',
+    name: 'Treasure Chest (or speculative crypto)',
     icon: '💎',
-    tagline: 'Big risk, big reward',
+    tagline: 'No income — pure speculation',
     kind: 'risky',
     basePrice: 100,
     volatility: 0.40,
     rentPerMonth: 0,
     riskLabel: 'High Risk',
+    // Unlike every other asset, Treasure Chest is deliberately given ZERO
+    // cash-flow story of any kind — no rentPerMonth, no weatherIncomeRange.
+    // That's the whole point: its price only moves because someone else is
+    // willing to pay more (or less) for it later, with nothing backing that
+    // up. That's speculation, not investing — the same idea behind a
+    // trendy collectible or a cryptocurrency — and FINANCIAL_LESSONS.riskReward
+    // below (triggered on a player's first purchase — see game/lessons.js)
+    // says so explicitly instead of leaving the highest-volatility asset in
+    // the game to read as an unexplained gamble.
   },
 ];
 
@@ -516,6 +531,14 @@ export const BADGES = [
     kind: 'assetHoldingAtLeast',
     value: 5,
     assetId: 'piggy',
+  },
+  {
+    id: 'balancedInvestor',
+    name: 'Balanced Investor',
+    icon: '🧺',
+    description: 'Own 3 or more different kinds of assets at once',
+    kind: 'assetDiversityAtLeast',
+    value: 3,
   },
 ];
 

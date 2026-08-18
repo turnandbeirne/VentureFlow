@@ -26,6 +26,15 @@ const CONCEPT_BY_KIND = {
   businessUpgrade: 'reinvestment',
 };
 
+// A badge earning entry is `kind: 'badge'` for every badge (see
+// turnEngine.js), which normally teaches the generic "badges track good
+// habits" lesson above. A badge that deserves a MORE specific concept gets
+// looked up here first, by its own badgeId, falling back to the generic
+// 'badge' -> 'goodHabits' mapping for every other badge.
+const CONCEPT_BY_BADGE_ID = {
+  balancedInvestor: 'diversification',
+};
+
 /**
  * Given the concept ids already shown this game and one newly-stamped log
  * entry, return `{ conceptId, lesson }` if this entry should teach a new
@@ -34,7 +43,8 @@ const CONCEPT_BY_KIND = {
  * for actually attaching the result and recording the conceptId as seen.
  */
 export function maybeAttachLesson(seenLessons, entry) {
-  const conceptId = CONCEPT_BY_KIND[entry?.kind];
+  const conceptId =
+    (entry?.kind === 'badge' && CONCEPT_BY_BADGE_ID[entry.badgeId]) || CONCEPT_BY_KIND[entry?.kind];
   if (!conceptId) return null;
   if ((seenLessons || []).includes(conceptId)) return null;
   const lesson = FINANCIAL_LESSONS[conceptId];

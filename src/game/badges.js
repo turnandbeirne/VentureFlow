@@ -11,13 +11,20 @@
 // VentureScouts integration can read from to sync earned badges externally
 // — see exportBadgeEvents() below.
 // ============================================================================
-import { BADGES } from '../data/gameConfig';
+import { ASSETS, BADGES } from '../data/gameConfig';
 import { passiveIncome } from './players';
 
 const CHECKERS = {
   passiveIncomeAtLeast: (player, badge, context) => passiveIncome(player, context) >= badge.value,
   businessCountAtLeast: (player, badge) => player.businesses.length >= badge.value,
   assetHoldingAtLeast: (player, badge) => (player.holdings[badge.assetId] || 0) >= badge.value,
+  // How many DIFFERENT asset kinds a player currently holds any of at all
+  // (mirrors game/insights.js's diversityCount, kept separate rather than
+  // shared since that one only needs a player and this one needs the badge
+  // threshold too) — rewards spreading out, not just owning a lot of one
+  // thing.
+  assetDiversityAtLeast: (player, badge) =>
+    ASSETS.filter((a) => (player.holdings[a.id] || 0) > 0).length >= badge.value,
 };
 
 /**

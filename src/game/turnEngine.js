@@ -131,7 +131,11 @@ function resolveMonthEnd(state) {
   players = players.map((p) => {
     const { player, newlyEarned } = evaluateBadges(p, month, badgeContext);
     for (const badge of newlyEarned) {
-      newlyEarnedLog.push({ icon: badge.icon, message: `${p.name} earned the ${badge.name} badge!`, playerId: p.id, kind: 'badge' });
+      // badgeId lets game/lessons.js teach a MORE specific concept than
+      // the generic "badges track good habits" lesson for a badge that
+      // deserves its own (currently just balancedInvestor -> the
+      // diversification lesson) — see lessons.js's CONCEPT_BY_BADGE_ID.
+      newlyEarnedLog.push({ icon: badge.icon, message: `${p.name} earned the ${badge.name} badge!`, playerId: p.id, kind: 'badge', badgeId: badge.id });
     }
     return player;
   });

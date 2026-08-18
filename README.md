@@ -861,3 +861,67 @@ behavior, just a second, more specific way in. (Nesting a real `<button>`
 inside the outer clickable card meant the card itself could no longer be a
 `<button>` — it's now a `<div role="button">` with the same click handler
 plus Enter/Space keyboard support, so accessibility didn't regress.)
+
+## Treasure Chest: an honest speculation lesson, not just an unexplained gamble
+
+Treasure Chest had the highest volatility in the game (0.40 — more than
+double Lemonade Stand's) and, unlike every other asset, absolutely no
+cash-flow mechanic of any kind: no rent, no weather-driven income, nothing.
+That's the correct design — it's supposed to be the one purely speculative
+asset at the table — but the game never actually *said* that, so it read as
+an unexplained "sometimes the shiny one goes up a lot, sometimes it
+crashes" rather than a lesson. Renamed to **Treasure Chest (or speculative
+crypto)** with a "No income — pure speculation" tagline, and the financial
+lesson that fires on a player's first purchase (`FINANCIAL_LESSONS.riskReward`
+in `gameConfig.js`, triggered via the existing `buy_treasure` → lesson hook
+in `game/lessons.js`) now explicitly teaches *why* it's risky: it never
+pays you anything the way Tree House rent or Lemonade Stand's earnings do,
+so its whole value is just whatever someone else is willing to pay for it
+next — speculation, the same idea behind a trendy collectible or a
+cryptocurrency, not investing. The asset's mechanics themselves are
+unchanged; this is a labeling and lesson-content fix, not a new mechanic.
+
+That reframes *what* the risk is, but the more useful lesson for a kids'
+game is probably *what to do about it* — hence two smaller additions
+alongside the rename:
+
+- **A new "Balanced Investor" badge** (`gameConfig.js`'s `BADGES`, a new
+  `assetDiversityAtLeast` checker in `badges.js`) for holding 3+ different
+  kinds of assets at once, with its own dedicated financial lesson
+  ("Don't put all your eggs in one basket" — `FINANCIAL_LESSONS.diversification`)
+  instead of the generic "badges track good habits" every other badge
+  triggers. `game/lessons.js` now looks up a badge's own id
+  (`CONCEPT_BY_BADGE_ID`) before falling back to the generic mapping, so
+  future badges can get their own specific "why" too without disturbing
+  the ones that don't need it.
+- **A named concentration warning at game-over** — `game/insights.js`'s
+  low-diversity insight used to just say "spreading out usually lowers
+  your risk" with no specifics. It now checks whether a player ended the
+  game heavily concentrated (≥40% of net worth) in something genuinely
+  volatile (Lemonade Stand's volatility or higher) and, if so, names it
+  directly: "62% of your money was in Treasure Chest (or speculative
+  crypto) by the end — the most volatile thing you held... likely why your
+  net worth swung around the most this game." This is a current-holdings
+  approximation, not a true month-by-month causal reconstruction (the game
+  doesn't keep a per-player, per-asset value history to compute that
+  precisely) — documented as such in the code — but naming the actual
+  culprit asset is a real improvement over the old generic nudge. Concentration
+  in something *safe* (e.g. all Piggy Bank) deliberately does NOT trigger
+  this warning — being concentrated isn't inherently risky, only being
+  concentrated in something volatile is.
+
+One reliability fix came out of building the badge lesson: `reducer.js`'s
+`appendLog()` only ever attaches one financial lesson per batch of log
+entries (so a single month-end resolution doesn't fire three lessons at
+once), previously just picking whichever qualifying entry happened to come
+first in the array. Month-end logs fortune cards *before* badges, and on
+month 1 essentially every fortune card qualifies for a still-unseen
+lesson — so a badge earned on turn one (Balanced Investor is easy to hit
+immediately) would almost always lose that race and silently never show
+its lesson, forever, since a badge only ever logs once. `appendLog` now
+gives badge-earned entries first crack at that single slot — a recurring
+kind like `fortuneGood` gets another shot the next time it happens, but a
+one-shot badge doesn't, so it's the one that should yield. Verified with a
+dedicated Playwright test that reproduces exactly this scenario (diversify
+into 3 assets on turn one) and confirms the diversification lesson now
+actually appears.
