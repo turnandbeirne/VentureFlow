@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { getDifficulty } from '../data/gameConfig';
 import { useLeaderboard } from '../hooks/useLeaderboard';
 import { playSound } from '../audio/soundEngine';
 
@@ -10,6 +11,15 @@ function formatDate(ts) {
   } catch {
     return '';
   }
+}
+
+/** "🥊 Hard Knocks" etc, or "—" for a score saved before difficulty presets
+ * existed — deliberately NOT falling back to a default difficulty here,
+ * since that would misrepresent what an old entry actually played on. */
+function difficultyLabel(difficultyId) {
+  if (!difficultyId) return '—';
+  const d = getDifficulty(difficultyId);
+  return `${d.icon} ${d.name}`;
 }
 
 /** Read-only breakdown of a leaderboard entry's frozen portfolio snapshot
@@ -60,7 +70,7 @@ function PortfolioSnapshot({ portfolio }) {
         <div className="vf-portfolio__businesses">
           {portfolio.businesses.map((biz) => (
             <div key={biz.id} className="vf-portfolio__business-row">
-              <span>🚀 Business #{biz.index}</span>
+              <span>🚀 {biz.name || `Business #${biz.index}`}</span>
               <span className="vf-portfolio__business-income">+${biz.income}/mo</span>
             </div>
           ))}
@@ -120,6 +130,9 @@ export default function LeaderboardModal({ open, onClose, highlightId }) {
                   <span className="vf-leaderboard__avatar">{entry.avatar}</span>
                   <span className="vf-leaderboard__name">{entry.name}</span>
                   <span className="vf-leaderboard__mode">{MODE_LABEL[entry.mode] || entry.mode}</span>
+                  <span className="vf-leaderboard__difficulty" title="Challenge level">
+                    {difficultyLabel(entry.difficultyId)}
+                  </span>
                   <span className="vf-leaderboard__date">{formatDate(entry.playedAt)}</span>
                   <span className="vf-leaderboard__score">${entry.netWorth.toLocaleString()}</span>
                 </button>

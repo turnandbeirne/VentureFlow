@@ -7,8 +7,25 @@
 // (aiEngine.js) call through here — one set of rules, two callers.
 // ============================================================================
 import { getAssetConfig } from './market';
-import { BUSINESS_COST, BUSINESS_SKILL_COST, BUSINESS_INCOME_MIN, BUSINESS_INCOME_MAX, SKILL_COST } from '../data/gameConfig';
-import { randomInt } from './rng';
+import {
+  BUSINESS_COST,
+  BUSINESS_SKILL_COST,
+  BUSINESS_INCOME_MIN,
+  BUSINESS_INCOME_MAX,
+  SKILL_COST,
+  BUSINESS_NAMES,
+} from '../data/gameConfig';
+import { randomInt, pickRandom } from './rng';
+
+/** A random whimsical name for a new business, preferring one this player
+ * hasn't already used this game (500 names is far more than any game will
+ * exhaust, but a player 500 businesses deep just gets a repeat rather than
+ * an error). */
+function pickBusinessName(existingBusinesses) {
+  const used = new Set(existingBusinesses.map((b) => b.name).filter(Boolean));
+  const available = BUSINESS_NAMES.filter((name) => !used.has(name));
+  return pickRandom(available.length > 0 ? available : BUSINESS_NAMES);
+}
 
 function updatePlayer(state, playerId, updater) {
   return {
@@ -46,7 +63,7 @@ export function buyAsset(state, playerId, assetId, qty = 1) {
   return {
     state: nextState,
     ok: true,
-    logEntry: { icon: asset.icon, message: `bought ${asset.name}`, kind: `buy_${assetId}` },
+    logEntry: { icon: asset.icon, message: `bought ${asset.name}`, kind: `buy_${assetId}`, playerId },
   };
 }
 
@@ -70,7 +87,7 @@ export function sellAsset(state, playerId, assetId, qty = 1) {
   return {
     state: nextState,
     ok: true,
-    logEntry: { icon: asset.icon, message: `sold ${asset.name}`, kind: `sell_${assetId}` },
+    logEntry: { icon: asset.icon, message: `sold ${asset.name}`, kind: `sell_${assetId}`, playerId },
   };
 }
 
@@ -81,7 +98,8 @@ export function startBusiness(state, playerId) {
   if (player.skillTokens < BUSINESS_SKILL_COST) return { state, ok: false, error: 'Not enough skill tokens.' };
 
   const income = randomInt(BUSINESS_INCOME_MIN, BUSINESS_INCOME_MAX);
-  const business = { id: `${playerId}-biz-${player.businesses.length + 1}`, income };
+  const name = pickBusinessName(player.businesses);
+  const business = { id: `${playerId}-biz-${player.businesses.length + 1}`, name, income };
 
   const nextState = updatePlayer(state, playerId, (p) => ({
     ...p,
@@ -93,7 +111,7 @@ export function startBusiness(state, playerId) {
   return {
     state: nextState,
     ok: true,
-    logEntry: { icon: '🚀', message: `started a business (+$${income}/mo)`, kind: 'business' },
+    logEntry: { icon: '🚀', message: `started ${name} (+$${income}/mo)`, kind: 'business', playerId },
   };
 }
 
@@ -111,6 +129,6 @@ export function learnSkill(state, playerId) {
   return {
     state: nextState,
     ok: true,
-    logEntry: { icon: '📚', message: 'learned a new skill', kind: 'skill' },
+    logEntry: { icon: '📚', message: 'learned a new skill', kind: 'skill', playerId },
   };
 }

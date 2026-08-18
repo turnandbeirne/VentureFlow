@@ -138,6 +138,10 @@ export const SOUNDS = {
   // Soft UI tap — mode selection, dismiss buttons, generic clicks.
   click: [note(520, 0, 0.06, 'triangle', 0.5)],
 
+  // A bot chat bubble popping in — quick, light, unobtrusive (this can fire
+  // several times in a row during a lively exchange, so it stays tiny).
+  chat: [note(740, 0, 0.045, 'sine', 0.3), note(950, 0.04, 0.05, 'sine', 0.22)],
+
   // Generic buy/sell fallback — used only if an asset added later (see
   // gameConfig.js ASSETS) doesn't have its own buy_<id>/sell_<id> below.
   buy: [note(660, 0, 0.09, 'triangle', 0.7), note(880, 0.06, 0.11, 'triangle', 0.6)],
@@ -225,6 +229,48 @@ export const SOUNDS = {
 
   // Thunderous applause — played when a saved score lands in the Top 20.
   applause: buildApplause,
+
+  // ---------------------------------------------------------------------
+  // Bot goof-off sound effects — see game/chatEngine.js's
+  // generateBotTurnFlavor() and gameConfig.js BOT_PERSONALITIES' sfxPool.
+  // Each robot has a chance, on its own turn, to play one of these silly
+  // noises instead of (or alongside) a spoken line. All original
+  // synthesized bits — no sampled/licensed audio — just built to hit the
+  // same goofy notes as a fart, a burp, a hype shout, a groan, a "take
+  // that back!", a cartoon laugh, a screech, and a mock-dramatic hero
+  // sting.
+  // ---------------------------------------------------------------------
+  botFart: [
+    note(150, 0, 0.06, 'sawtooth', 0.45),
+    note(110, 0.05, 0.06, 'sawtooth', 0.45),
+    note(90, 0.1, 0.08, 'sawtooth', 0.4),
+    note(70, 0.17, 0.14, 'sawtooth', 0.35),
+    noise(0, 0.32, { gain: 0.28, filterType: 'lowpass', filterFreq: 500, filterFreqEnd: 150, filterQ: 1, attack: 0.005 }),
+  ],
+  botBurp: [
+    sweep(220, 90, 0, 0.28, 'sawtooth', 0.5),
+    noise(0, 0.12, { gain: 0.22, filterType: 'lowpass', filterFreq: 600, filterQ: 0.8, attack: 0.003 }),
+  ],
+  botOhYeah: [
+    sweep(300, 700, 0, 0.22, 'sawtooth', 0.5),
+    note(880, 0.2, 0.12, 'triangle', 0.45),
+    note(660, 0.3, 0.12, 'triangle', 0.4),
+  ],
+  botGroan: [sweep(300, 150, 0, 0.5, 'sawtooth', 0.4), sweep(280, 140, 0.05, 0.5, 'triangle', 0.25)],
+  botTakeItBack: [sweep(500, 900, 0, 0.15, 'square', 0.4), note(200, 0.16, 0.14, 'square', 0.45)],
+  botLaugh: [
+    note(440, 0, 0.08, 'square', 0.4),
+    note(370, 0.09, 0.08, 'square', 0.4),
+    note(440, 0.19, 0.08, 'square', 0.4),
+    note(370, 0.28, 0.08, 'square', 0.4),
+    note(490, 0.38, 0.12, 'square', 0.42),
+  ],
+  botScreech: [noise(0, 0.35, { gain: 0.4, filterType: 'bandpass', filterFreq: 2600, filterFreqEnd: 3400, filterQ: 6, attack: 0.01 })],
+  botHeroSting: [
+    note(196, 0, 0.14, 'sawtooth', 0.5),
+    note(196, 0.16, 0.14, 'sawtooth', 0.5),
+    sweep(220, 440, 0.32, 0.24, 'sawtooth', 0.55),
+  ],
 
   // Something couldn't be done (reserved for future use).
   error: [note(220, 0, 0.12, 'square', 0.35)],

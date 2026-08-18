@@ -202,6 +202,21 @@ percentage versus that average — plus rent earned per month where relevant
 (Tree House). Below that is a list of every business the player has started,
 each with its own individual monthly cash flow, and a total.
 
+Each new business gets a whimsical name instead of a generic "Business #1" —
+`gameConfig.js`'s `BUSINESS_NAMES` is a pool of 500 kid-funny options (things
+like "Auntie Betty's Bakery" or "Buttons' Bangs and Clangs Comic Shop") that
+`game/actions.js`'s `startBusiness()` picks from at random, preferring a name
+the player hasn't already used that game so a player running several
+businesses doesn't see repeats. The name is stored on the business itself
+(`business.name`) and shown everywhere a business appears — the event log,
+this portfolio modal, and a saved leaderboard snapshot — with every
+`Business #N`-style fallback still in place for businesses started before
+this feature existed (they simply have no `.name` and fall back to their
+index). Add more options by appending to `BUSINESS_NAMES`; every entry is
+also run through `nameFilter.js`'s `isOffensiveName()` at build/generation
+time as a sanity check, though the pool is hand-curated to be kid-appropriate
+so nothing should ever actually trip it at runtime.
+
 Average purchase price is tracked per player per asset in
 `game/players.js`'s `purchaseStats` (`{ qty, spent }`, accumulated on every
 buy in `game/actions.js`) and read via the `avgPurchasePrice()` selector —
@@ -225,6 +240,135 @@ existed). A small pill in the corner of the game board shows which
 difficulty is active, since a 24-month game is long enough to forget. Add a
 new preset by adding an entry to `DIFFICULTIES` — it automatically appears
 as a card on the setup screen.
+
+## Robot personalities and skill levels
+
+Each robot opponent in Solo mode is one of seven named personalities —
+Leeroy Jenkins, BossEmby, MrB, MrGrinch, DaddyBigBux, MoneyMama, and
+GrumpyMommy — defined in `gameConfig.js`'s `BOT_PERSONALITIES` array, each
+with its own avatar, a one-line `blurb`, and a `strategyId` that picks a
+scoring profile in `game/aiEngine.js`'s `STRATEGIES` table. That profile is
+just a set of score multipliers (plus a couple of behavior flags) layered on
+top of the same base greedy AI every robot always used — so Leeroy
+(`reckless`) ignores stormy weather and charges into risky assets and
+businesses, MrGrinch (`hoarder`) piles almost everything into the Piggy
+Bank and rarely starts a business, DaddyBigBux (`tycoon`) chases businesses
+and skill tokens above all else, GrumpyMommy (`contrarian`) deliberately
+plays the weather backwards (buying when everyone else is retreating and
+vice versa), and so on for BossEmby (`flipper`), MoneyMama (`saver`), and
+MrB (`balanced`, the original unweighted behavior).
+
+Separately, each robot also gets a skill level — Rookie 🐣, Sharp 🧠, or
+Shark 🦈 (`gameConfig.js`'s `SKILL_LEVELS`) — that's independent of
+personality and controls how *well* it plays rather than *what* it prefers:
+a `SKILL_PROFILES` entry in `aiEngine.js` sets how much cash it always
+leaves idle (`cashBuffer`), how many moves it's willing to make in one turn
+(`maxSteps`), and how often it plays a random affordable move instead of its
+best-scoring one (`mistakeChance`) — Rookie fumbles fairly often, Shark
+almost never does.
+
+At setup, for each robot the player either picks a specific personality and
+skill level from a pair of dropdowns, or leaves either (or both) on "🎲
+Random." Selections flow from `SetupScreen.jsx`'s `botConfigs` state through
+`useGame.startGame()` → the reducer → `game/newGame.js` →
+`game/players.js`'s `createPlayerRoster()`, which resolves each `random`
+into an actual personality/skill (avoiding handing two robots at the same
+table the same personality when rolling randomly) and copies the resolved
+`personalityId`, `strategyId`, and `skillLevelId` directly onto the player
+object — not looked up live against the config tables — so a future edit to
+a personality's strategy here never rewrites how an already-in-progress or
+saved game plays. A robot's chosen personality also becomes its display name
+and avatar everywhere (player cards, event log, leaderboard), and tapping
+its card shows its blurb and skill level in the portfolio modal. Games saved
+before this feature existed have robots with none of these three fields;
+`aiEngine.js` and the UI both fall back gracefully (`balanced` strategy,
+`sharp` skill, a plain "AI player" tooltip, no blurb) rather than breaking.
+
+While building this out, `game/aiEngine.js`'s `isGoodWeather()` turned out to
+be reading a `mood` field that `gameConfig.js`'s `WEATHER_STAGES` never
+actually set — every robot was treating every month as bad weather (retreat
+mode), regardless of what the sky actually looked like. Fixed by adding
+`mood: 'boom' | 'peak' | 'dip' | 'bust' | 'rebound'` to each stage, matching
+the `GOOD_MOODS` set `aiEngine.js` already checked against. Worth knowing if
+robot behavior in an older build looked oddly cautious across the board.
+
+## Robot chat
+
+Robots comment on the game as it happens, in their own voice —
+`gameConfig.js`'s `BOT_CHAT_LINES` holds a bank of lines per personality per
+category (greeting, question, tease, challenge, compliment, applause, gloat,
+sympathy, weatherGood/weatherBad, and botBanter — a bot addressing another
+bot by name), and `game/chatEngine.js` picks when and who gets to speak.
+
+The trigger point is a single choke point: every log entry that already
+flows into the event log (a business started, a badge earned, a fortune
+card, the weather shifting, a turn starting, the game ending — see
+`actions.js` / `turnEngine.js` / `aiEngine.js`'s `kind`-tagged log entries)
+is offered to `chatEngine.js`'s `reactToLogEntries()` inside `reducer.js`'s
+`appendLog()`, which decides — per event kind, with its own trigger chance —
+whether a robot reacts, and if so, picks one, picks a line from its
+personality's bank for the right category, and fills in `{player}`/`{bot}`.
+High-volume events (a single buy or sell) trigger rarely (~5%) so the feed
+doesn't turn into noise; rare, exciting ones (a badge, the game ending)
+trigger often (75-70%). A turn starting has its own small ambient chance
+(`kind: 'endTurn'`) to have a robot greet/tease/question/challenge the
+player whose turn it now is — or, if it's another robot's turn, a quick
+`botBanter` aside — which is also how "bot to bot" chat happens; on top of
+that, any reaction has a further chance of a second robot chiming in right
+after with a `botBanter` follow-up aimed at whoever just spoke, so a business
+start or a big win can turn into a short back-and-forth between two robots.
+Solo mode caps at 2 robots, so bot-to-bot chat is always exactly those two.
+Game start gets its own one-time `generateGreeting()` call (every robot
+introduces itself) since the very first log entry hasn't happened yet.
+
+Only robots with a `personalityId` ever speak — a game (or a specific robot
+within it) saved before this feature existed has none, and just stays quiet
+rather than crashing or talking with a generic voice. Chat lives in
+`state.chat` (parallel to `state.log`, capped at the most recent 60), shown
+in `components/ChatPanel.jsx` on the game board. `GameOverScreen.jsx` also
+pulls the tail of `state.chat` filtered to `gloat`/`applause` lines to show
+the robots' closing thoughts under the final standings.
+
+### Goof-off sound effects and hype quotes
+
+On top of reacting to events, each robot also gets an independent, separate
+roll once per turn it takes (`game/reducer.js`'s `RUN_AI_TURN` case calls
+`chatEngine.js`'s `generateBotTurnFlavor()`) for two unrelated bits of
+flavor: a goof-off sound effect (~22% chance) and an unprompted money/
+winning catchphrase (~16% chance) — either, both, or neither can land on any
+given turn. The sound effects — a fart, a burp, a hype "OH YEAAAAH!", a
+groan, a mock-indignant "take that back!", a big cartoon laugh, a screech,
+and a mock-dramatic hero one-liner — are original synthesized Web Audio
+recipes in `audio/soundLibrary.js` (`botFart`/`botBurp`/`botOhYeah`/etc., no
+sampled or licensed audio, same approach as every other sound in the game),
+picked from that personality's own `sfxPool` on its `gameConfig.js`
+`BOT_PERSONALITIES` entry (Leeroy Jenkins reaches for the hype shout and
+hero sting, MrGrinch for groans and burps, GrumpyMommy even keeps a fart in
+her back pocket) — a chat entry tagged `category: 'sfx'` carries the actual
+`sound` name and a short caption (e.g. `*BURRRP*`) so the feed still shows
+*something* even though the point is the noise. The catchphrases are a new
+`hype` category in `BOT_CHAT_LINES`, each personality's own take on money/
+winning slang ("earnin' and burnin', baby," "bet!," "sus...," "that's cap!,"
+"six... seven" all make an appearance, voiced differently per bot — MrB
+finds the slang bewildering, GrumpyMommy is suspicious of it on principle).
+
+Sound playback for the chat feed is its own reactive layer,
+`hooks/useChatSounds.js` (mirrors `useGameSounds.js`'s approach for the
+event log): it watches `state.chat` and plays `entry.sound` for an `sfx`
+entry, or the light generic `chat` pop for every other new line, mounted
+once in `App.jsx` so it works no matter which screen is showing.
+
+### Color-coded chat
+
+Every `BOT_PERSONALITIES` entry also has a `color`, and every chat entry
+`chatEngine.js` creates carries that color along with it (`say()`'s single
+choke point, so nothing has to remember to set it). `components/
+ChatPanel.jsx` exports a shared `ChatEntryRow` (reused by `GameOverScreen`'s
+closing-chat section too) that tints each bubble's left border and speaker
+name with `entry.color`, falling back to a neutral gray for an entry saved
+before this field existed — so each bot reads as visually distinct at a
+glance, on top of its avatar icon. An `sfx`-category entry additionally gets
+a dashed border and italic caption so it reads as "a noise," not a sentence.
 
 ## Hold-to-repeat buying and selling
 
@@ -260,8 +404,15 @@ with their in-game name, editable) and optionally attach an email, then
 "Save My Score." The email is stored on the entry for VentureMaker's own
 use (e.g. a future "you made the leaderboard!" follow-up) but no rendering
 code ever reads it back out — `LeaderboardModal.jsx` only ever displays
-name/avatar/net worth/mode/date/portfolio. Open the leaderboard from the
-trophy button on any screen.
+name/avatar/net worth/mode/difficulty/date/portfolio. Open the leaderboard
+from the trophy button on any screen.
+
+Each row also shows which difficulty preset (see "Difficulty presets" above)
+that run was played on — `entry.difficultyId` is saved alongside the score
+and rendered next to the mode as an icon + label (e.g. "🥊 Hard Knocks") via
+`LeaderboardModal.jsx`'s `difficultyLabel()`. Entries saved before this
+feature existed have no `difficultyId`, and deliberately show "—" rather than
+guessing a default, since that would misrepresent what was actually played.
 
 Saving a score also attaches a frozen "hard copy" snapshot of the winner's
 portfolio at that exact moment — how much of each asset they owned and their

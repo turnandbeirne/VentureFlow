@@ -6,7 +6,7 @@ import { createPlayerRoster } from './players';
 import { createInitialPrices } from './market';
 import { createWeatherState } from './weather';
 
-export function createNewGame(mode, humanNames = [], difficultyId = DEFAULT_DIFFICULTY_ID) {
+export function createNewGame(mode, humanNames = [], difficultyId = DEFAULT_DIFFICULTY_ID, botConfigs = []) {
   const difficulty = getDifficulty(difficultyId);
   return {
     status: 'playing', // 'playing' | 'monthRecap' | 'gameover'
@@ -18,9 +18,10 @@ export function createNewGame(mode, humanNames = [], difficultyId = DEFAULT_DIFF
     weather: createWeatherState(),
     assetPrices: createInitialPrices(),
     previousAssetPrices: createInitialPrices(),
-    players: createPlayerRoster(mode, humanNames, difficulty),
+    players: createPlayerRoster(mode, humanNames, difficulty, botConfigs),
     activePlayerIndex: 0,
     log: [],
+    chat: [], // bot personality chat feed — see game/chatEngine.js
     fortuneRecap: [],
     fortuneRecapIndex: 0,
     winnerId: null,

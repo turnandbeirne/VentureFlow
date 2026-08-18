@@ -9,6 +9,7 @@ import PlayerPanel from './PlayerPanel';
 import AssetShop from './AssetShop';
 import ActionBar from './ActionBar';
 import EventLog from './EventLog';
+import ChatPanel from './ChatPanel';
 import FortuneCardModal from './FortuneCardModal';
 import VolumeControl from './VolumeControl';
 import MusicControl from './MusicControl';
@@ -18,7 +19,8 @@ import PlayerDetailModal from './PlayerDetailModal';
 
 export default function GameBoard({ game }) {
   const { state } = game;
-  const { players, activePlayerIndex, weather, assetPrices, previousAssetPrices, month, totalMonths, log, status } = state;
+  const { players, activePlayerIndex, weather, assetPrices, previousAssetPrices, month, totalMonths, log, chat, status } =
+    state;
   const difficulty = getDifficulty(state.difficultyId);
   const [showLeaderboard, setShowLeaderboard] = useState(false);
   const [selectedPlayerId, setSelectedPlayerId] = useState(null);
@@ -130,6 +132,8 @@ export default function GameBoard({ game }) {
           onLearnSkill={() => game.learnSkill(activePlayer.id)}
           onDone={() => game.endTurn(activePlayer.id)}
         />
+
+        <ChatPanel chat={chat} />
 
         <EventLog log={log} />
       </div>

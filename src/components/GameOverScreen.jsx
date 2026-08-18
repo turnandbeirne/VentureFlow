@@ -11,11 +11,18 @@ import MusicControl from './MusicControl';
 import Brand from './Brand';
 import LeaderboardModal from './LeaderboardModal';
 import Fireworks from './Fireworks';
+import { ChatEntryRow } from './ChatPanel';
 
 export default function GameOverScreen({ state, onPlayAgain }) {
-  const { players, assetPrices, winnerId, mode } = state;
+  const { players, assetPrices, winnerId, mode, difficultyId } = state;
   const ranked = [...players].sort((a, b) => netWorth(b, assetPrices) - netWorth(a, assetPrices));
   const winner = players.find((p) => p.id === winnerId) || ranked[0];
+
+  // The robots' closing thoughts — gloating if one of them won, applauding
+  // whoever did (see game/chatEngine.js's 'gameover' reaction). Naturally
+  // the most recent chat entries, since they're generated the instant the
+  // game ends.
+  const closingChat = (state.chat || []).filter((c) => c.category === 'gloat' || c.category === 'applause').slice(-4);
 
   const { addEntry } = useLeaderboard();
   const [scoreName, setScoreName] = useState(winner.name);
@@ -49,6 +56,7 @@ export default function GameOverScreen({ state, onPlayAgain }) {
       avatar: winner.avatar,
       netWorth: netWorth(winner, assetPrices),
       mode: mode?.type,
+      difficultyId,
       email: scoreEmail,
       // A frozen "hard copy" of exactly what the winner owned when they
       // saved — see game/players.js snapshotPortfolio + game/leaderboard.js.
@@ -92,6 +100,14 @@ export default function GameOverScreen({ state, onPlayAgain }) {
             </div>
           ))}
         </div>
+
+        {closingChat.length > 0 && (
+          <div className="vf-card vf-gameover__chat">
+            {closingChat.map((c) => (
+              <ChatEntryRow key={c.id} entry={c} />
+            ))}
+          </div>
+        )}
 
         <div className="vf-card vf-save-score">
           <div className="vf-save-score__title">

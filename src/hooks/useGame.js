@@ -31,8 +31,8 @@ export function useGame() {
     return () => clearTimeout(aiTimeoutRef.current);
   }, [state]);
 
-  const startGame = useCallback((mode, humanNames, difficultyId) => {
-    dispatch({ type: 'START_GAME', mode, humanNames, difficultyId });
+  const startGame = useCallback((mode, humanNames, difficultyId, botConfigs) => {
+    dispatch({ type: 'START_GAME', mode, humanNames, difficultyId, botConfigs });
   }, []);
 
   const newGame = useCallback(() => {

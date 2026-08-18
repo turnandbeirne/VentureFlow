@@ -21,7 +21,7 @@ export function endTurn(state, playerId) {
     const nextPlayer = state.players[nextIndex];
     return {
       state: { ...state, activePlayerIndex: nextIndex },
-      logEntries: [{ icon: '➡️', message: `Passed the turn to ${nextPlayer.name}.`, kind: 'endTurn' }],
+      logEntries: [{ icon: '➡️', message: `Passed the turn to ${nextPlayer.name}.`, kind: 'endTurn', playerId: nextPlayer.id }],
     };
   }
 

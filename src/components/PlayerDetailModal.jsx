@@ -1,4 +1,4 @@
-import { ASSETS } from '../data/gameConfig';
+import { ASSETS, getBotPersonality, getSkillLevel } from '../data/gameConfig';
 import { assetValue, businessValue, netWorth, passiveIncome, avgPurchasePrice } from '../game/players';
 import { playSound } from '../audio/soundEngine';
 
@@ -35,6 +35,17 @@ export default function PlayerDetailModal({ player, prices, onClose }) {
             Close
           </button>
         </div>
+
+        {player.type === 'ai' && player.personalityId && (
+          <div className="vf-portfolio__bot-tag">
+            <span>💬 "{getBotPersonality(player.personalityId).blurb}"</span>
+            {player.skillLevelId && (
+              <span className="vf-portfolio__bot-skill">
+                {getSkillLevel(player.skillLevelId).icon} {getSkillLevel(player.skillLevelId).name}
+              </span>
+            )}
+          </div>
+        )}
 
         <div className="vf-portfolio__body vf-scroll">
           <div className="vf-portfolio__summary">
@@ -121,7 +132,7 @@ export default function PlayerDetailModal({ player, prices, onClose }) {
               <div className="vf-portfolio__businesses">
                 {player.businesses.map((biz, i) => (
                   <div key={biz.id} className="vf-portfolio__business-row">
-                    <span>🚀 Business #{i + 1}</span>
+                    <span>🚀 {biz.name || `Business #${i + 1}`}</span>
                     <span className="vf-portfolio__business-income">+${biz.income}/mo</span>
                   </div>
                 ))}

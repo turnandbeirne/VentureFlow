@@ -3,12 +3,14 @@
 // ----------------------------------------------------------------------------
 // The single place that turns an action into a new game state. Delegates
 // the actual rules to actions.js / turnEngine.js / aiEngine.js and just
-// handles wiring + the shared event log.
+// handles wiring + the shared event log (and, on top of that, the bot chat
+// feed — see chatEngine.js).
 // ============================================================================
 import { createNewGame } from './newGame';
 import { buyAsset, sellAsset, startBusiness, learnSkill } from './actions';
 import { endTurn, acknowledgeFortuneCard } from './turnEngine';
 import { runAiTurn } from './aiEngine';
+import { reactToLogEntries, generateGreeting, generateBotTurnFlavor } from './chatEngine';
 
 let logCounter = 0;
 function nextLogId() {
@@ -16,10 +18,28 @@ function nextLogId() {
   return `log-${logCounter}-${Date.now()}`;
 }
 
+let chatCounter = 0;
+function nextChatId() {
+  chatCounter += 1;
+  return `chat-${chatCounter}-${Date.now()}`;
+}
+
+function appendChat(state, entries) {
+  if (!entries || entries.length === 0) return state;
+  const stamped = entries.map((e) => ({ id: nextChatId(), month: state.month, ...e }));
+  return { ...state, chat: [...(state.chat || []), ...stamped].slice(-60) };
+}
+
+// Every log entry that gets appended is also offered to the robots as a
+// chance to react in character — this is the single choke point both human
+// actions (dispatched one at a time below) and a whole robot turn's worth
+// of actions (RUN_AI_TURN, which appends several log entries at once) flow
+// through, so bot chat "just works" for both without extra wiring per case.
 function appendLog(state, entries) {
   if (!entries || entries.length === 0) return state;
   const stamped = entries.map((e) => ({ id: nextLogId(), month: state.month, ...e }));
-  return { ...state, log: [...state.log, ...stamped].slice(-200) };
+  const withLog = { ...state, log: [...state.log, ...stamped].slice(-200) };
+  return appendChat(withLog, reactToLogEntries(withLog, stamped));
 }
 
 function withResult(result) {
@@ -33,8 +53,10 @@ function withResult(result) {
 
 export function gameReducer(state, action) {
   switch (action.type) {
-    case 'START_GAME':
-      return createNewGame(action.mode, action.humanNames, action.difficultyId);
+    case 'START_GAME': {
+      const newState = createNewGame(action.mode, action.humanNames, action.difficultyId, action.botConfigs);
+      return appendChat(newState, generateGreeting(newState));
+    }
 
     case 'LOAD_GAME':
       return action.state;
@@ -61,13 +83,31 @@ export function gameReducer(state, action) {
 
     case 'RUN_AI_TURN': {
       const { state: afterAi, logEntries } = runAiTurn(state, action.playerId);
-      const logged = appendLog(afterAi, logEntries);
+      let logged = appendLog(afterAi, logEntries);
+      // Independent of whatever the bot actually did this turn, it gets a
+      // separate small chance at a goof-off sound effect and/or a hype
+      // quote — see chatEngine.js's generateBotTurnFlavor().
+      logged = appendChat(logged, generateBotTurnFlavor(logged, action.playerId));
       const { state: nextState, logEntries: turnLog } = endTurn(logged, action.playerId);
       return appendLog(nextState, turnLog);
     }
 
-    case 'ACK_FORTUNE_CARD':
-      return acknowledgeFortuneCard(state);
+    case 'ACK_FORTUNE_CARD': {
+      const nextState = acknowledgeFortuneCard(state);
+      // The transition from the month's fortune-card recap back to normal
+      // play doesn't produce its own "passed the turn" log entry (that only
+      // happens for a plain within-month hand-off — see turnEngine.js), so
+      // give the new month's first player the same ambient chat chance by
+      // hand — reusing the 'endTurn' reaction rather than duplicating it.
+      if (nextState.status === 'playing' && state.status !== 'playing') {
+        const firstPlayer = nextState.players[nextState.activePlayerIndex];
+        const chat = firstPlayer
+          ? reactToLogEntries(nextState, [{ kind: 'endTurn', playerId: firstPlayer.id }])
+          : [];
+        return appendChat(nextState, chat);
+      }
+      return nextState;
+    }
 
     case 'CLEAR_ERROR':
       return { ...state, lastError: null };

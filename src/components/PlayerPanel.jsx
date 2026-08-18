@@ -1,5 +1,14 @@
 import { netWorth, passiveIncome } from '../game/players';
 import { getBadgeInfo } from '../game/badges';
+import { getSkillLevel } from '../data/gameConfig';
+
+/** "🤖 GrumpyMommy · 🦈 Shark" for a robot with a known skill level, or a
+ * plain "AI player" for one saved before this feature existed. */
+function botTooltip(player) {
+  if (!player.skillLevelId) return 'AI player';
+  const skill = getSkillLevel(player.skillLevelId);
+  return `${player.name} · ${skill.icon} ${skill.name}`;
+}
 
 function PlayerCard({ player, prices, isActive, onSelect }) {
   return (
@@ -11,7 +20,7 @@ function PlayerCard({ player, prices, isActive, onSelect }) {
       <div className="vf-player-card__name">
         <span>{player.avatar}</span>
         <span>{player.name}</span>
-        {player.type === 'ai' && <span title="AI player">🤖</span>}
+        {player.type === 'ai' && <span title={botTooltip(player)}>🤖</span>}
       </div>
       <div className="vf-player-card__networth">${netWorth(player, prices).toLocaleString()}</div>
       <div className="vf-player-card__stat">💵 Cash: ${Math.round(player.cash).toLocaleString()}</div>

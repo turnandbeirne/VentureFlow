@@ -9,7 +9,8 @@
 // `email` is stored on the entry (so it's there if VentureMaker ever wants
 // to follow up about a milestone, a future VentureScouts tie-in, etc.) but
 // is NEVER read by any rendering code — see LeaderboardModal.jsx, which
-// only ever reads name/avatar/netWorth/mode/playedAt/portfolio off an entry.
+// only ever reads name/avatar/netWorth/mode/difficultyId/playedAt/portfolio
+// off an entry.
 //
 // `portfolio` is an optional frozen "hard copy" snapshot of the winner's
 // assets/businesses/avg-purchase-prices at the moment they saved their
@@ -47,7 +48,7 @@ function persist(entries) {
  * frozen snapshot (see header) — stored as-is, never read for rendering
  * except by the leaderboard's own expandable detail view.
  */
-export function addLeaderboardEntry({ name, avatar, netWorth, mode, email, portfolio }) {
+export function addLeaderboardEntry({ name, avatar, netWorth, mode, difficultyId, email, portfolio }) {
   const entries = loadLeaderboard();
   const entry = {
     id: `lb-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
@@ -55,6 +56,7 @@ export function addLeaderboardEntry({ name, avatar, netWorth, mode, email, portf
     avatar: avatar || '🙂',
     netWorth: Math.round(netWorth),
     mode: mode || 'solo',
+    difficultyId: difficultyId || null,
     email: email ? email.trim() : null,
     portfolio: portfolio || null,
     playedAt: Date.now(),

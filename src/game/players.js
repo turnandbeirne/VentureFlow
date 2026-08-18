@@ -6,11 +6,14 @@ import {
   STARTING_SKILL_TOKENS,
   ASSETS,
   PLAYER_AVATARS,
-  AI_NAMES,
+  BOT_PERSONALITIES,
+  SKILL_LEVELS,
+  getBotPersonality,
   BUSINESS_COST,
   getDifficulty,
   DEFAULT_DIFFICULTY_ID,
 } from '../data/gameConfig';
+import { pickRandom } from './rng';
 
 export function createPlayer({
   id,
@@ -19,6 +22,9 @@ export function createPlayer({
   type,
   startingCash = STARTING_CASH,
   startingSkillTokens = STARTING_SKILL_TOKENS,
+  personalityId = null,
+  strategyId = null,
+  skillLevelId = null,
 }) {
   const holdings = {};
   const purchaseStats = {};
@@ -32,6 +38,13 @@ export function createPlayer({
     name,
     avatar,
     type, // 'human' | 'ai'
+    // Robot-only identity: which named personality this bot is playing as
+    // and the strategy/skill that drives its turns (game/aiEngine.js).
+    // null for human players. See createPlayerRoster below for how these
+    // get assigned at game start.
+    personalityId,
+    strategyId,
+    skillLevelId,
     cash: startingCash,
     holdings, // { assetId: quantity currently owned }
     purchaseStats, // { assetId: { qty, spent } } — lifetime buys, for avg purchase price
@@ -45,13 +58,53 @@ export function createPlayer({
 }
 
 /**
+ * Resolve one robot's personality + skill level for roster creation.
+ * `config` is `{ personalityId, skillLevelId }` from SetupScreen's bot
+ * picker, where either field can be the literal 'random' (or simply
+ * missing) to mean "roll it". `usedPersonalityIds` avoids handing two
+ * robots at the same table the same named personality when rolling
+ * randomly — a human-picked duplicate is left alone, since that's a
+ * deliberate choice.
+ */
+function resolveBotConfig(config, usedPersonalityIds) {
+  const requestedPersonalityId = config?.personalityId;
+  let personality;
+  if (requestedPersonalityId && requestedPersonalityId !== 'random') {
+    personality = getBotPersonality(requestedPersonalityId);
+  } else {
+    const pool = BOT_PERSONALITIES.filter((p) => !usedPersonalityIds.has(p.id));
+    personality = pickRandom(pool.length > 0 ? pool : BOT_PERSONALITIES);
+  }
+  usedPersonalityIds.add(personality.id);
+
+  const requestedSkillLevelId = config?.skillLevelId;
+  const skillLevelId =
+    requestedSkillLevelId && requestedSkillLevelId !== 'random'
+      ? requestedSkillLevelId
+      : pickRandom(SKILL_LEVELS).id;
+
+  return { personality, skillLevelId };
+}
+
+/**
  * Build the player roster for a given mode config. Every player — human or
  * robot — starts from the same `difficulty` preset (see gameConfig.js
  * DIFFICULTIES), so the challenge level is consistent across the table.
  * Defaults to the standard difficulty if none is passed (e.g. any direct
  * caller/test that predates difficulty presets).
+ *
+ * `botConfigs` is an optional array (one entry per robot, from
+ * SetupScreen's bot picker) of `{ personalityId, skillLevelId }`, where
+ * either field can be 'random'/missing to roll it — see resolveBotConfig
+ * above. Omitting it entirely (e.g. an older direct caller) rolls every
+ * robot at random, so nothing breaks for callers that predate this feature.
  */
-export function createPlayerRoster(mode, humanNames = [], difficulty = getDifficulty(DEFAULT_DIFFICULTY_ID)) {
+export function createPlayerRoster(
+  mode,
+  humanNames = [],
+  difficulty = getDifficulty(DEFAULT_DIFFICULTY_ID),
+  botConfigs = []
+) {
   const startingCash = difficulty.startingCash;
   const startingSkillTokens = difficulty.startingSkillTokens;
 
@@ -67,15 +120,20 @@ export function createPlayerRoster(mode, humanNames = [], difficulty = getDiffic
         startingSkillTokens,
       })
     );
+    const usedPersonalityIds = new Set();
     for (let i = 0; i < mode.aiCount; i++) {
+      const { personality, skillLevelId } = resolveBotConfig(botConfigs[i], usedPersonalityIds);
       players.push(
         createPlayer({
           id: `ai${i + 1}`,
-          name: AI_NAMES[i] || `Robot ${i + 1}`,
-          avatar: '🤖',
+          name: personality.name,
+          avatar: personality.avatar,
           type: 'ai',
           startingCash,
           startingSkillTokens,
+          personalityId: personality.id,
+          strategyId: personality.strategyId,
+          skillLevelId,
         })
       );
     }
@@ -151,6 +209,6 @@ export function snapshotPortfolio(player, prices) {
       avgPurchasePrice: avgPurchasePrice(player, asset.id),
       priceAtSave: prices[asset.id],
     })),
-    businesses: player.businesses.map((b, i) => ({ id: b.id, index: i + 1, income: b.income })),
+    businesses: player.businesses.map((b, i) => ({ id: b.id, index: i + 1, name: b.name || null, income: b.income })),
   };
 }

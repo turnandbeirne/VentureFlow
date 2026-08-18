@@ -1,6 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import '../styles/setup.css';
-import { DIFFICULTIES, DEFAULT_DIFFICULTY_ID, GAME_LENGTH_MONTHS } from '../data/gameConfig';
+import {
+  DIFFICULTIES,
+  DEFAULT_DIFFICULTY_ID,
+  GAME_LENGTH_MONTHS,
+  BOT_PERSONALITIES,
+  SKILL_LEVELS,
+} from '../data/gameConfig';
 import { playSound } from '../audio/soundEngine';
 import { playMusicTrack } from '../audio/musicEngine';
 import { isOffensiveName } from '../game/nameFilter';
@@ -29,6 +35,10 @@ export default function SetupScreen({ onStart }) {
   const [aiCount, setAiCount] = useState(1);
   const [humanCount, setHumanCount] = useState(2);
   const [names, setNames] = useState(['', '', '']);
+  const [botConfigs, setBotConfigs] = useState([
+    { personalityId: 'random', skillLevelId: 'random' },
+    { personalityId: 'random', skillLevelId: 'random' },
+  ]);
   const [showLeaderboard, setShowLeaderboard] = useState(false);
   const [difficultyId, setDifficultyId] = useState(DEFAULT_DIFFICULTY_ID);
   const difficulty = DIFFICULTIES.find((d) => d.id === difficultyId) || DIFFICULTIES[0];
@@ -55,6 +65,15 @@ export default function SetupScreen({ onStart }) {
     });
   }
 
+  function updateBotConfig(index, field, value) {
+    playSound('click');
+    setBotConfigs((prev) => {
+      const next = [...prev];
+      next[index] = { ...next[index], [field]: value };
+      return next;
+    });
+  }
+
   function selectMode(id) {
     playSound('click');
     setModeId(id);
@@ -72,7 +91,7 @@ export default function SetupScreen({ onStart }) {
     }
     playSound('business');
     if (modeId === 'solo') {
-      onStart({ type: 'solo', aiCount }, [names[0] || 'You'], difficultyId);
+      onStart({ type: 'solo', aiCount }, [names[0] || 'You'], difficultyId, botConfigs.slice(0, aiCount));
     } else {
       onStart({ type: 'hotseat', humanCount }, names.slice(0, humanCount), difficultyId);
     }
@@ -133,6 +152,45 @@ export default function SetupScreen({ onStart }) {
                     </button>
                   ))}
                 </div>
+              </div>
+              <div>
+                <span className="vf-field-label">Choose your robots</span>
+                <div className="vf-bot-picker">
+                  {Array.from({ length: aiCount }).map((_, i) => (
+                    <div key={i} className="vf-bot-picker__row">
+                      <span className="vf-bot-picker__slot">Robot {i + 1}</span>
+                      <select
+                        className="vf-select"
+                        value={botConfigs[i].personalityId}
+                        onChange={(e) => updateBotConfig(i, 'personalityId', e.target.value)}
+                        aria-label={`Robot ${i + 1} personality`}
+                      >
+                        <option value="random">🎲 Random</option>
+                        {BOT_PERSONALITIES.map((p) => (
+                          <option key={p.id} value={p.id}>
+                            {p.avatar} {p.name}
+                          </option>
+                        ))}
+                      </select>
+                      <select
+                        className="vf-select"
+                        value={botConfigs[i].skillLevelId}
+                        onChange={(e) => updateBotConfig(i, 'skillLevelId', e.target.value)}
+                        aria-label={`Robot ${i + 1} skill level`}
+                      >
+                        <option value="random">🎲 Random</option>
+                        {SKILL_LEVELS.map((s) => (
+                          <option key={s.id} value={s.id}>
+                            {s.icon} {s.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  ))}
+                </div>
+                <p className="vf-bot-picker__hint">
+                  Each robot has its own play style — leave on Random to be surprised!
+                </p>
               </div>
               <div>
                 <span className="vf-field-label">Your name</span>
