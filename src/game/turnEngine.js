@@ -13,6 +13,7 @@ import { drawFortuneCard, applyCardEffect } from './decks';
 import { evaluateBadges } from './badges';
 import { netWorth, passiveIncome } from './players';
 import { getScenario, checkScenarioObjective } from './scenarios';
+import { resolvePendingRnd, pruneExpiredBoosts } from './businessUpgrades';
 
 export function endTurn(state, playerId) {
   const currentIndex = state.players.findIndex((p) => p.id === playerId);
@@ -46,18 +47,41 @@ function resolveMonthEnd(state) {
   const scenario = getScenario(state.scenarioId);
   const leaderBefore = currentLeaderId(state.players, state.assetPrices, month);
 
-  // 1) Allowance + rent + business income + card bonuses. Allowance comes
+  // 1) Resolve any R&D projects whose delay is up, and drop expired
+  // Marketing boosts, for every business — BEFORE payday, so a project that
+  // resolves this month already counts toward this month's paycheck
+  // instead of showing up a month late. See game/businessUpgrades.js.
+  let players = state.players.map((p) => {
+    const businesses = p.businesses.map((b) => {
+      const { business: afterRnd, results } = resolvePendingRnd(b, month);
+      for (const r of results) {
+        logEntries.push({
+          icon: '🔬',
+          message: `R&D paid off for ${afterRnd.name} — ${r.big ? 'a big breakthrough' : 'a modest improvement'} (+$${r.amount}/mo, permanent)!`,
+          kind: 'businessRnd',
+          playerId: p.id,
+        });
+      }
+      return pruneExpiredBoosts(afterRnd, month);
+    });
+    return { ...p, businesses };
+  });
+
+  // 2) Allowance + rent + business income + card bonuses. Allowance comes
   // from the difficulty preset chosen at setup (state.monthlyAllowance);
   // MONTHLY_ALLOWANCE is only a fallback for a game saved before difficulty
-  // presets existed.
+  // presets existed. passiveIncome() needs the whole table (not just this
+  // player) and the live pre-drift prices now, since Tree House rent is
+  // dynamic — see players.js's effectiveRentPerUnit.
   const allowance = state.monthlyAllowance ?? MONTHLY_ALLOWANCE;
-  let players = state.players.map((p) => {
-    const income = allowance + passiveIncome(p);
+  const incomeContext = { allPlayers: players, prices: state.assetPrices, month };
+  players = players.map((p) => {
+    const income = allowance + passiveIncome(p, incomeContext);
     return { ...p, cash: p.cash + income };
   });
   logEntries.push({ icon: '💰', message: `Payday! Everyone collected their allowance and passive income.`, kind: 'payday' });
 
-  // 2) Fortune cards — drawn using the weather that governed this month.
+  // 3) Fortune cards — drawn using the weather that governed this month.
   const startingPrices = state.assetPrices;
   let prices = state.assetPrices;
   const fortuneRecap = [];
@@ -83,14 +107,18 @@ function resolveMonthEnd(state) {
     });
   }
 
-  // 3) Price drift for the month that's ending.
+  // 4) Price drift for the month that's ending.
   const drift = driftPrices(prices, state.weather);
   prices = drift.prices;
 
-  // 4) Badges.
+  // 5) Badges — passiveIncomeAtLeast needs the same allPlayers/prices
+  // context passiveIncome() takes everywhere else now (dynamic Tree House
+  // rent); use the post-drift prices since that's the live figure going
+  // forward into next month.
+  const badgeContext = { allPlayers: players, prices };
   const newlyEarnedLog = [];
   players = players.map((p) => {
-    const { player, newlyEarned } = evaluateBadges(p, month);
+    const { player, newlyEarned } = evaluateBadges(p, month, badgeContext);
     for (const badge of newlyEarned) {
       newlyEarnedLog.push({ icon: badge.icon, message: `${p.name} earned the ${badge.name} badge!`, playerId: p.id, kind: 'badge' });
     }
@@ -98,29 +126,29 @@ function resolveMonthEnd(state) {
   });
   logEntries.push(...newlyEarnedLog);
 
-  // 5) Scenario objective check (Passive Income Race / Business Sprint —
+  // 6) Scenario objective check (Passive Income Race / Business Sprint —
   // Classic Growth and Survive the Crash have no objective and no-op here).
   // Uses this month's post-income/post-badge numbers, same as everything
   // else below. See game/scenarios.js.
-  const objectiveCheck = checkScenarioObjective(scenario, state.difficultyId, players, month);
+  const objectiveCheck = checkScenarioObjective(scenario, state.difficultyId, players, month, prices);
   players = objectiveCheck.players;
   logEntries.push(...objectiveCheck.logEntries);
 
-  // 6) Weather tick for the month ahead.
+  // 7) Weather tick for the month ahead.
   const tick = tickWeather(state.weather);
   if (tick.changed) {
     const info = getStageInfo(tick.weather);
     logEntries.push({ icon: info.icon, message: `The weather shifted to ${info.name}!`, kind: 'weather' });
   }
 
-  // 7) Net worth history snapshot — one point per completed month, used by
+  // 8) Net worth history snapshot — one point per completed month, used by
   // the game-over screen's growth chart (see components/NetWorthChart.jsx).
   players = players.map((p) => ({
     ...p,
     netWorthHistory: [...p.netWorthHistory, { month, netWorth: netWorth(p, prices) }],
   }));
 
-  // 8) Lead-change callout — a bit of extra excitement when the standings
+  // 9) Lead-change callout — a bit of extra excitement when the standings
   // actually flip (skipped in a solo/no-real-leader-yet situation — see
   // currentLeaderId above). Reacted to by game/chatEngine.js and given its
   // own celebratory sound by hooks/useGameSounds.js.
@@ -137,7 +165,7 @@ function resolveMonthEnd(state) {
     }
   }
 
-  // 9) Advance the calendar.
+  // 10) Advance the calendar.
   const nextMonth = month + 1;
   const isGameOver = nextMonth > GAME_LENGTH_MONTHS;
 

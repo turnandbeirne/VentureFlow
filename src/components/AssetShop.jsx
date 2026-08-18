@@ -1,5 +1,6 @@
 import { useCallback } from 'react';
-import { ASSETS } from '../data/gameConfig';
+import { ASSETS, RENT_OVERSUPPLY_FREE_UNITS } from '../data/gameConfig';
+import { effectiveRentPerUnit, totalUnitsOwned } from '../game/players';
 import { useHoldRepeat } from '../hooks/useHoldRepeat';
 
 /** A quick 1-4 dot risk meter from an asset's volatility, paired with its
@@ -13,7 +14,16 @@ function riskDots(volatility) {
   return 4;
 }
 
-function AssetCard({ asset, price, previousPrice, owned, cash, onBuy, onSell, disabled }) {
+/** A plain-language read on how crowded a rent-bearing asset's market is
+ * right now — the same totalOwned number that drives effectiveRentPerUnit
+ * in game/players.js, just translated into words instead of a formula. */
+function crowdingLabel(totalOwned) {
+  if (totalOwned <= RENT_OVERSUPPLY_FREE_UNITS) return null;
+  if (totalOwned <= RENT_OVERSUPPLY_FREE_UNITS + 4) return 'Market: getting crowded';
+  return 'Market: very crowded';
+}
+
+function AssetCard({ asset, price, previousPrice, owned, cash, totalOwned, onBuy, onSell, disabled }) {
   const trendUp = price >= previousPrice;
   const trendPct = previousPrice ? Math.round(((price - previousPrice) / previousPrice) * 100) : 0;
   const canBuy = !disabled && cash >= price;
@@ -50,7 +60,14 @@ function AssetCard({ asset, price, previousPrice, owned, cash, onBuy, onSell, di
       ) : (
         <span className="vf-asset-card__trend">—</span>
       )}
-      {asset.rentPerMonth > 0 && <span className="vf-asset-card__rent">+${asset.rentPerMonth}/mo each</span>}
+      {asset.rentPerMonth > 0 ? (
+        <span className="vf-asset-card__rent" title="Rent scales with price, and drops a bit the more of this the whole table owns — see the Tree House lesson.">
+          +${effectiveRentPerUnit(asset, price, totalOwned).toFixed(0)}/mo each
+          {crowdingLabel(totalOwned) && <span className="vf-asset-card__crowding"> · {crowdingLabel(totalOwned)}</span>}
+        </span>
+      ) : (
+        <span className="vf-asset-card__no-income">💵 Price only — no monthly income</span>
+      )}
       <span className="vf-asset-card__owned">You have: {owned}</span>
       <div className="vf-asset-card__actions">
         <button type="button" className="vf-btn vf-btn--go" disabled={!canBuy} {...buyHold}>
@@ -64,7 +81,7 @@ function AssetCard({ asset, price, previousPrice, owned, cash, onBuy, onSell, di
   );
 }
 
-export default function AssetShop({ prices, previousPrices, player, disabled, onBuy, onSell }) {
+export default function AssetShop({ prices, previousPrices, player, allPlayers, disabled, onBuy, onSell }) {
   return (
     <div>
       <div className="vf-section-title">
@@ -81,6 +98,7 @@ export default function AssetShop({ prices, previousPrices, player, disabled, on
             previousPrice={previousPrices?.[asset.id]}
             owned={player.holdings[asset.id] || 0}
             cash={player.cash}
+            totalOwned={totalUnitsOwned(allPlayers, asset.id)}
             disabled={disabled}
             onBuy={() => onBuy(asset.id)}
             onSell={() => onSell(asset.id)}

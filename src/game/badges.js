@@ -15,7 +15,7 @@ import { BADGES } from '../data/gameConfig';
 import { passiveIncome } from './players';
 
 const CHECKERS = {
-  passiveIncomeAtLeast: (player, badge) => passiveIncome(player) >= badge.value,
+  passiveIncomeAtLeast: (player, badge, context) => passiveIncome(player, context) >= badge.value,
   businessCountAtLeast: (player, badge) => player.businesses.length >= badge.value,
   assetHoldingAtLeast: (player, badge) => (player.holdings[badge.assetId] || 0) >= badge.value,
 };
@@ -23,17 +23,21 @@ const CHECKERS = {
 /**
  * Evaluate all badges for a player, returning a new player object with any
  * newly-earned badges appended (and logged into badgeEvents with the month
- * they were earned). Non-mutating.
+ * they were earned). Non-mutating. `context` (optional — { allPlayers,
+ * prices }) is passed straight through to passiveIncome() for the
+ * passiveIncomeAtLeast check, which now needs to know everyone's Tree House
+ * holdings and current prices to compute dynamic rent (see players.js).
  */
-export function evaluateBadges(player, month) {
+export function evaluateBadges(player, month, context = {}) {
   const earnedSet = new Set(player.badges);
   const newlyEarned = [];
+  const fullContext = { ...context, month };
 
   for (const badge of BADGES) {
     if (earnedSet.has(badge.id)) continue;
     const checker = CHECKERS[badge.kind];
     if (!checker) continue;
-    if (checker(player, badge)) {
+    if (checker(player, badge, fullContext)) {
       earnedSet.add(badge.id);
       newlyEarned.push(badge);
     }

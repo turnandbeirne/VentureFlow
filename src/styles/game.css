@@ -352,6 +352,17 @@
   font-weight: 600;
 }
 
+.vf-asset-card__crowding {
+  color: var(--vf-ink-soft);
+  font-weight: 500;
+}
+
+.vf-asset-card__no-income {
+  font-size: 0.78rem;
+  color: var(--vf-ink-soft);
+  font-weight: 500;
+}
+
 .vf-asset-card__actions {
   display: flex;
   gap: 0.4rem;
@@ -1150,14 +1161,20 @@
   gap: 0.45rem;
 }
 
-.vf-portfolio__business-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+.vf-portfolio__business-card {
   padding: 0.55rem 0.8rem;
   border: 2px solid var(--vf-border);
   border-radius: var(--vf-radius-md);
   background: var(--vf-white);
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.vf-portfolio__business-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   font-size: 0.88rem;
   font-weight: 600;
 }
@@ -1165,6 +1182,48 @@
 .vf-portfolio__business-income {
   color: var(--vf-green-dark);
   font-weight: 700;
+}
+
+/* Business upgrades (Marketing / Sales / Operations / R&D) ------------ */
+.vf-biz-upgrades {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding-top: 0.35rem;
+  border-top: 1px dashed var(--vf-border);
+}
+
+.vf-biz-upgrades__status {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+
+.vf-biz-upgrades__chip {
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--vf-ink-soft);
+  background: var(--vf-cream-deep);
+  border-radius: var(--vf-radius-pill);
+  padding: 0.15rem 0.5rem;
+}
+
+.vf-biz-upgrades__chip--active {
+  color: var(--vf-green-dark);
+  background: var(--vf-white);
+  border: 1px solid var(--vf-green);
+}
+
+.vf-biz-upgrades__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.vf-biz-upgrades__btn {
+  font-size: 0.72rem;
+  padding: 0.3rem 0.55rem;
+  min-height: auto;
 }
 
 .vf-portfolio__empty {
@@ -1345,11 +1404,15 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  width: 100%;
   padding: 0.6rem 0.9rem;
   border-radius: var(--vf-radius-md);
   border: 2px solid var(--vf-border);
   background: var(--vf-white);
   font-weight: 600;
+  font-size: 1rem;
+  text-align: left;
+  cursor: pointer;
 }
 
 .vf-standing-row--winner {
@@ -1359,4 +1422,12 @@
 .vf-standing-row__rank {
   width: 2rem;
   text-align: center;
+}
+
+.vf-gameover__standings-hint {
+  font-size: 0.75rem;
+  color: var(--vf-ink-soft);
+  font-weight: 500;
+  text-align: center;
+  margin-top: -0.15rem;
 }

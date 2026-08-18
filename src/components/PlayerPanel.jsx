@@ -10,7 +10,7 @@ function botTooltip(player) {
   return `${player.name} · ${skill.icon} ${skill.name}`;
 }
 
-function PlayerCard({ player, prices, isActive, onSelect }) {
+function PlayerCard({ player, prices, allPlayers, month, isActive, onSelect }) {
   return (
     <button
       type="button"
@@ -25,7 +25,7 @@ function PlayerCard({ player, prices, isActive, onSelect }) {
       <div className="vf-player-card__networth">${netWorth(player, prices).toLocaleString()}</div>
       <div className="vf-player-card__stat">💵 Cash: ${Math.round(player.cash).toLocaleString()}</div>
       <div className="vf-player-card__stat">
-        🌱 Passive: ${passiveIncome(player)}/mo · 💡 {player.skillTokens}
+        🌱 Passive: ${passiveIncome(player, { allPlayers, prices, month })}/mo · 💡 {player.skillTokens}
       </div>
       {player.badges.length > 0 && (
         <div className="vf-player-card__badges">
@@ -45,7 +45,7 @@ function PlayerCard({ player, prices, isActive, onSelect }) {
   );
 }
 
-export default function PlayerPanel({ players, prices, activePlayerIndex, onSelectPlayer }) {
+export default function PlayerPanel({ players, prices, month, activePlayerIndex, onSelectPlayer }) {
   return (
     <div className="vf-players">
       {players.map((player, i) => (
@@ -53,6 +53,8 @@ export default function PlayerPanel({ players, prices, activePlayerIndex, onSele
           key={player.id}
           player={player}
           prices={prices}
+          allPlayers={players}
+          month={month}
           isActive={i === activePlayerIndex}
           onSelect={() => onSelectPlayer(player.id)}
         />

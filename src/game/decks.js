@@ -6,7 +6,10 @@
 // the small set of effect "type"s so new cards never need engine changes.
 // ============================================================================
 import { OPPORTUNITY_DECK, SETBACK_DECK } from '../data/gameConfig';
-import { weightedPick, pickRandom } from './rng';
+// Environment stream — see game/rng.js's module comment. Which fortune
+// card gets drawn is part of the shared Daily Challenge environment, not a
+// player choice.
+import { envWeightedPick as weightedPick, envPickRandom as pickRandom } from './rng';
 import { getStageInfo } from './weather';
 import { bumpPrice } from './market';
 

@@ -12,8 +12,12 @@ import {
   BUSINESS_COST,
   getDifficulty,
   DEFAULT_DIFFICULTY_ID,
+  RENT_OVERSUPPLY_FREE_UNITS,
+  RENT_OVERSUPPLY_RATE,
+  RENT_MIN_YIELD_FACTOR,
 } from '../data/gameConfig';
 import { pickRandom } from './rng';
+import { activeMarketingBoostTotal } from './businessUpgrades';
 
 export function createPlayer({
   id,
@@ -162,21 +166,82 @@ export function assetValue(player, prices) {
 }
 
 export function businessValue(player) {
-  // Simple valuation: a business is "worth" what you put into it.
-  return player.businesses.length * BUSINESS_COST;
+  // A business is "worth" what's actually been put into it — the original
+  // BUSINESS_COST plus every upgrade purchased since (see
+  // game/businessUpgrades.js). `totalInvested` tracks that running total;
+  // a business loaded from a save made before upgrades existed won't have
+  // it, so falls back to just BUSINESS_COST.
+  return player.businesses.reduce((sum, b) => sum + (b.totalInvested ?? BUSINESS_COST), 0);
 }
 
 export function netWorth(player, prices) {
   return Math.round(player.cash + assetValue(player, prices) + businessValue(player));
 }
 
-export function passiveIncome(player) {
-  const rent = ASSETS.filter((a) => a.rentPerMonth > 0).reduce(
-    (sum, a) => sum + (player.holdings[a.id] || 0) * a.rentPerMonth,
-    0
-  );
-  const businessIncome = player.businesses.reduce((sum, b) => sum + b.income, 0);
-  return rent + businessIncome + (player.passiveBonus || 0);
+/** How many units of a rent-bearing asset are owned across EVERY player at
+ * the table right now — the denominator effectiveRentPerUnit needs to know
+ * how crowded the rental market currently is. */
+export function totalUnitsOwned(allPlayers, assetId) {
+  return (allPlayers || []).reduce((sum, p) => sum + (p.holdings[assetId] || 0), 0);
+}
+
+// A rent-bearing asset's baseline yield, derived from its own configured
+// rentPerMonth/basePrice (Tree House: 40/250 = 16%) rather than a separate
+// config field — see gameConfig.js's "Tree House rent dynamics" comment.
+function baseYield(asset) {
+  return asset.basePrice > 0 ? asset.rentPerMonth / asset.basePrice : 0;
+}
+
+/** What one unit of a rent-bearing asset currently pays, given its live
+ * price and how many units are owned across the whole table right now. The
+ * first couple of units anyone owns pay the full baseline yield; every unit
+ * beyond that crowds the rental market a bit more and pulls the per-unit
+ * yield down, floored so it never goes to nothing. Non-rent-bearing assets
+ * (Lemonade Co., Treasure Chest, Piggy Bank) always return 0 — they're
+ * price-only, with no monthly income at all. */
+export function effectiveRentPerUnit(asset, price, totalOwned) {
+  if (!asset || asset.rentPerMonth <= 0) return 0;
+  const excess = Math.max(0, (totalOwned || 0) - RENT_OVERSUPPLY_FREE_UNITS);
+  const yieldFactor = Math.max(RENT_MIN_YIELD_FACTOR, 1 / (1 + RENT_OVERSUPPLY_RATE * excess));
+  return price * baseYield(asset) * yieldFactor;
+}
+
+/** A business's current effective monthly income: its permanent base
+ * (original random amount + any Sales/R&D bumps folded in — see
+ * game/businessUpgrades.js's applyUpgrade/resolvePendingRnd) plus whatever
+ * Marketing boosts are still active this month. Pass `month == null` to get
+ * just the permanent figure (used where "current month" isn't known/
+ * relevant). */
+export function businessMonthlyIncome(business, month) {
+  if (month == null) return business.income;
+  return business.income + activeMarketingBoostTotal(business, month);
+}
+
+/**
+ * A player's total passive (no-extra-effort) monthly income: dynamic rent
+ * from rent-bearing assets (see effectiveRentPerUnit above — this is why
+ * `allPlayers` and `prices` are needed now, not just this one player),
+ * every business's current effective income, and any permanent
+ * fortune-card passiveBonus. `context` is optional so a caller that only
+ * has this one player can still get a (less precise, single-player-only)
+ * answer rather than crashing; `month` defaults to "unknown," which safely
+ * excludes any temporary Marketing boosts rather than guessing they're
+ * active.
+ */
+export function passiveIncome(player, context = {}) {
+  const allPlayers = context.allPlayers || [player];
+  const prices = context.prices || {};
+  const month = context.month;
+
+  const rent = ASSETS.filter((a) => a.rentPerMonth > 0).reduce((sum, a) => {
+    const qty = player.holdings[a.id] || 0;
+    if (qty === 0) return sum;
+    const total = totalUnitsOwned(allPlayers, a.id);
+    const price = prices[a.id] ?? a.basePrice;
+    return sum + qty * effectiveRentPerUnit(a, price, total);
+  }, 0);
+  const businessIncome = player.businesses.reduce((sum, b) => sum + businessMonthlyIncome(b, month), 0);
+  return Math.round(rent + businessIncome + (player.passiveBonus || 0));
 }
 
 /**

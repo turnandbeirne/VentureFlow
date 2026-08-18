@@ -21,6 +21,11 @@ function resolveSound(kind) {
   // see game/scenarios.js and game/turnEngine.js for what triggers these.
   if (kind === 'objectiveMet') return 'badge';
   if (kind === 'leadChange') return 'cheering';
+  // Investing in a business reuses the "leveling up" skill chime; an R&D
+  // project actually paying off (see game/businessUpgrades.js) reuses the
+  // achievement badge chime — see game/turnEngine.js for what triggers each.
+  if (kind === 'businessUpgrade') return 'skill';
+  if (kind === 'businessRnd') return 'badge';
   return null;
 }
 

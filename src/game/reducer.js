@@ -7,7 +7,7 @@
 // feed — see chatEngine.js).
 // ============================================================================
 import { createNewGame } from './newGame';
-import { buyAsset, sellAsset, startBusiness, learnSkill } from './actions';
+import { buyAsset, sellAsset, startBusiness, learnSkill, upgradeBusiness } from './actions';
 import { endTurn, acknowledgeFortuneCard } from './turnEngine';
 import { runAiTurn } from './aiEngine';
 import {
@@ -121,6 +121,9 @@ export function gameReducer(state, action) {
 
     case 'LEARN_SKILL':
       return withResult(learnSkill(state, action.playerId));
+
+    case 'UPGRADE_BUSINESS':
+      return withResult(upgradeBusiness(state, action.playerId, action.businessId, action.trackId));
 
     case 'END_TURN': {
       const { state: nextState, logEntries } = endTurn(state, action.playerId);

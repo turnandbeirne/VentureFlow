@@ -23,6 +23,7 @@ const CONCEPT_BY_KIND = {
   fortuneGood: 'opportunity',
   skill: 'investInYourself',
   badge: 'goodHabits',
+  businessUpgrade: 'reinvestment',
 };
 
 /**

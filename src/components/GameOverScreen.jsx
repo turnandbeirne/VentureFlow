@@ -15,9 +15,10 @@ import Fireworks from './Fireworks';
 import { ChatEntryRow } from './ChatPanel';
 import NetWorthChart from './NetWorthChart';
 import FamilyRecapModal from './FamilyRecapModal';
+import PlayerDetailModal from './PlayerDetailModal';
 
 export default function GameOverScreen({ state, onPlayAgain, onRecordProfileResult }) {
-  const { players, assetPrices, winnerId, mode, difficultyId, scenarioId, dailyChallengeDate } = state;
+  const { players, assetPrices, winnerId, mode, difficultyId, scenarioId, dailyChallengeDate, month } = state;
   const ranked = [...players].sort((a, b) => netWorth(b, assetPrices) - netWorth(a, assetPrices));
   const winner = players.find((p) => p.id === winnerId) || ranked[0];
   const scenario = getScenario(scenarioId);
@@ -37,6 +38,13 @@ export default function GameOverScreen({ state, onPlayAgain, onRecordProfileResu
   const [showLeaderboard, setShowLeaderboard] = useState(false);
   const [showRecap, setShowRecap] = useState(false);
   const [unlockCelebration, setUnlockCelebration] = useState(null);
+  // Which standings row (if any) has its full portfolio breakdown open —
+  // read-only here (game's over, nothing left to upgrade), but this is
+  // exactly what makes it possible to see at a glance how much a specific
+  // holding (lemonade's price swings, a business's upgrades, etc.) actually
+  // contributed, instead of only ever seeing the final net-worth total.
+  const [selectedPlayerId, setSelectedPlayerId] = useState(null);
+  const selectedPlayer = selectedPlayerId ? players.find((p) => p.id === selectedPlayerId) : null;
 
   const insights = buildInsights(winner);
 
@@ -58,7 +66,7 @@ export default function GameOverScreen({ state, onPlayAgain, onRecordProfileResu
     const bestHuman = [...humans].sort((a, b) => netWorth(b, assetPrices) - netWorth(a, assetPrices))[0];
     const result = onRecordProfileResult({
       netWorth: netWorth(bestHuman, assetPrices),
-      passiveIncome: passiveIncome(bestHuman),
+      passiveIncome: passiveIncome(bestHuman, { allPlayers: players, prices: assetPrices, month }),
       badgesEarnedThisGame: bestHuman.badges.length,
     });
     if (result && (result.newlyUnlockedAvatars.length > 0 || result.newlyUnlockedThemes.length > 0)) {
@@ -175,15 +183,25 @@ export default function GameOverScreen({ state, onPlayAgain, onRecordProfileResu
 
         <div className="vf-standings">
           {ranked.map((player, i) => (
-            <div key={player.id} className={`vf-standing-row ${player.id === winnerId ? 'vf-standing-row--winner' : ''}`}>
+            <button
+              key={player.id}
+              type="button"
+              className={`vf-standing-row ${player.id === winnerId ? 'vf-standing-row--winner' : ''}`}
+              onClick={() => {
+                playSound('click');
+                setSelectedPlayerId(player.id);
+              }}
+              title="Tap for a full portfolio breakdown"
+            >
               <span className="vf-standing-row__rank">{i + 1}</span>
               <span>
                 {player.avatar} {player.name}
               </span>
               <span>${netWorth(player, assetPrices).toLocaleString()}</span>
-            </div>
+            </button>
           ))}
         </div>
+        <p className="vf-gameover__standings-hint">🔍 Tap a player for their full portfolio breakdown</p>
 
         <div className="vf-card vf-gameover__chart-card">
           <div className="vf-section-title">
@@ -281,6 +299,15 @@ export default function GameOverScreen({ state, onPlayAgain, onRecordProfileResu
 
       <LeaderboardModal open={showLeaderboard} onClose={() => setShowLeaderboard(false)} highlightId={savedEntryId} />
       <FamilyRecapModal open={showRecap} onClose={() => setShowRecap(false)} state={state} prices={assetPrices} />
+      {selectedPlayer && (
+        <PlayerDetailModal
+          player={selectedPlayer}
+          prices={assetPrices}
+          allPlayers={players}
+          month={month}
+          onClose={() => setSelectedPlayerId(null)}
+        />
+      )}
     </div>
   );
 }

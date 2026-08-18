@@ -11,8 +11,24 @@
 // gets the identical weather timeline, fortune-card draws, and price-drift
 // noise, so differences in the final score come from player choices, not
 // random luck.
-let state = seedFromEntropy();
-
+//
+// TWO independent streams, not one — this is the part that actually makes
+// that fairness guarantee hold. The "environment" stream (weather duration,
+// price drift noise, fortune-card draws — see weather.js/market.js/decks.js)
+// is what every player's Daily Challenge run must share bit-for-bit. The
+// default stream (business income rolls, robot decision-making, R&D
+// payoffs, ...) is everything that stems from PLAYER CHOICES, which are
+// allowed — expected — to differ. Once economy features let one player's
+// choices affect another player's cash (Tree House rent depends on how
+// much of it the WHOLE TABLE owns, not just one player — see players.js's
+// effectiveRentPerUnit), a robot's cash trajectory can differ depending on
+// what a human bought, which changes how many decision-rolls that robot's
+// AI makes on its turn. If that consumed the SAME stream the environment
+// draws from, two players' "identical" Daily Challenge environments would
+// silently drift apart the moment their in-game choices diverged — exactly
+// the bug a single shared stream can't avoid. Splitting the streams means a
+// robot's own randomness can wobble around as much as it wants without ever
+// touching the sequence weather/prices/cards are drawn from.
 function seedFromEntropy() {
   // No Math.random() ban here — this is the one place in the whole engine
   // that's allowed to touch real entropy, since it's just picking an
@@ -21,66 +37,103 @@ function seedFromEntropy() {
   return (Date.now() ^ (Math.random() * 0xffffffff)) >>> 0;
 }
 
-/** mulberry32 — small, fast, good-enough-for-a-kids'-board-game PRNG. */
-function nextUint32() {
-  state = (state + 0x6d2b79f5) >>> 0;
-  let t = state;
-  t = Math.imul(t ^ (t >>> 15), t | 1);
-  t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-  return ((t ^ (t >>> 14)) >>> 0);
+/** A tiny mulberry32 generator instance — small, fast, good-enough-for-a-
+ * kids'-board-game PRNG. Each stream below is one of these, independently
+ * seeded and advanced. */
+function createGenerator(seed) {
+  let state = seed >>> 0;
+
+  function nextUint32() {
+    state = (state + 0x6d2b79f5) >>> 0;
+    let t = state;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return (t ^ (t >>> 14)) >>> 0;
+  }
+
+  function next() {
+    return nextUint32() / 4294967296;
+  }
+
+  return {
+    reseed(newSeed) {
+      state = (Math.floor(newSeed) || 0) >>> 0;
+      // Run forward once so a seed of 0 (or any value that would otherwise
+      // produce a degenerate first output) still mixes properly.
+      nextUint32();
+    },
+    randomInt(min, max) {
+      return Math.floor(next() * (max - min + 1)) + min;
+    },
+    randomFloat(min, max) {
+      return next() * (max - min) + min;
+    },
+    noise(magnitude) {
+      return this.randomFloat(-magnitude, magnitude);
+    },
+    chance(p) {
+      return next() < p;
+    },
+    weightedPick(weights) {
+      const entries = Object.entries(weights);
+      const total = entries.reduce((sum, [, w]) => sum + w, 0);
+      let roll = next() * total;
+      for (const [key, w] of entries) {
+        roll -= w;
+        if (roll <= 0) return key;
+      }
+      return entries[entries.length - 1][0];
+    },
+    pickRandom(arr) {
+      return arr[this.randomInt(0, arr.length - 1)];
+    },
+  };
 }
 
-/** A float in [0, 1) — the seedable stand-in for Math.random() used by
- * every helper below. */
-function next() {
-  return nextUint32() / 4294967296;
-}
+const defaultGen = createGenerator(seedFromEntropy());
+const envGen = createGenerator(seedFromEntropy());
 
-/** Reset the generator to a known starting point. Pass any finite number
- * (e.g. a hash of today's date — see game/dailyChallenge.js). Every random
- * call anywhere in the engine (weather duration, fortune-card draws, price
- * drift noise, business names, robot personality/skill rolls) flows through
- * this same generator, so seeding it once at the start of a game makes that
- * whole game's randomness reproducible. */
+/** Reset BOTH streams to known, independent starting points derived from
+ * one seed (e.g. a hash of today's date — see game/dailyChallenge.js). The
+ * environment stream and the default stream get different derived seeds
+ * (simple, deterministic, and independent enough for a kids' board game —
+ * this doesn't need to be cryptographically robust) so they don't happen to
+ * produce the same sequence. */
 export function seedRng(seed) {
-  state = (Math.floor(seed) || 0) >>> 0;
-  // Run the generator forward once so a seed of 0 (or any value that would
-  // otherwise produce a degenerate first output) still mixes properly.
-  nextUint32();
+  const base = (Math.floor(seed) || 0) >>> 0;
+  defaultGen.reseed(base);
+  envGen.reseed((base ^ 0x9e3779b9) >>> 0);
 }
 
 export function randomInt(min, max) {
-  return Math.floor(next() * (max - min + 1)) + min;
+  return defaultGen.randomInt(min, max);
 }
 
 export function randomFloat(min, max) {
-  return next() * (max - min) + min;
+  return defaultGen.randomFloat(min, max);
 }
 
-// Uniform noise in [-magnitude, +magnitude]
 export function noise(magnitude) {
-  return randomFloat(-magnitude, magnitude);
+  return defaultGen.noise(magnitude);
 }
 
-// True with probability `p` (0-1). Centralizing this (rather than every
-// caller writing its own `Math.random() < p`) is what keeps every
-// probabilistic decision in the engine part of the same seedable sequence.
 export function chance(p) {
-  return next() < p;
+  return defaultGen.chance(p);
 }
 
-// Weighted pick from an object like { a: 0.7, b: 0.3 } -> 'a' | 'b'
 export function weightedPick(weights) {
-  const entries = Object.entries(weights);
-  const total = entries.reduce((sum, [, w]) => sum + w, 0);
-  let roll = next() * total;
-  for (const [key, w] of entries) {
-    roll -= w;
-    if (roll <= 0) return key;
-  }
-  return entries[entries.length - 1][0];
+  return defaultGen.weightedPick(weights);
 }
 
 export function pickRandom(arr) {
-  return arr[randomInt(0, arr.length - 1)];
+  return defaultGen.pickRandom(arr);
 }
+
+// The environment stream — weather duration rolls (weather.js), price-drift
+// noise (market.js), and fortune-card draws (decks.js) ONLY. Nothing that
+// stems from a player's own choices should ever call these; see the module
+// comment above for why that boundary is what keeps Daily Challenge fair.
+export const envRandomInt = (min, max) => envGen.randomInt(min, max);
+export const envNoise = (magnitude) => envGen.noise(magnitude);
+export const envWeightedPick = (weights) => envGen.weightedPick(weights);
+export const envPickRandom = (arr) => envGen.pickRandom(arr);

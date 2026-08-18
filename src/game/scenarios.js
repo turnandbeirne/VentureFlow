@@ -9,7 +9,10 @@
 // through checkScenarioObjective below.
 // ============================================================================
 import { WEATHER_STAGES, getScenario, DEFAULT_SCENARIO_ID } from '../data/gameConfig';
-import { randomInt } from './rng';
+// Environment stream — the STARTING weather's duration is part of the
+// shared Daily Challenge environment, same as every other weather roll
+// (see weather.js / game/rng.js's module comment).
+import { envRandomInt as randomInt } from './rng';
 import { passiveIncome } from './players';
 
 export { getScenario, DEFAULT_SCENARIO_ID };
@@ -45,9 +48,10 @@ export function passiveIncomeTarget(scenario, difficultyId) {
  * `scenarioGoalMonth` set (so this only ever fires once per player) and an
  * announcement log entry (kind: 'objectiveMet', which both the event log
  * and the bot-chat reaction system already know how to display/react to —
- * see chatEngine.js).
+ * see chatEngine.js). `prices` is only needed for the passiveIncomeTarget
+ * check (dynamic Tree House rent depends on live price — see players.js).
  */
-export function checkScenarioObjective(scenario, difficultyId, players, month) {
+export function checkScenarioObjective(scenario, difficultyId, players, month, prices) {
   if (!scenario?.objective) return { players, logEntries: [] };
   const logEntries = [];
 
@@ -55,7 +59,7 @@ export function checkScenarioObjective(scenario, difficultyId, players, month) {
     const target = passiveIncomeTarget(scenario, difficultyId);
     const nextPlayers = players.map((p) => {
       if (p.scenarioGoalMonth != null) return p;
-      if (passiveIncome(p) >= target) {
+      if (passiveIncome(p, { allPlayers: players, prices, month }) >= target) {
         logEntries.push({
           icon: '🏁',
           message: `${p.name} reached the Passive Income Race goal — $${target}/mo!`,

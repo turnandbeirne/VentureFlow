@@ -6,7 +6,12 @@
 // it teaches that you can't perfectly time markets.
 // ============================================================================
 import { WEATHER_ORDER, WEATHER_STAGES } from '../data/gameConfig';
-import { randomInt } from './rng';
+// Uses the ENVIRONMENT rng stream (not the default one) — every player's
+// Daily Challenge run needs the identical weather timeline regardless of
+// what choices they made, and only the environment stream is guaranteed to
+// stay unaffected by player/robot decisions. See game/rng.js's module
+// comment for why the split exists.
+import { envRandomInt as randomInt } from './rng';
 
 /** Create the starting weather state (always begins on the first stage). */
 export function createWeatherState() {

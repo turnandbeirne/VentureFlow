@@ -1,16 +1,77 @@
-import { ASSETS, getBotPersonality, getSkillLevel } from '../data/gameConfig';
-import { assetValue, businessValue, netWorth, passiveIncome, avgPurchasePrice } from '../game/players';
+import { ASSETS, BUSINESS_UPGRADE_TRACKS, getBotPersonality, getSkillLevel } from '../data/gameConfig';
+import {
+  assetValue,
+  businessValue,
+  netWorth,
+  passiveIncome,
+  avgPurchasePrice,
+  effectiveRentPerUnit,
+  totalUnitsOwned,
+  businessMonthlyIncome,
+} from '../game/players';
+import { upgradeCost, canUpgradeTrack, activeMarketingBoostTotal } from '../game/businessUpgrades';
 import { playSound } from '../audio/soundEngine';
+
+const UPGRADE_TRACK_ORDER = ['marketing', 'sales', 'ops', 'rnd'];
+
+/** A business's upgrade section: read-only level/status chips always show
+ * (so anyone glancing at this business — including from the game-over
+ * screen — can see how it was grown), and the four action buttons only
+ * appear when `canUpgrade` is true (this player's own live turn). */
+function BusinessUpgrades({ business, month, cash, canUpgrade, onUpgrade }) {
+  const activeBoost = activeMarketingBoostTotal(business, month);
+  const pendingRnd = (business.pendingRnd || []).length;
+
+  return (
+    <div className="vf-biz-upgrades">
+      <div className="vf-biz-upgrades__status">
+        {activeBoost > 0 && (
+          <span className="vf-biz-upgrades__chip vf-biz-upgrades__chip--active">📣 +${activeBoost}/mo campaign live</span>
+        )}
+        <span className="vf-biz-upgrades__chip">🤝 Sales Lv{business.salesLevel || 0}/3</span>
+        <span className="vf-biz-upgrades__chip">⚙️ Ops Lv{business.opsLevel || 0}/3</span>
+        <span className="vf-biz-upgrades__chip">
+          🔬 R&D {business.rndCount || 0}/2{pendingRnd > 0 && ` (${pendingRnd} pending)`}
+        </span>
+      </div>
+      {canUpgrade && (
+        <div className="vf-biz-upgrades__actions">
+          {UPGRADE_TRACK_ORDER.map((trackId) => {
+            const track = BUSINESS_UPGRADE_TRACKS[trackId];
+            const capped = !canUpgradeTrack(business, trackId);
+            const cost = upgradeCost(business, trackId);
+            const affordable = cash >= cost;
+            return (
+              <button
+                key={trackId}
+                type="button"
+                className="vf-btn vf-btn--sm vf-btn--ghost vf-biz-upgrades__btn"
+                disabled={capped || !affordable}
+                title={track.blurb}
+                onClick={() => onUpgrade(business.id, trackId)}
+              >
+                {track.icon} {track.name} {capped ? '(maxed)' : `$${cost}`}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
 
 /**
  * Full portfolio breakdown for one player — opened by tapping their card in
- * PlayerPanel. Shows quantity owned + lifetime average purchase price per
- * asset (via avgPurchasePrice in game/players.js), current value and
- * gain/loss vs. that average, plus each business and its individual cash
- * flow. Read-only: no actions can be taken from here, so it's safe to open
- * for any player (including AI) at any time, even mid-turn.
+ * PlayerPanel (live game) or a standings row on the game-over screen.
+ * Shows quantity owned + lifetime average purchase price per asset (via
+ * avgPurchasePrice in game/players.js), current value and gain/loss vs.
+ * that average, plus each business, its current income, and how it's been
+ * grown so far. Actionable (the four business-upgrade buttons) only when
+ * `canUpgrade` is true — otherwise this is read-only and safe to open for
+ * any player, including AI, at any time, even mid-turn or after the game
+ * has ended.
  */
-export default function PlayerDetailModal({ player, prices, onClose }) {
+export default function PlayerDetailModal({ player, prices, allPlayers, month, canUpgrade = false, onUpgradeBusiness, onClose }) {
   if (!player) return null;
 
   function handleClose() {
@@ -18,9 +79,14 @@ export default function PlayerDetailModal({ player, prices, onClose }) {
     onClose();
   }
 
+  function handleUpgrade(businessId, trackId) {
+    playSound('click');
+    onUpgradeBusiness?.(player.id, businessId, trackId);
+  }
+
   const totalAssetValue = assetValue(player, prices);
   const totalBusinessValue = businessValue(player);
-  const totalBusinessIncome = player.businesses.reduce((sum, b) => sum + b.income, 0);
+  const totalBusinessIncome = player.businesses.reduce((sum, b) => sum + businessMonthlyIncome(b, month), 0);
 
   return (
     <div className="vf-modal-overlay" onClick={handleClose}>
@@ -63,7 +129,7 @@ export default function PlayerDetailModal({ player, prices, onClose }) {
             </div>
             <div className="vf-portfolio__summary-stat">
               <span className="vf-portfolio__summary-label">Passive / mo</span>
-              <span className="vf-portfolio__summary-value">${passiveIncome(player)}</span>
+              <span className="vf-portfolio__summary-value">${passiveIncome(player, { allPlayers, prices, month })}</span>
             </div>
           </div>
 
@@ -76,6 +142,7 @@ export default function PlayerDetailModal({ player, prices, onClose }) {
                 const currentPrice = prices[asset.id];
                 const currentValue = qty * currentPrice;
                 const gainPct = avgPrice ? ((currentPrice - avgPrice) / avgPrice) * 100 : null;
+                const rentPerUnit = asset.rentPerMonth > 0 ? effectiveRentPerUnit(asset, currentPrice, totalUnitsOwned(allPlayers, asset.id)) : 0;
 
                 if (qty === 0 && avgPrice === null) {
                   return (
@@ -83,7 +150,9 @@ export default function PlayerDetailModal({ player, prices, onClose }) {
                       <span className="vf-portfolio__asset-icon">{asset.icon}</span>
                       <div>
                         <div className="vf-portfolio__asset-name">{asset.name}</div>
-                        <div className="vf-portfolio__asset-detail">Never bought</div>
+                        <div className="vf-portfolio__asset-detail">
+                          Never bought{asset.rentPerMonth === 0 && ' · price only, no monthly income'}
+                        </div>
                       </div>
                       <span className="vf-portfolio__asset-value">—</span>
                     </div>
@@ -100,7 +169,10 @@ export default function PlayerDetailModal({ player, prices, onClose }) {
                       <div className="vf-portfolio__asset-detail">
                         Avg paid: {avgPrice !== null ? `$${avgPrice.toFixed(2)}` : '—'} · Now: $
                         {currentPrice.toFixed(2)}
-                        {asset.rentPerMonth > 0 && qty > 0 && <> · +${qty * asset.rentPerMonth}/mo rent</>}
+                        {asset.rentPerMonth > 0 && qty > 0 && rentPerUnit > 0 && (
+                          <> · +${(qty * rentPerUnit).toFixed(0)}/mo rent</>
+                        )}
+                        {asset.rentPerMonth === 0 && <> · price only, no monthly income</>}
                       </div>
                     </div>
                     <div>
@@ -131,9 +203,18 @@ export default function PlayerDetailModal({ player, prices, onClose }) {
             ) : (
               <div className="vf-portfolio__businesses">
                 {player.businesses.map((biz, i) => (
-                  <div key={biz.id} className="vf-portfolio__business-row">
-                    <span>🚀 {biz.name || `Business #${i + 1}`}</span>
-                    <span className="vf-portfolio__business-income">+${biz.income}/mo</span>
+                  <div key={biz.id} className="vf-portfolio__business-card">
+                    <div className="vf-portfolio__business-row">
+                      <span>🚀 {biz.name || `Business #${i + 1}`}</span>
+                      <span className="vf-portfolio__business-income">+${businessMonthlyIncome(biz, month)}/mo</span>
+                    </div>
+                    <BusinessUpgrades
+                      business={biz}
+                      month={month}
+                      cash={player.cash}
+                      canUpgrade={canUpgrade}
+                      onUpgrade={handleUpgrade}
+                    />
                   </div>
                 ))}
               </div>

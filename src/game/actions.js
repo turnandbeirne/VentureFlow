@@ -14,8 +14,10 @@ import {
   BUSINESS_INCOME_MAX,
   SKILL_COST,
   BUSINESS_NAMES,
+  BUSINESS_UPGRADE_TRACKS,
 } from '../data/gameConfig';
 import { randomInt, pickRandom } from './rng';
+import { upgradeCost, canUpgradeTrack, applyUpgrade } from './businessUpgrades';
 
 /** A random whimsical name for a new business, preferring one this player
  * hasn't already used this game (500 names is far more than any game will
@@ -99,7 +101,17 @@ export function startBusiness(state, playerId) {
 
   const income = randomInt(BUSINESS_INCOME_MIN, BUSINESS_INCOME_MAX);
   const name = pickBusinessName(player.businesses);
-  const business = { id: `${playerId}-biz-${player.businesses.length + 1}`, name, income };
+  const business = {
+    id: `${playerId}-biz-${player.businesses.length + 1}`,
+    name,
+    income,
+    totalInvested: BUSINESS_COST, // grows with every upgrade bought — see businessValue() in players.js
+    salesLevel: 0,
+    opsLevel: 0,
+    rndCount: 0,
+    tempBoosts: [], // active Marketing boosts — [{ amount, expiresMonth }]
+    pendingRnd: [], // in-flight R&D projects — [{ resolveMonth }]
+  };
 
   const nextState = updatePlayer(state, playerId, (p) => ({
     ...p,
@@ -112,6 +124,43 @@ export function startBusiness(state, playerId) {
     state: nextState,
     ok: true,
     logEntry: { icon: '🚀', message: `started ${name} (+$${income}/mo)`, kind: 'business', playerId },
+  };
+}
+
+/**
+ * Invest in one of a business's four upgrade tracks — Marketing, Sales,
+ * Operations, or R&D (see gameConfig.js's BUSINESS_UPGRADE_TRACKS and
+ * game/businessUpgrades.js for what each one actually does). Validates
+ * ownership, that the track hasn't already hit its cap for this business,
+ * and that the player can afford the current cost (which shrinks with that
+ * business's Operations level).
+ */
+export function upgradeBusiness(state, playerId, businessId, trackId) {
+  const player = findPlayer(state, playerId);
+  const track = BUSINESS_UPGRADE_TRACKS[trackId];
+  if (!player || !track) return { state, ok: false, error: 'Invalid upgrade.' };
+
+  const business = player.businesses.find((b) => b.id === businessId);
+  if (!business) return { state, ok: false, error: 'Invalid business.' };
+  if (!canUpgradeTrack(business, trackId)) {
+    return { state, ok: false, error: `${track.name} is already maxed out for ${business.name}.` };
+  }
+
+  const cost = upgradeCost(business, trackId);
+  if (player.cash < cost) return { state, ok: false, error: `Not enough cash to invest in ${track.name}.` };
+
+  const { business: nextBusiness, description } = applyUpgrade(business, trackId, state.month);
+
+  const nextState = updatePlayer(state, playerId, (p) => ({
+    ...p,
+    cash: p.cash - cost,
+    businesses: p.businesses.map((b) => (b.id === businessId ? nextBusiness : b)),
+  }));
+
+  return {
+    state: nextState,
+    ok: true,
+    logEntry: { icon: track.icon, message: description, kind: 'businessUpgrade', playerId },
   };
 }
 

@@ -6,7 +6,9 @@
 // off src/data/gameConfig.js — add a new asset there and it prices itself.
 // ============================================================================
 import { ASSETS, MIN_ASSET_PRICE } from '../data/gameConfig';
-import { noise } from './rng';
+// Environment stream — see game/rng.js's module comment and weather.js for
+// why price drift can't share a stream with anything player-choice-driven.
+import { envNoise as noise } from './rng';
 import { getStageInfo } from './weather';
 
 export function createInitialPrices() {

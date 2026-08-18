@@ -170,6 +170,12 @@ export const FINANCIAL_LESSONS = {
     blurb:
       "A badge isn't just a prize — it's proof you built a genuinely good money habit. The more of these habits you practice, the more they add up over time.",
   },
+  reinvestment: {
+    icon: '🔁',
+    title: 'Reinvesting in what you own',
+    blurb:
+      "Putting more money into something you already have — like upgrading a business instead of starting a brand new one — is called reinvesting. It's one of the most reliable ways to make something you own grow even more.",
+  },
 };
 
 // ---------------------------------------------------------------------------
@@ -192,6 +198,77 @@ export const BUSINESS_COST = 300;
 export const BUSINESS_SKILL_COST = 1;
 export const BUSINESS_INCOME_MIN = 30;
 export const BUSINESS_INCOME_MAX = 70;
+
+// ---------------------------------------------------------------------------
+// Business upgrades — four ways to keep growing a business after starting it
+// ---------------------------------------------------------------------------
+// Each track models a different real business lever, and each behaves
+// mechanically differently on purpose (see game/businessUpgrades.js):
+// Marketing buys a temporary revenue spike that fades; Sales grows the
+// permanent customer base a little at a time (capped, so it's a steady
+// climb rather than a runaway number); Operations makes the business run
+// leaner, discounting every OTHER upgrade bought for it afterward; R&D is a
+// bigger, slower, riskier bet — cash now for a delayed payoff that's never
+// zero, but is sometimes small and sometimes big, on purpose (that
+// variance is the point).
+export const BUSINESS_UPGRADE_TRACKS = {
+  marketing: {
+    id: 'marketing',
+    name: 'Marketing',
+    icon: '📣',
+    cost: 120,
+    blurb: 'A short ad campaign — a quick income bump that fades after a few months.',
+  },
+  sales: {
+    id: 'sales',
+    name: 'Sales',
+    icon: '🤝',
+    cost: 180,
+    blurb: 'Grow the customer base — smaller than Marketing, but permanent.',
+  },
+  ops: {
+    id: 'ops',
+    name: 'Operations',
+    icon: '⚙️',
+    cost: 150,
+    blurb: "Run leaner — makes every future upgrade on this business cheaper.",
+  },
+  rnd: {
+    id: 'rnd',
+    name: 'R&D',
+    icon: '🔬',
+    cost: 250,
+    blurb: 'Invest in innovation — a bigger, slower, riskier bet that always pays off SOMETHING.',
+  },
+};
+
+export const MARKETING_BOOST_AMOUNT = 25;
+export const MARKETING_BOOST_MONTHS = 3;
+export const SALES_BOOST_AMOUNT = 15;
+export const SALES_MAX_LEVEL = 3;
+export const OPS_DISCOUNT_PER_LEVEL = 0.1;
+export const OPS_MAX_LEVEL = 3;
+export const RND_DELAY_MONTHS = 2;
+export const RND_MAX_PROJECTS = 2;
+export const RND_BIG_PAYOFF_CHANCE = 0.65;
+export const RND_BIG_PAYOFF_AMOUNT = 40;
+export const RND_SMALL_PAYOFF_AMOUNT = 15;
+
+// ---------------------------------------------------------------------------
+// Tree House rent dynamics
+// ---------------------------------------------------------------------------
+// A rent-bearing asset's "baseline yield" is derived from its own
+// rentPerMonth / basePrice (Tree House: 40/250 = 16%) in game/players.js,
+// rather than a separate config field — so the existing rentPerMonth number
+// keeps meaning "what one unit pays in the normal, uncrowded case," and any
+// future rent-bearing asset needs no new config here. The first couple of
+// units anyone at the table owns pay that full baseline; every unit beyond
+// that — counted across EVERY player, not just one — crowds the rental
+// market a bit more and pulls the per-unit yield down, floored so it never
+// goes to nothing.
+export const RENT_OVERSUPPLY_FREE_UNITS = 2;
+export const RENT_OVERSUPPLY_RATE = 0.15;
+export const RENT_MIN_YIELD_FACTOR = 0.35;
 
 // Prices can never drift below this (keeps the game from ever showing $0 or
 // negative prices).

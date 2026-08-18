@@ -680,3 +680,118 @@ handling scenario goals get. The bigger celebration (fireworks + applause,
 already used for other big moments) now also covers these swing moments,
 making a genuine overtake feel like the game event it is instead of quietly
 scrolling past in the log.
+
+## Clearer Lemonade Co. and dynamic Tree House rent
+
+Two related fixes to what was actually a confusing pair of mechanics: an
+asset with `rentPerMonth: 0` (Lemonade Co., Treasure Chest, Piggy Bank)
+generated no visible label at all in `AssetShop.jsx`, which read as a gap
+rather than as "this one pays no monthly income" — Lemonade Co. in
+particular is pure price appreciation/depreciation (weather + its own
+volatility + a couple of specific fortune cards), never cash flow, and nothing
+about the old blank space said so. Every zero-income asset card now shows an
+explicit "💵 Price only — no monthly income" line instead of nothing.
+
+Tree House's rent was the other half: `rentPerMonth: 40` was a flat
+constant regardless of price or how many were ever bought, even though the
+price itself drifted every month like any other asset — two numbers that
+should have been connected but weren't. `game/players.js`'s
+`effectiveRentPerUnit()` now derives a baseline yield from the asset's own
+`rentPerMonth`/`basePrice` (Tree House: 40/250 = 16%) and multiplies it by
+the *live* price, so rent rises and falls with price the way a real rental
+cap rate would. On top of that, the first couple of units owned **across
+the whole table** (not just one player — see `totalUnitsOwned()`) pay that
+full baseline; every unit beyond that crowds the shared rental market a bit
+more and pulls the per-unit yield down (floored so it never goes to
+nothing) — `RENT_OVERSUPPLY_FREE_UNITS`/`RENT_OVERSUPPLY_RATE`/
+`RENT_MIN_YIELD_FACTOR` in `gameConfig.js`. `AssetShop.jsx`'s Tree House
+card now shows the live computed rent instead of a static number, plus a
+plain-language "Market: getting crowded" / "Market: very crowded" tag once
+the shared oversupply threshold is crossed, so the mechanic is visible
+instead of hidden inside a formula.
+
+Because rent now depends on what *every* player owns, a robot's own cash
+(and so its own turn-by-turn decisions) can be nudged by what a human
+bought — which surfaced a real bug while building this: `game/rng.js` used
+to be a single shared random-number stream for everything, and Daily
+Challenge's fairness guarantee (see above) depends on every player getting
+the *identical* weather/price/fortune-card sequence regardless of their own
+choices. A robot needing more or fewer decision-rolls because its rent
+income shifted was enough to desync that shared stream. Fixed by splitting
+`rng.js` into two independent streams: an "environment" stream (weather
+duration, price drift noise, fortune-card draws — `envRandomInt`/
+`envNoise`/`envWeightedPick`/`envPickRandom`, used only by `weather.js`,
+`market.js`, `decks.js`, and `scenarios.js`'s starting-weather roll) that
+every Daily Challenge player shares bit-for-bit, and the original default
+stream for everything that stems from a player's own choices (business
+income rolls, robot decision-making, R&D payoffs). `seedRng()` seeds both
+from one input seed with two independently-derived starting points, so
+Daily Challenge is still fully deterministic per date — just correctly
+isolated from anything player choices can perturb.
+
+## Business upgrades: Marketing, Sales, Operations, and R&D
+
+A started business used to be pure autopilot: one decision (pay $300 + a
+skill token), then a fixed, randomly-rolled income forever with nothing
+further to do. Businesses can now be reinvested in via four upgrade tracks
+— `gameConfig.js`'s `BUSINESS_UPGRADE_TRACKS`, applied by
+`game/businessUpgrades.js` — each modeling a different real lever, and each
+behaving mechanically differently on purpose rather than being four
+reskins of the same button:
+
+- **📣 Marketing** ($120) — a short campaign: +$25/mo for the next 3
+  months, then it fades. No cap on repeat purchases (every one costs real
+  cash and only ever helps briefly).
+- **🤝 Sales** ($180) — grows the permanent customer base: +$15/mo,
+  forever, capped at 3 purchases per business so it's a steady climb
+  rather than a runaway number.
+- **⚙️ Operations** ($150) — doesn't touch income directly; each level
+  (capped at 3) discounts every *other* upgrade bought for that business
+  by 10% (never discounting itself, or Operations would just be strictly
+  better than the other three tracks). "Running leaner" makes future
+  investment cheaper, not more income today.
+- **🔬 R&D** ($250) — the riskiest, slowest bet, capped at 2 projects per
+  business: cash spent now queues a project that resolves 2 months later
+  (`RND_DELAY_MONTHS`) for a permanent bump that's always *something* —
+  65% chance of a big payoff (+$40/mo), 35% chance of a smaller one
+  (+$15/mo) — never nothing, so it reads as "a risk worth taking," not a
+  trap, while the size variance still teaches that R&D is less certain
+  than Sales.
+
+`actions.js`'s new `upgradeBusiness()` validates ownership, the track's cap,
+and cost (after any Operations discount) the same way every other action
+does, and `turnEngine.js`'s month-end resolution now has a step *before*
+payday that resolves any R&D project whose delay is up and drops expired
+Marketing boosts (`resolvePendingRnd()`/`pruneExpiredBoosts()`) — so a
+project that resolves this month already counts toward this month's
+paycheck instead of showing up a month late. A business's net-worth
+contribution (`businessValue()` in `players.js`) now tracks
+`totalInvested` — the original $300 plus every upgrade actually paid for
+— instead of a flat per-business constant, so reinvesting in a business is
+real net-worth growth, not just a cash-flow trick. Upgrade buttons live in
+`PlayerDetailModal.jsx`'s business rows, but only render when
+`canUpgrade` is true (viewing your own live turn — `GameBoard.jsx` computes
+this); opening any other player's card, including an AI's or your own
+after the game has ended, stays exactly as read-only as it always was,
+just now also showing each business's upgrade levels so it's visible how
+it was grown. A first business-upgrade purchase also surfaces a new
+"reinvesting in what you own" financial lesson (`FINANCIAL_LESSONS.reinvestment`
+in `gameConfig.js`), same one-time-per-game treatment as every other lesson.
+
+Bots don't use this system yet — every robot personality still just starts
+businesses and never upgrades them, a deliberate scope cut to keep this
+round's AI behavior unchanged and easy to reason about. A follow-up could
+teach e.g. DaddyBigBux's `tycoon` strategy to reinvest in its own
+businesses, but that's future work, not something this round claims to do.
+
+## Portfolio breakdown available at game-over
+
+Tapping a player's card always showed a live gain/loss breakdown per asset
+(average price paid vs. current price) and each business's income, but
+that view — `PlayerDetailModal.jsx` — was never wired up on the game-over
+screen, which is exactly when "how did my Lemonade Co. actually do this
+game?" is the more interesting question. Every row in the final standings
+is now tappable (`GameOverScreen.jsx`), opening the same portfolio
+breakdown in its normal read-only mode (no upgrade buttons — the game's
+over, there's nothing left to invest in) for any player, not just the
+winner.

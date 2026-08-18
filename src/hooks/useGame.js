@@ -65,6 +65,10 @@ export function useGame() {
     dispatch({ type: 'LEARN_SKILL', playerId });
   }, []);
 
+  const upgradeBusiness = useCallback((playerId, businessId, trackId) => {
+    dispatch({ type: 'UPGRADE_BUSINESS', playerId, businessId, trackId });
+  }, []);
+
   const endTurn = useCallback((playerId) => {
     dispatch({ type: 'END_TURN', playerId });
   }, []);
@@ -90,6 +94,7 @@ export function useGame() {
     sellAsset,
     startBusiness,
     learnSkill,
+    upgradeBusiness,
     endTurn,
     ackFortuneCard,
     sendChat,

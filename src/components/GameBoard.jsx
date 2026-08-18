@@ -101,6 +101,7 @@ export default function GameBoard({ game }) {
           <PlayerPanel
             players={players}
             prices={assetPrices}
+            month={month}
             activePlayerIndex={activePlayerIndex}
             onSelectPlayer={(playerId) => {
               playSound('click');
@@ -122,6 +123,7 @@ export default function GameBoard({ game }) {
             prices={assetPrices}
             previousPrices={previousAssetPrices}
             player={activePlayer}
+            allPlayers={players}
             disabled={!isHumanTurn}
             onBuy={(assetId) => game.buyAsset(activePlayer.id, assetId, 1)}
             onSell={(assetId) => game.sellAsset(activePlayer.id, assetId, 1)}
@@ -157,6 +159,13 @@ export default function GameBoard({ game }) {
         <PlayerDetailModal
           player={selectedPlayer}
           prices={assetPrices}
+          allPlayers={players}
+          month={month}
+          // Upgrade buttons only appear when viewing YOUR OWN active turn —
+          // opening any other player's card (including mid-turn, including
+          // AI) stays read-only, same as it always has been.
+          canUpgrade={isHumanTurn && selectedPlayer.id === activePlayer?.id}
+          onUpgradeBusiness={(playerId, businessId, trackId) => game.upgradeBusiness(playerId, businessId, trackId)}
           onClose={() => setSelectedPlayerId(null)}
         />
       )}
