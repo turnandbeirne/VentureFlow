@@ -27,7 +27,7 @@ import { driftPrices } from './market';
 import { tickWeather, getStageInfo } from './weather';
 import { drawFortuneCard, applyCardEffect } from './decks';
 import { evaluateBadges } from './badges';
-import { netWorth, passiveIncome, rollWeatherIncomeAmounts } from './players';
+import { netWorth, passiveIncomeBreakdown, rollWeatherIncomeAmounts } from './players';
 import { getScenario, checkScenarioObjective } from './scenarios';
 import { resolvePendingRnd, pruneExpiredBoosts, applyBusinessDecline } from './businessUpgrades';
 import { rollBusinessExit } from './businessExits';
@@ -64,18 +64,20 @@ function currentLeaderId(players, prices, month) {
  * never needs its own RNG draw (see businessExits.js's module comment on
  * why the environment stream's draw count/order can never depend on player
  * choices — this sidesteps the question entirely by not drawing at all).
- * A truly rich offer (10x/20x) is always taken — nobody turns down a
+ * `exit.multiplier` is now a multiple of ANNUAL revenue (1x-15x — see
+ * gameConfig.js's BUSINESS_EXIT_MULTIPLIER_WEIGHTS), not monthly. A truly
+ * rich offer (8x/15x annual revenue) is always taken — nobody turns down a
  * jackpot. Below that, it comes down to temperament: a tycoon (chasing
- * businesses, not cash-outs) holds out for at least 8x; a hoarder/saver
+ * businesses, not cash-outs) holds out for at least 4x; a hoarder/saver
  * (cash now beats a maybe-better offer later) takes anything reasonable;
- * everyone else takes the common 5x/8x middle ground but shrugs off a
- * lowball 2x.
+ * everyone else takes the common 2x/4x middle ground but shrugs off a
+ * lowball 1x.
  */
 function aiDecideExitOffer(player, exit) {
-  if (exit.multiplier >= 10) return true;
-  if (player?.strategyId === 'tycoon') return exit.multiplier >= 8;
+  if (exit.multiplier >= 8) return true;
+  if (player?.strategyId === 'tycoon') return exit.multiplier >= 4;
   if (player?.strategyId === 'hoarder' || player?.strategyId === 'saver') return true;
-  return exit.multiplier >= 5;
+  return exit.multiplier >= 2;
 }
 
 /**
@@ -99,6 +101,13 @@ function applyExitOutcome(players, exit, accepted, month) {
           ...p.soldBusinesses,
           { id: exit.businessId, name: exit.business.name, income: exit.income, multiplier: exit.multiplier, payout: exit.payout, month },
         ],
+        // See game/turnEngine.js's ledger notes near finishMonthEnd — every
+        // cash movement gets a matching entry so the portfolio's Cash
+        // Ledger can show exactly where a buyout payout came from.
+        ledger: [
+          ...(p.ledger || []),
+          { month, type: 'in', amount: exit.payout, source: `Buyout: sold ${bizName}`, detail: `${exit.multiplier}x annual revenue` },
+        ],
       };
     });
     const rarity = BUSINESS_EXIT_RARITY_LABELS[exit.multiplier] || 'rare';
@@ -106,7 +115,7 @@ function applyExitOutcome(players, exit, accepted, month) {
       players: nextPlayers,
       logEntry: {
         icon: '💼',
-        message: `${targetPlayer.name} sold ${bizName} for $${exit.payout} (${exit.multiplier}x monthly revenue, a ${rarity} offer)!`,
+        message: `${targetPlayer.name} sold ${bizName} for $${exit.payout} (${exit.multiplier}x annual revenue, a ${rarity} offer)!`,
         kind: 'businessExit',
         playerId: exit.playerId,
       },
@@ -119,9 +128,9 @@ function applyExitOutcome(players, exit, accepted, month) {
           icon: '💼',
           title: 'Buyout Offer!',
           flavor: `A buyer wanted ${bizName} — and they weren't lowballing.`,
-          why: 'Selling a business for a multiple of what it earns each month is called an "exit" — the more monthly income you had built up before the offer came, the bigger the payday.',
+          why: 'Selling a business for a multiple of its annual revenue is called an "exit" — the more you had built up before the offer came, the bigger the payday.',
         },
-        description: `Sold for $${exit.payout} (${exit.multiplier}x monthly revenue)!`,
+        description: `Sold for $${exit.payout} (${exit.multiplier}x annual revenue)!`,
       },
     };
   }
@@ -130,7 +139,7 @@ function applyExitOutcome(players, exit, accepted, month) {
     players,
     logEntry: {
       icon: '🤝',
-      message: `${targetPlayer.name} turned down a $${exit.payout} buyout offer for ${bizName} (${exit.multiplier}x monthly revenue) and kept building.`,
+      message: `${targetPlayer.name} turned down a $${exit.payout} buyout offer for ${bizName} (${exit.multiplier}x annual revenue) and kept building.`,
       kind: 'businessExitDeclined',
       playerId: exit.playerId,
     },
@@ -145,7 +154,7 @@ function applyExitOutcome(players, exit, accepted, month) {
         flavor: `${targetPlayer.name} turned down a buyer for ${bizName}, betting it's worth more kept.`,
         why: "Turning down cash now to keep growing something you own can pay off bigger later — but it's a real gamble; there's no guarantee a better offer ever comes again.",
       },
-      description: `Declined a $${exit.payout} offer (${exit.multiplier}x monthly revenue).`,
+      description: `Declined a $${exit.payout} offer (${exit.multiplier}x annual revenue).`,
     },
   };
 }
@@ -214,7 +223,7 @@ function beginMonthEnd(state) {
       const bizName = exit.business.name || 'a business';
       logEntries.push({
         icon: '💼',
-        message: `${targetPlayer.name} got a buyout offer for ${bizName} — $${exit.payout} (${exit.multiplier}x monthly revenue)! Decide before the month wraps up.`,
+        message: `${targetPlayer.name} got a buyout offer for ${bizName} — $${exit.payout} (${exit.multiplier}x annual revenue)! Decide before the month wraps up.`,
         kind: 'businessExitOffer',
         playerId: exit.playerId,
       });
@@ -269,8 +278,26 @@ function finishMonthEnd(state, players, logEntries, month, scenario, leaderBefor
   const allowance = state.monthlyAllowance ?? MONTHLY_ALLOWANCE;
   const incomeContext = { allPlayers: players, prices: state.assetPrices, month, weatherIncomeAmounts };
   players = players.map((p) => {
-    const income = allowance + passiveIncome(p, incomeContext);
-    return { ...p, cash: p.cash + income };
+    // passiveIncomeBreakdown gives both the exact total (identical to the
+    // old passiveIncome() call — same formula, same single final rounding,
+    // so the actual cash credited is unchanged) AND its individually-
+    // rounded parts, purely for the Cash Ledger's "source" breakdown below.
+    // Those parts can differ from the total by a dollar or so (rounding
+    // three numbers separately vs. rounding their sum once) — acceptable
+    // for a human-readable "here's roughly where it came from" line, since
+    // the ledger ENTRY's own `amount` always matches the real cash change
+    // exactly, only the descriptive breakdown text is approximate.
+    const breakdown = passiveIncomeBreakdown(p, incomeContext);
+    const income = allowance + breakdown.total;
+    const parts = [`$${allowance} allowance`];
+    if (breakdown.businessIncome) parts.push(`$${breakdown.businessIncome} business income`);
+    if (breakdown.assetIncome) parts.push(`$${breakdown.assetIncome} asset income`);
+    if (breakdown.passiveBonus) parts.push(`$${breakdown.passiveBonus} card bonus`);
+    return {
+      ...p,
+      cash: p.cash + income,
+      ledger: [...(p.ledger || []), { month, type: 'in', amount: income, source: 'Payday', detail: parts.join(' + ') }],
+    };
   });
   logEntries.push({ icon: '💰', message: `Payday! Everyone collected their allowance and passive income.`, kind: 'payday' });
 
@@ -281,7 +308,28 @@ function finishMonthEnd(state, players, logEntries, month, scenario, leaderBefor
     const player = players[i];
     const { deckId, card } = drawFortuneCard(state.weather);
     const applied = applyCardEffect(player, prices, card);
-    players[i] = applied.player;
+    // Only some fortune cards move cash (a plain $ bump/hit, a % of cash,
+    // or a per-unit-owned amount — see decks.js's applyCardEffect); others
+    // just shift an asset's price or hand out a skill token. Comparing
+    // cash before/after — rather than inspecting the card's effect
+    // type(s) directly — catches every current and future cash-moving
+    // effect type without this file needing to know its name.
+    const cashDelta = applied.player.cash - player.cash;
+    players[i] = cashDelta !== 0
+      ? {
+          ...applied.player,
+          ledger: [
+            ...(applied.player.ledger || []),
+            {
+              month,
+              type: cashDelta > 0 ? 'in' : 'out',
+              amount: Math.abs(cashDelta),
+              source: `Fortune card: ${card.title}`,
+              detail: applied.description,
+            },
+          ],
+        }
+      : applied.player;
     prices = applied.prices;
     logEntries.push({
       icon: card.icon,

@@ -60,6 +60,10 @@ export function buyAsset(state, playerId, assetId, qty = 1) {
         spent: (p.purchaseStats?.[assetId]?.spent || 0) + cost,
       },
     },
+    ledger: [
+      ...(p.ledger || []),
+      { month: state.month, type: 'out', amount: cost, source: `Bought ${asset.name}`, detail: qty > 1 ? `${qty} units` : undefined },
+    ],
   }));
 
   return {
@@ -84,6 +88,10 @@ export function sellAsset(state, playerId, assetId, qty = 1) {
     ...p,
     cash: p.cash + proceeds,
     holdings: { ...p.holdings, [assetId]: owned - qty },
+    ledger: [
+      ...(p.ledger || []),
+      { month: state.month, type: 'in', amount: proceeds, source: `Sold ${asset.name}`, detail: qty > 1 ? `${qty} units` : undefined },
+    ],
   }));
 
   return {
@@ -131,6 +139,7 @@ export function startBusiness(state, playerId) {
     skillTokens: p.skillTokens - BUSINESS_SKILL_COST,
     businesses: [...p.businesses, business],
     businessSeq: nextSeq,
+    ledger: [...(p.ledger || []), { month: state.month, type: 'out', amount: BUSINESS_COST, source: `Started business: ${name}` }],
   }));
 
   return {
@@ -168,6 +177,10 @@ export function upgradeBusiness(state, playerId, businessId, trackId) {
     ...p,
     cash: p.cash - cost,
     businesses: p.businesses.map((b) => (b.id === businessId ? nextBusiness : b)),
+    ledger: [
+      ...(p.ledger || []),
+      { month: state.month, type: 'out', amount: cost, source: `Upgraded ${business.name}`, detail: track.name },
+    ],
   }));
 
   return {
@@ -186,6 +199,7 @@ export function learnSkill(state, playerId) {
     ...p,
     cash: p.cash - SKILL_COST,
     skillTokens: p.skillTokens + 1,
+    ledger: [...(p.ledger || []), { month: state.month, type: 'out', amount: SKILL_COST, source: 'Learned a skill' }],
   }));
 
   return {

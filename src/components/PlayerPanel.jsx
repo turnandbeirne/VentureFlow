@@ -2,6 +2,7 @@ import { netWorth, passiveIncome } from '../game/players';
 import { getBadgeInfo } from '../game/badges';
 import { getSkillLevel } from '../data/gameConfig';
 import { businessHealthStatus } from '../game/businessUpgrades';
+import WealthPile from './WealthPile';
 
 /** "🤖 GrumpyMommy · 🦈 Shark" for a robot with a known skill level, or a
  * plain "AI player" for one saved before this feature existed. */
@@ -28,6 +29,7 @@ function worstBusinessHealth(player, month) {
 
 function PlayerCard({ player, prices, allPlayers, month, weatherIncomeAmounts, isActive, onSelect }) {
   const worstHealth = worstBusinessHealth(player, month);
+  const playerNetWorth = netWorth(player, prices);
   // A <button> can't legally contain another <button> (the invest CTA
   // below), so the whole-card tap target is a div with button semantics
   // bolted on (role/tabIndex/Enter+Space) instead of a real <button> — see
@@ -50,8 +52,9 @@ function PlayerCard({ player, prices, allPlayers, month, weatherIncomeAmounts, i
         <span>{player.avatar}</span>
         <span>{player.name}</span>
         {player.type === 'ai' && <span title={botTooltip(player)}>🤖</span>}
+        <WealthPile netWorth={playerNetWorth} />
       </div>
-      <div className="vf-player-card__networth">${netWorth(player, prices).toLocaleString()}</div>
+      <div className="vf-player-card__networth">${playerNetWorth.toLocaleString()}</div>
       <div className="vf-player-card__stat">💵 Cash: ${Math.round(player.cash).toLocaleString()}</div>
       <div className="vf-player-card__stat">
         🌱 Passive: ${passiveIncome(player, { allPlayers, prices, month, weatherIncomeAmounts })}/mo · 💡 {player.skillTokens}

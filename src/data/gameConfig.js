@@ -318,16 +318,23 @@ export const BUSINESS_DECLINE_INCOME_FLOOR = 10;
 // than a fixed schedule — see game/businessExits.js), the table gets a shot
 // at an acquisition offer: one random player, IF they currently own any
 // business, gets bought out for a multiple of that business's current
-// monthly income. This directly rewards every dollar put into Marketing/
+// ANNUAL revenue (its monthly income × 12) — the standard way a real
+// business valuation is actually framed, rather than a multiple of a single
+// month's income. This directly rewards every dollar put into Marketing/
 // Sales/Ops/R&D (see BUSINESS_UPGRADE_TRACKS above) — a business earning
 // more per month is worth more the instant an offer shows up.
 export const BUSINESS_EXIT_CHANCE_PER_MONTH = 1 / 6;
-// Keyed by multiplier (envWeightedPick reads plain {key: weight} objects —
-// see game/rng.js); weights sum to 100 so they read directly as percentages
-// of a fired exit event. 5x/8x are the common outcomes, 2x/10x are rarer,
-// and 20x is a true jackpot.
-export const BUSINESS_EXIT_MULTIPLIER_WEIGHTS = { 2: 9, 5: 40, 8: 40, 10: 9, 20: 2 };
-export const BUSINESS_EXIT_RARITY_LABELS = { 2: 'rare', 5: 'common', 8: 'common', 10: 'rare', 20: 'very rare' };
+// Keyed by multiplier of ANNUAL revenue (envWeightedPick reads plain
+// {key: weight} objects — see game/rng.js); weights sum to 100 so they read
+// directly as percentages of a fired exit event. 2x/4x are the common
+// outcomes, 1x/8x are rarer, and 15x is a true jackpot. (These are plain
+// integers written in ascending order, which happens to sidestep a real
+// footgun: JS reorders integer-looking object keys to the front in
+// ascending numeric order regardless of insertion order — harmless here
+// since they're already in that order, but worth knowing before adding a
+// 6th tier out of sequence.)
+export const BUSINESS_EXIT_MULTIPLIER_WEIGHTS = { 1: 9, 2: 40, 4: 40, 8: 9, 15: 2 };
+export const BUSINESS_EXIT_RARITY_LABELS = { 1: 'rare', 2: 'common', 4: 'common', 8: 'rare', 15: 'very rare' };
 
 // ---------------------------------------------------------------------------
 // Tree House rent dynamics
@@ -1470,6 +1477,10 @@ export const LOCAL_STORAGE_KEY = 'ventureflow-save-v1';
 export const GAME_NAME = 'VentureFlow';
 export const PARENT_BRAND = 'VentureMaker';
 export const BRAND_TAGLINE = `A ${PARENT_BRAND}™ game`;
+// The credit line under the tagline (see Brand.jsx) — rendered in a
+// cursive/signature-style font to actually read like a signature rather
+// than a third line of body copy.
+export const BRAND_CREDIT = 'by Michael P Beirne';
 // Where the VentureMaker brand mark and the "learn more / connect with
 // entrepreneurs" callouts link out to (see components/Brand.jsx and
 // components/VentureMakerLink.jsx) — one place to update if it ever moves.

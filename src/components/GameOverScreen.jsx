@@ -18,6 +18,7 @@ import { ChatEntryRow } from './ChatPanel';
 import NetWorthChart from './NetWorthChart';
 import FamilyRecapModal from './FamilyRecapModal';
 import PlayerDetailModal from './PlayerDetailModal';
+import WealthPile from './WealthPile';
 
 export default function GameOverScreen({ state, onPlayAgain, onRecordProfileResult }) {
   const { players, assetPrices, winnerId, mode, difficultyId, scenarioId, dailyChallengeDate, month } = state;
@@ -227,6 +228,7 @@ export default function GameOverScreen({ state, onPlayAgain, onRecordProfileResu
               <span className="vf-standing-row__rank">{i + 1}</span>
               <span>
                 {player.avatar} {player.name}
+                <WealthPile netWorth={netWorth(player, assetPrices)} />
               </span>
               <span>${netWorth(player, assetPrices).toLocaleString()}</span>
             </button>

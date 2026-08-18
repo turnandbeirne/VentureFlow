@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { ASSETS, BUSINESS_UPGRADE_TRACKS, WEATHER_STAGES, getAssetIncomeRange, getBotPersonality, getSkillLevel } from '../data/gameConfig';
 import {
   assetValue,
@@ -11,6 +12,7 @@ import {
 } from '../game/players';
 import { upgradeCost, canUpgradeTrack, activeMarketingBoostTotal, businessHealthStatus } from '../game/businessUpgrades';
 import { playSound } from '../audio/soundEngine';
+import LedgerModal from './LedgerModal';
 
 const UPGRADE_TRACK_ORDER = ['marketing', 'sales', 'ops', 'rnd'];
 
@@ -72,6 +74,11 @@ function BusinessUpgrades({ business, month, cash, canUpgrade, onUpgrade }) {
  * has ended.
  */
 export default function PlayerDetailModal({ player, prices, allPlayers, month, weather, weatherIncomeAmounts, canUpgrade = false, onUpgradeBusiness, onClose }) {
+  // Hooks must run on every render regardless of the early-return below —
+  // this modal can be mounted (by GameBoard/GameOverScreen) before a
+  // player is actually selected, so `player` starts out null.
+  const [showLedger, setShowLedger] = useState(false);
+
   if (!player) return null;
 
   function handleClose() {
@@ -82,6 +89,11 @@ export default function PlayerDetailModal({ player, prices, allPlayers, month, w
   function handleUpgrade(businessId, trackId) {
     playSound('click');
     onUpgradeBusiness?.(player.id, businessId, trackId);
+  }
+
+  function openLedger() {
+    playSound('click');
+    setShowLedger(true);
   }
 
   const totalAssetValue = assetValue(player, prices);
@@ -97,9 +109,19 @@ export default function PlayerDetailModal({ player, prices, allPlayers, month, w
             <span>{player.name}</span>
             {player.type === 'ai' && <span title="AI player">🤖</span>}
           </div>
-          <button type="button" className="vf-btn vf-btn--sm vf-btn--ghost" onClick={handleClose}>
-            Close
-          </button>
+          <div className="vf-portfolio__header-actions">
+            <button
+              type="button"
+              className="vf-btn vf-btn--sm vf-btn--ghost"
+              onClick={openLedger}
+              title="See every dollar in and out, from day one"
+            >
+              📒 Cash Ledger
+            </button>
+            <button type="button" className="vf-btn vf-btn--sm vf-btn--ghost" onClick={handleClose}>
+              Close
+            </button>
+          </div>
         </div>
 
         {player.type === 'ai' && player.personalityId && (
@@ -271,6 +293,8 @@ export default function PlayerDetailModal({ player, prices, allPlayers, month, w
           </div>
         </div>
       </div>
+
+      <LedgerModal open={showLedger} onClose={() => setShowLedger(false)} player={player} />
     </div>
   );
 }

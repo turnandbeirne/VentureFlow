@@ -79,6 +79,16 @@ export function createPlayer({
     turnComplete: false,
     scenarioGoalMonth: null, // month this player hit the scenario's objective, if any — see game/scenarios.js
     netWorthHistory: [], // [{ month, netWorth }] — one snapshot per completed month, see game/turnEngine.js
+    // Every cash movement this player has ever had, day 1 through game end
+    // — [{ month, type: 'in'|'out', amount, source, detail? }]. Appended to
+    // (never rewritten) at every site that actually changes `cash`: buying/
+    // selling an asset and starting a business/learning a skill/upgrading a
+    // business (actions.js), payday and fortune-card cash effects and an
+    // accepted buyout (turnEngine.js). Powers the portfolio's Cash Ledger
+    // (components/LedgerModal.jsx). Starts with the player's starting
+    // capital already as the first entry, so the ledger genuinely covers
+    // "day 1" and not just what happens after it.
+    ledger: startingCash > 0 ? [{ month: 1, type: 'in', amount: startingCash, source: 'Starting capital' }] : [],
   };
 }
 
@@ -276,18 +286,19 @@ export function businessMonthlyIncome(business, month) {
 }
 
 /**
- * A player's total passive (no-extra-effort) monthly income: per-unit
- * income from every asset that has any (dynamic rent from Tree House, this
- * period's rolled weather income from Lemonade Stand — see perUnitIncome
- * above, which is why `allPlayers`/`prices`/`weatherIncomeAmounts` are
- * needed now, not just this one player), every business's current
- * effective income, and any permanent fortune-card passiveBonus. `context`
- * is optional so a caller that only has this one player can still get a
- * (less precise, single-player-only) answer rather than crashing; `month`
- * defaults to "unknown," which safely excludes any temporary Marketing
- * boosts rather than guessing they're active.
+ * Same inputs/math as passiveIncome() below, but returns the three
+ * components separately (each individually rounded) alongside the exact
+ * same `total` passiveIncome() itself returns — used by turnEngine.js's
+ * payday step to build the Cash Ledger's human-readable "$X allowance +
+ * $Y business income + ..." breakdown without duplicating this formula.
+ * `total` is computed from the UNROUNDED parts (summed once, then
+ * rounded), exactly like the original single-number passiveIncome() always
+ * has, so splitting this out changes no player's actual income by even a
+ * penny — only the individually-rounded parts are new, and those are for
+ * display only (they can differ from `total` by a dollar or so, since
+ * rounding three numbers separately isn't the same as rounding their sum).
  */
-export function passiveIncome(player, context = {}) {
+export function passiveIncomeBreakdown(player, context = {}) {
   const allPlayers = context.allPlayers || [player];
   const prices = context.prices || {};
   const month = context.month;
@@ -301,7 +312,29 @@ export function passiveIncome(player, context = {}) {
     return sum + qty * perUnitIncome(a, { price, totalOwned: total, weatherIncomeAmounts });
   }, 0);
   const businessIncome = player.businesses.reduce((sum, b) => sum + businessMonthlyIncome(b, month), 0);
-  return Math.round(assetIncome + businessIncome + (player.passiveBonus || 0));
+  const passiveBonus = player.passiveBonus || 0;
+  return {
+    assetIncome: Math.round(assetIncome),
+    businessIncome: Math.round(businessIncome),
+    passiveBonus: Math.round(passiveBonus),
+    total: Math.round(assetIncome + businessIncome + passiveBonus),
+  };
+}
+
+/**
+ * A player's total passive (no-extra-effort) monthly income: per-unit
+ * income from every asset that has any (dynamic rent from Tree House, this
+ * period's rolled weather income from Lemonade Stand — see perUnitIncome
+ * above, which is why `allPlayers`/`prices`/`weatherIncomeAmounts` are
+ * needed now, not just this one player), every business's current
+ * effective income, and any permanent fortune-card passiveBonus. `context`
+ * is optional so a caller that only has this one player can still get a
+ * (less precise, single-player-only) answer rather than crashing; `month`
+ * defaults to "unknown," which safely excludes any temporary Marketing
+ * boosts rather than guessing they're active.
+ */
+export function passiveIncome(player, context = {}) {
+  return passiveIncomeBreakdown(player, context).total;
 }
 
 /**

@@ -1333,3 +1333,122 @@ the BMP). The new Playwright UI test (`test_ui_new_features.js`) confirms
 the Career Stats modal opens and shows injected totals, and that clicking
 Share Result actually copies the expected text to the clipboard on a
 crafted Daily Challenge game-over state.
+
+## A signature credit line under the brand mark
+
+The header now reads three lines instead of two: **VentureFlow**, *A
+VentureMaker™ game*, and — new — a cursive **by Michael P Beirne** credit
+underneath, styled like an actual signature rather than another line of
+UI copy. `Brand.jsx` gained a third `<div>` (`BRAND_CREDIT` in
+`gameConfig.js`) set in Dancing Script (`@fontsource/dancing-script`,
+self-hosted the same way the rest of the game's fonts already are —
+`main.jsx` only imports the one weight it actually uses, `600`) instead of
+the game's usual Fredoka. The whole mark — logo, tagline, and signature —
+is still one single link out to VentureMaker, unchanged from before.
+
+## A wealth pile that grows next to each player's name
+
+A quick, glanceable read on how someone's doing beyond the raw net-worth
+number: as a player's net worth crosses a series of thresholds, small
+icons pile up right next to their name — loose change first (🪙 at
+$500), then cash (💵 at $2,500), money bags (💰 at $10,000), jewels (💎 at
+$25,000), and finally the big-ticket lifestyle purchases: a sports car
+(🚗 at $50,000), a house (🏠 at $100,000), and a yacht (🛥️ at $250,000).
+Tiers are cumulative — a wealthy player shows every icon they've earned
+at once, not just the newest one — so the pile reads as something that's
+been genuinely building up over the course of the game, not a single
+badge that gets swapped out. Implemented as a small pure function
+(`wealthPileTiers()` in the new `game/wealthPile.js`, kept separate from
+the React that renders it, same pattern as `businessHealthStatus`) plus a
+`WealthPile.jsx` component wired into both the live player card
+(`PlayerPanel.jsx`) and the game-over standings (`GameOverScreen.jsx`), so
+the pile is visible throughout the game and still there for the final
+reveal at the end. Purely cosmetic — nothing else in the game reads these
+tiers — with a hover tooltip spelling out the exact net worth and which
+tiers have been reached, for anyone curious about the icons themselves.
+
+## A full Cash Ledger inside the player portfolio
+
+Every dollar that's ever moved for a player, from the game's first month
+through however far it's gotten, is now just a tap away: a new **📒 Cash
+Ledger** button in the portfolio breakdown's header (`PlayerDetailModal.jsx`)
+opens a dedicated modal (`LedgerModal.jsx`) listing every inflow and
+outflow in order, each with the month it happened, whether it was money
+in or out, and exactly where it came from or went — starting capital,
+a purchase or sale, starting a business, upgrading one, learning a skill,
+payday (with a breakdown of how much came from allowance vs. business
+income vs. asset income), a fortune card, or a buyout offer. It's
+read-only and safe to open for any player (human or AI) at any point in
+the game, same as the portfolio breakdown it lives inside.
+
+Under the hood, every player now carries a `ledger` array
+(`game/players.js`'s `createPlayer`, seeded with a "Starting capital"
+entry on day one) that gets a new entry appended — never rewritten —
+at every single site that actually changes `player.cash`: buying/selling
+an asset, starting a business, upgrading one, and learning a skill
+(`game/actions.js`), plus payday, an accepted buyout, and any fortune
+card with a cash effect (`game/turnEngine.js`). Fortune cards are handled
+generically — rather than checking each card's effect type by name, the
+ledger just compares a player's cash before and after `applyCardEffect`
+runs, so a card that doesn't touch cash (a price shift, a skill token)
+correctly produces no ledger noise, and any *future* cash-effect type
+gets ledger coverage for free. Every ledger entry's `amount` is always
+the exact, real cash change — never a derived/estimated figure — so the
+ledger can never drift out of sync with the number on the player's card;
+the one place an approximation shows up is payday's descriptive
+breakdown text (allowance/business/asset amounts are rounded
+individually for readability and can be a dollar off from their sum,
+while the actual entry `amount` credited always matches the real payday
+total exactly).
+
+Verified with a new dedicated Node test (`test_cash_ledger.mjs`, 30
+checks) covering every action's entry shape, that payday's entry amount
+exactly matches the real cash gained that month, and — the strongest
+check — a full multi-player game where every player's starting cash plus
+their entire ledger history sums to EXACTLY their actual current cash,
+confirming no cash-moving site was missed. The new Playwright UI test
+(`test_ui_round3.js`) opens the ledger from a real game, confirms it
+shows the starting-capital entry and a fresh purchase, and confirms
+closing the ledger doesn't also close the portfolio underneath it (the
+ledger nests inside the portfolio's own modal overlay — a first for this
+game's modals — so its backdrop click needed an explicit
+`stopPropagation` to avoid closing both at once).
+
+## Buyout offers are now a multiple of annual revenue, not monthly
+
+A business buyout offer's multiplier (see the "real accept/decline
+decision" section above) was being applied to a single month's income,
+which doesn't match how a real business valuation is actually framed —
+a buyer values a business against what it earns in a YEAR, not what it
+happened to earn last month. `game/businessExits.js`'s `rollBusinessExit`
+now computes `annualIncome` (monthly income × 12) and applies the
+multiplier to that instead: `BUSINESS_EXIT_MULTIPLIER_WEIGHTS` moved from
+2x/5x/8x/10x/20x-of-monthly to **1x/2x/4x/8x/15x-of-annual** (weighted so
+2x/4x are the common outcomes, 1x/8x are rarer, and 15x is a true
+jackpot) — clean, easy-to-read multiples of a full year's revenue rather
+than an odd fraction of one. The rarity labels, the AI's accept/decline
+thresholds (`aiDecideExitOffer` in `turnEngine.js` — always takes 8x/15x,
+a tycoon holds out for 4x+, everyone else takes 2x+ and shrugs off a
+lowball 1x), and every log message / the offer modal's copy were all
+updated from "Nx monthly revenue" to "Nx annual revenue" to match.
+
+(An earlier draft of this change used fractional multipliers —
+0.25x/0.5x/0.75x/1.25x/2.5x — chosen to land close to the OLD monthly-
+revenue dollar payouts. Feedback afterward asked for the current, cleaner
+1x/2x/4x/8x/15x set instead, which pays out noticeably more per business
+than either the original monthly scheme or that first fractional draft —
+a deliberate richer jackpot, not an oversight.)
+
+Verified by extending the existing `test_business_exits1.mjs` (now also
+checking `annualIncome === income × 12` and that `payout` is computed off
+the annual figure — both checks are parametric against whatever
+`BUSINESS_EXIT_MULTIPLIER_WEIGHTS` currently holds, so they kept passing
+unmodified across the mid-round multiplier-set change) and the Playwright
+suite (`test_ui_round3.js` confirms the offer modal's copy says "annual
+revenue" with a `$/yr` figure and never says "monthly revenue";
+`test_ui_business_exit.js`'s existing full-game exit coverage was updated
+to detect the new message wording). The existing
+`test_business_exit_decision.mjs` needed no changes — it exercises
+accept/decline against a directly-injected offer object rather than
+deriving one from the multiplier math, so it stayed valid across the
+switch.

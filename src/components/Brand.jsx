@@ -1,8 +1,9 @@
-import { BRAND_TAGLINE, PARENT_BRAND, VENTUREMAKER_URL } from '../data/gameConfig';
+import { BRAND_CREDIT, BRAND_TAGLINE, PARENT_BRAND, VENTUREMAKER_URL } from '../data/gameConfig';
 
-/** VentureFlow wordmark + "A VentureMaker™ game" tagline — used on every
- * screen (setup, board, game over). The whole mark links out to VentureMaker
- * (opens in a new tab so nobody loses their in-progress game). */
+/** VentureFlow wordmark + "A VentureMaker™ game" tagline + a cursive
+ * "by Michael P Beirne" signature credit — used on every screen (setup,
+ * board, game over). The whole mark links out to VentureMaker (opens in a
+ * new tab so nobody loses their in-progress game). */
 export default function Brand({ size = 'md', align = 'center' }) {
   return (
     <a
@@ -16,6 +17,7 @@ export default function Brand({ size = 'md', align = 'center' }) {
         Venture<span>Flow</span>
       </div>
       <div className="vf-brand__tag">{BRAND_TAGLINE}</div>
+      <div className="vf-brand__signature">{BRAND_CREDIT}</div>
     </a>
   );
 }

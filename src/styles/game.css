@@ -184,6 +184,29 @@
   font-size: 1.05rem;
 }
 
+/* The "wealth pile" — see components/WealthPile.jsx / game/wealthPile.js —
+   a cluster of icons next to a player's name that grows as their net worth
+   crosses each threshold. Icons overlap slightly and tilt at alternating
+   angles (via the --vf-pile-i custom property each icon sets inline) so it
+   reads as a loose, growing pile rather than a tidy row of badges. */
+.vf-wealth-pile {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 0.15rem;
+}
+
+.vf-wealth-pile__icon {
+  font-size: 0.85rem;
+  line-height: 1;
+  margin-left: -0.3rem;
+  transform: rotate(calc((var(--vf-pile-i, 0) * 11deg) - 16deg)) translateY(calc(var(--vf-pile-i, 0) * -1px));
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.15));
+}
+
+.vf-wealth-pile__icon:first-child {
+  margin-left: 0.1rem;
+}
+
 .vf-player-card__networth {
   font-size: 1.55rem;
   font-weight: 700;
@@ -1167,6 +1190,13 @@
   font-size: 1.25rem;
 }
 
+.vf-portfolio__header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-shrink: 0;
+}
+
 .vf-portfolio__bot-tag {
   display: flex;
   align-items: center;
@@ -1318,6 +1348,132 @@
 .vf-portfolio__business-income {
   color: var(--vf-green-dark);
   font-weight: 700;
+}
+
+/* Cash Ledger modal (opened from the portfolio header) ------------------ */
+.vf-ledger {
+  width: 100%;
+  max-width: 480px;
+  max-height: 80vh;
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  text-align: left;
+  animation: vf-pop-in 0.18s ease;
+}
+
+.vf-ledger__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  font-weight: 700;
+  font-size: 1.1rem;
+}
+
+.vf-ledger__blurb {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--vf-ink-soft);
+}
+
+.vf-ledger__summary {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.6rem;
+}
+
+.vf-ledger__summary-stat {
+  background: var(--vf-cream);
+  border-radius: var(--vf-radius-md);
+  padding: 0.5rem 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.vf-ledger__summary-label {
+  font-size: 0.75rem;
+  color: var(--vf-ink-soft);
+  font-weight: 600;
+}
+
+.vf-ledger__summary-value {
+  font-size: 1.15rem;
+  font-weight: 700;
+}
+
+.vf-ledger__summary-stat--in .vf-ledger__summary-value {
+  color: var(--vf-green-dark);
+}
+
+.vf-ledger__summary-stat--out .vf-ledger__summary-value {
+  color: var(--vf-red-dark, #b02a2a);
+}
+
+.vf-ledger__empty {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--vf-ink-soft);
+  text-align: center;
+  padding: 1rem 0;
+}
+
+.vf-ledger__rows {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  overflow-y: auto;
+  padding-right: 0.25rem;
+}
+
+.vf-ledger__row {
+  display: grid;
+  grid-template-columns: auto auto 1fr auto;
+  align-items: baseline;
+  gap: 0.45rem;
+  padding: 0.4rem 0.5rem;
+  border-radius: var(--vf-radius-sm, 6px);
+  font-size: 0.85rem;
+}
+
+.vf-ledger__row--in {
+  background: rgba(46, 160, 67, 0.08);
+}
+
+.vf-ledger__row--out {
+  background: rgba(200, 60, 60, 0.06);
+}
+
+.vf-ledger__row-month {
+  font-weight: 600;
+  color: var(--vf-ink-soft);
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+
+.vf-ledger__row-source {
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+
+.vf-ledger__row-detail {
+  color: var(--vf-ink-soft);
+  font-weight: 400;
+}
+
+.vf-ledger__row-amount {
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.vf-ledger__row--in .vf-ledger__row-amount {
+  color: var(--vf-green-dark);
+}
+
+.vf-ledger__row--out .vf-ledger__row-amount {
+  color: var(--vf-red-dark, #b02a2a);
 }
 
 /* Business upgrades (Marketing / Sales / Operations / R&D) ------------ */
