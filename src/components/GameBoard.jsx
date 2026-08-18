@@ -12,6 +12,7 @@ import ActionBar from './ActionBar';
 import EventLog from './EventLog';
 import ChatPanel from './ChatPanel';
 import FortuneCardModal from './FortuneCardModal';
+import BusinessExitOfferModal from './BusinessExitOfferModal';
 import VolumeControl from './VolumeControl';
 import MusicControl from './MusicControl';
 import Brand from './Brand';
@@ -52,6 +53,8 @@ export default function GameBoard({ game }) {
     ? players.find((p) => p.id === currentFortuneEntry.playerId)
     : null;
   const showModalForHuman = currentFortuneEntry && currentFortunePlayer?.type === 'human';
+  const pendingExitOffer = status === 'exitOffer' ? state.pendingExitOffer : null;
+  const exitOfferPlayer = pendingExitOffer ? players.find((p) => p.id === pendingExitOffer.playerId) : null;
 
   // Robots don't need to see their own fortune-card recap — auto-advance
   // past their entries so only human players' cards pause the game.
@@ -122,7 +125,9 @@ export default function GameBoard({ game }) {
           />
 
           <div className={`vf-turn-banner ${isHumanTurn ? '' : 'vf-turn-banner--ai'}`}>
-            {status === 'monthRecap'
+            {status === 'exitOffer'
+              ? `💼 ${exitOfferPlayer?.name || 'Someone'} has a buyout offer to decide on...`
+              : status === 'monthRecap'
               ? '📬 Reading this month\'s fortune cards...'
               : isHumanTurn
               ? `${activePlayer.avatar} ${
@@ -165,6 +170,15 @@ export default function GameBoard({ game }) {
 
       {showModalForHuman && (
         <FortuneCardModal entry={currentFortuneEntry} onContinue={game.ackFortuneCard} />
+      )}
+
+      {pendingExitOffer && (
+        <BusinessExitOfferModal
+          offer={pendingExitOffer}
+          playerName={exitOfferPlayer?.name}
+          playerAvatar={exitOfferPlayer?.avatar}
+          onDecide={(accept) => game.resolveExitOffer(pendingExitOffer.playerId, accept)}
+        />
       )}
 
       <LeaderboardModal open={showLeaderboard} onClose={() => setShowLeaderboard(false)} />

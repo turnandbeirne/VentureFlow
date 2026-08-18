@@ -8,7 +8,7 @@
 // ============================================================================
 import { createNewGame } from './newGame';
 import { buyAsset, sellAsset, startBusiness, learnSkill, upgradeBusiness } from './actions';
-import { endTurn, acknowledgeFortuneCard } from './turnEngine';
+import { endTurn, acknowledgeFortuneCard, resolveExitOfferDecision } from './turnEngine';
 import { runAiTurn } from './aiEngine';
 import {
   reactToLogEntries,
@@ -156,6 +156,11 @@ export function gameReducer(state, action) {
       logged = appendChat(logged, generateBotTurnFlavor(logged, action.playerId));
       const { state: nextState, logEntries: turnLog } = endTurn(logged, action.playerId);
       return appendLog(nextState, turnLog);
+    }
+
+    case 'RESOLVE_EXIT_OFFER': {
+      const { state: nextState, logEntries } = resolveExitOfferDecision(state, action.playerId, action.accept);
+      return appendLog(nextState, logEntries);
     }
 
     case 'ACK_FORTUNE_CARD': {

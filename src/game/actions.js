@@ -117,6 +117,12 @@ export function startBusiness(state, playerId) {
     rndCount: 0,
     tempBoosts: [], // active Marketing boosts — [{ amount, expiresMonth }]
     pendingRnd: [], // in-flight R&D projects — [{ resolveMonth }]
+    // Both feed the business-decline decay in game/businessUpgrades.js —
+    // starting a business itself counts as "tending" it, so a brand-new
+    // business gets the full grace period before neglect can start costing
+    // it anything.
+    startedMonth: state.month,
+    lastTendedMonth: state.month,
   };
 
   const nextState = updatePlayer(state, playerId, (p) => ({

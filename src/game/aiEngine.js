@@ -28,10 +28,18 @@
 // Reuses the exact same action functions humans use (actions.js), so the
 // robots can never break a rule a human couldn't also break.
 // ============================================================================
-import { buyAsset, sellAsset, startBusiness, learnSkill } from './actions';
+import { buyAsset, sellAsset, startBusiness, learnSkill, upgradeBusiness } from './actions';
 import { BUSINESS_COST, BUSINESS_SKILL_COST, SKILL_COST } from '../data/gameConfig';
 import { getStageInfo } from './weather';
 import { chance, randomInt } from './rng';
+import { upgradeCost, canUpgradeTrack } from './businessUpgrades';
+
+// The four upgrade tracks a bot can reinvest in, in the order a candidate
+// list checks them — see buildBusinessUpgradeCandidates below. Kept as its
+// own list (rather than reading BUSINESS_UPGRADE_TRACKS's key order
+// directly) so it's obvious at a glance which "kind" string maps to which
+// track for the STRATEGIES weight tables just below.
+const UPGRADE_TRACK_IDS = ['marketing', 'sales', 'ops', 'rnd'];
 
 const GOOD_MOODS = new Set(['boom', 'peak', 'rebound']);
 
@@ -45,6 +53,17 @@ const DEFAULT_SKILL_ID = 'sharp';
 //     or not — a reckless bot that never sees a reason to retreat.
 //   - contrarian: flips which candidate set gets built — plays "growth"
 //     moves during storms and "retreat" moves during booms.
+// Per-strategy weights for reinvesting in an already-owned business — see
+// buildBusinessUpgradeCandidates below, kind strings 'upgradeMarketing' /
+// 'upgradeSales' / 'upgradeOps' / 'upgradeRnd'. Every personality gets SOME
+// weight here (nobody is hard-coded to literally never reinvest) but they
+// lean into it very differently: tycoon (chasing businesses) reinvests
+// aggressively across the board; hoarder (cash above all) barely touches
+// it, especially the slow/risky R&D track; saver leans hardest into
+// Operations (efficiency = future savings, right in its wheelhouse);
+// reckless likes the flashy short-term Marketing bump and the swingy R&D
+// gamble but shrugs off patient Sales growth; flipper (in-and-out) prefers
+// the short-lived Marketing boost over anything permanent.
 const STRATEGIES = {
   balanced: {
     // MrB — the original, unweighted greedy behavior.
@@ -53,7 +72,18 @@ const STRATEGIES = {
   reckless: {
     // Leeroy Jenkins — charges into risky/flashy plays and ignores storms.
     ignoreWeatherRisk: true,
-    weights: { business: 1.2, treasure: 1.5, lemonade: 1.3, treehouse: 0.9, skill: 0.5, piggy: 0.1 },
+    weights: {
+      business: 1.2,
+      treasure: 1.5,
+      lemonade: 1.3,
+      treehouse: 0.9,
+      skill: 0.5,
+      piggy: 0.1,
+      upgradeMarketing: 1.3,
+      upgradeSales: 0.8,
+      upgradeOps: 0.6,
+      upgradeRnd: 1.3,
+    },
   },
   flipper: {
     // BossEmby — chases the bouncy assets both in and out, skips slow ones.
@@ -66,6 +96,10 @@ const STRATEGIES = {
       piggy: 0.3,
       sellTreasure: 1.3,
       sellLemonade: 1.3,
+      upgradeMarketing: 1.1,
+      upgradeSales: 0.6,
+      upgradeOps: 0.6,
+      upgradeRnd: 0.8,
     },
   },
   hoarder: {
@@ -80,21 +114,49 @@ const STRATEGIES = {
       piggy: 2.5,
       sellTreasure: 1.1,
       sellLemonade: 1.1,
+      upgradeMarketing: 0.3,
+      upgradeSales: 0.5,
+      upgradeOps: 0.7,
+      upgradeRnd: 0.2,
     },
   },
   tycoon: {
-    // DaddyBigBux — businesses, businesses, and more businesses.
-    weights: { business: 2.2, skill: 1.6, treasure: 0.6, lemonade: 0.6, treehouse: 0.8, piggy: 0.3 },
+    // DaddyBigBux — businesses, businesses, and more businesses. The one
+    // personality that treats reinvesting as just as core as starting new
+    // ones in the first place — every upgrade track scores above 1.
+    weights: {
+      business: 2.2,
+      skill: 1.6,
+      treasure: 0.6,
+      lemonade: 0.6,
+      treehouse: 0.8,
+      piggy: 0.3,
+      upgradeMarketing: 1.4,
+      upgradeSales: 1.8,
+      upgradeOps: 1.3,
+      upgradeRnd: 1.6,
+    },
   },
   saver: {
     // MoneyMama — smart, patient, and always prepared, but not stingy.
-    weights: { piggy: 1.6, treehouse: 1.3, skill: 1.1, treasure: 0.7, lemonade: 0.7, business: 0.9 },
+    weights: {
+      piggy: 1.6,
+      treehouse: 1.3,
+      skill: 1.1,
+      treasure: 0.7,
+      lemonade: 0.7,
+      business: 0.9,
+      upgradeMarketing: 0.6,
+      upgradeSales: 1.0,
+      upgradeOps: 1.5,
+      upgradeRnd: 0.7,
+    },
   },
   contrarian: {
     // GrumpyMommy — buys the dip, sells the hype. Always keeps a rainy-day
     // fund on hand regardless of which way the market's going.
     contrarian: true,
-    weights: { piggy: 1.2, business: 0.9 },
+    weights: { piggy: 1.2, business: 0.9, upgradeMarketing: 0.8, upgradeSales: 0.9, upgradeOps: 0.9, upgradeRnd: 0.8 },
   },
 };
 
@@ -132,6 +194,43 @@ function weighted(strategy, kind, score) {
   return { score: score * multiplier, kind };
 }
 
+// Base (pre-strategy-weight) scores for reinvesting in an owned business,
+// per track, per weather mood. Deliberately below 'business' (100/15) in
+// both moods — a bot still prioritizes STARTING a new business over
+// upgrading one it already has, then reinvests with whatever it's got left
+// over, the same "grow what you already started" order a human player
+// would naturally lean toward. Storm-mode scores are much lower across the
+// board (cash preservation matters more than growing a business further
+// mid-downturn) but never zero, so a saver/hoarder bot can still slip in a
+// cheap Operations purchase between defensive moves if nothing else is
+// worth doing.
+const UPGRADE_BASE_SCORES_GOOD = { marketing: 55, sales: 85, ops: 50, rnd: 75 };
+const UPGRADE_BASE_SCORES_STORM = { marketing: 10, sales: 20, ops: 15, rnd: 8 };
+const UPGRADE_KIND_BY_TRACK = { marketing: 'upgradeMarketing', sales: 'upgradeSales', ops: 'upgradeOps', rnd: 'upgradeRnd' };
+
+/**
+ * One candidate per (owned business × still-upgradeable, affordable track)
+ * — see game/businessUpgrades.js's canUpgradeTrack/upgradeCost for the
+ * exact affordability/cap rules, reused as-is so a bot can never buy an
+ * upgrade a human couldn't also buy. Reuses actions.js's upgradeBusiness()
+ * the same way every other candidate here reuses a human action function.
+ */
+function buildUpgradeCandidates(player, strategy, cashBuffer, baseScores) {
+  const candidates = [];
+  for (const business of player.businesses) {
+    for (const trackId of UPGRADE_TRACK_IDS) {
+      if (!canUpgradeTrack(business, trackId)) continue;
+      const cost = upgradeCost(business, trackId);
+      if (player.cash - cashBuffer < cost) continue;
+      candidates.push({
+        ...weighted(strategy, UPGRADE_KIND_BY_TRACK[trackId], baseScores[trackId]),
+        run: (s) => upgradeBusiness(s, player.id, business.id, trackId),
+      });
+    }
+  }
+  return candidates;
+}
+
 function buildCandidates(state, playerId, strategy, cashBuffer) {
   const player = findPlayer(state, playerId);
   const prices = state.assetPrices;
@@ -158,6 +257,7 @@ function buildCandidates(state, playerId, strategy, cashBuffer) {
     if (player.cash - cashBuffer >= prices.piggy) {
       candidates.push({ ...weighted(strategy, 'piggy', 20), run: (s) => buyAsset(s, playerId, 'piggy', 1) });
     }
+    candidates.push(...buildUpgradeCandidates(player, strategy, cashBuffer, UPGRADE_BASE_SCORES_GOOD));
   } else {
     // Storms / dips: retreat to safety first.
     if ((player.holdings.treasure || 0) > 0) {
@@ -175,6 +275,7 @@ function buildCandidates(state, playerId, strategy, cashBuffer) {
     if (player.cash >= SKILL_COST && player.skillTokens < 2) {
       candidates.push({ ...weighted(strategy, 'skill', 10), run: (s) => learnSkill(s, playerId) });
     }
+    candidates.push(...buildUpgradeCandidates(player, strategy, cashBuffer, UPGRADE_BASE_SCORES_STORM));
   }
 
   return candidates;

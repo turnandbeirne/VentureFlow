@@ -223,20 +223,29 @@ export const BUSINESS_INCOME_MAX = 70;
 // bigger, slower, riskier bet — cash now for a delayed payoff that's never
 // zero, but is sometimes small and sometimes big, on purpose (that
 // variance is the point).
+//
+// Marketing/Sales/R&D all pay out as a random PERCENTAGE of the business's
+// current monthly income, not a flat dollar amount (see the *_PCT_MIN/MAX
+// constants below and businessUpgrades.js's applyUpgrade/resolvePendingRnd)
+// — a flat $ figure meant the exact same purchase felt huge on a brand-new
+// $30/mo business and trivial on one that had already grown, which is
+// backwards: a bigger, more successful business should get a bigger payoff
+// from the same kind of investment, the same way a real ad campaign or
+// sales hire pays off more for a company with more revenue to build on.
 export const BUSINESS_UPGRADE_TRACKS = {
   marketing: {
     id: 'marketing',
     name: 'Marketing',
     icon: '📣',
-    cost: 120,
-    blurb: 'A short ad campaign — a quick income bump that fades after a few months.',
+    cost: 75,
+    blurb: 'A short ad campaign — a % revenue bump that fades after a few months.',
   },
   sales: {
     id: 'sales',
     name: 'Sales',
     icon: '🤝',
     cost: 180,
-    blurb: 'Grow the customer base — smaller than Marketing, but permanent.',
+    blurb: 'Grow the customer base — a % revenue bump, but permanent.',
   },
   ops: {
     id: 'ops',
@@ -254,17 +263,53 @@ export const BUSINESS_UPGRADE_TRACKS = {
   },
 };
 
-export const MARKETING_BOOST_AMOUNT = 25;
+// Marketing and Sales both draw their % gain from the same 8%-30% range —
+// requested range (0-30%) with a small floor so a purchase never reads as
+// a total dud/bug; a genuinely bad roll (near 8%) is still a real letdown
+// relative to a great one (near 30%), which is the point. Whichever
+// business's CURRENT income the roll applies to (see businessUpgrades.js)
+// — so later purchases, on a business that's already grown from prior
+// Sales/R&D, pay out MORE dollars for the same % roll. That's intentional
+// compounding, not a bug.
+export const MARKETING_BOOST_PCT_MIN = 0.08;
+export const MARKETING_BOOST_PCT_MAX = 0.3;
 export const MARKETING_BOOST_MONTHS = 3;
-export const SALES_BOOST_AMOUNT = 15;
+export const SALES_BOOST_PCT_MIN = 0.08;
+export const SALES_BOOST_PCT_MAX = 0.3;
 export const SALES_MAX_LEVEL = 3;
 export const OPS_DISCOUNT_PER_LEVEL = 0.1;
 export const OPS_MAX_LEVEL = 3;
 export const RND_DELAY_MONTHS = 2;
 export const RND_MAX_PROJECTS = 2;
 export const RND_BIG_PAYOFF_CHANCE = 0.65;
-export const RND_BIG_PAYOFF_AMOUNT = 40;
-export const RND_SMALL_PAYOFF_AMOUNT = 15;
+// R&D keeps its own "small vs big" split (rather than one shared 8-30%
+// pool like Marketing/Sales) so a big payoff still reliably feels bigger
+// than a small one — both sub-ranges stay inside the overall 8%-30% band.
+export const RND_SMALL_PAYOFF_PCT_MIN = 0.08;
+export const RND_SMALL_PAYOFF_PCT_MAX = 0.18;
+export const RND_BIG_PAYOFF_PCT_MIN = 0.2;
+export const RND_BIG_PAYOFF_PCT_MAX = 0.3;
+
+// A business is worth reinvesting in — that's the whole point of the four
+// tracks above — but it's also worth PENALIZING for being ignored: a
+// business nobody has touched in a long while starts to atrophy, the same
+// way a real business that never gets any attention or investment loses
+// ground to competitors. `lastTendedMonth` (set on every business at
+// creation and refreshed by ANY upgrade purchase — see
+// businessUpgrades.js's applyUpgrade) tracks the last time a player
+// actually did something about it. Once BUSINESS_DECLINE_GRACE_MONTHS pass
+// with no purchase, the business starts losing a random 5%-10% chunk of its
+// current income every BUSINESS_DECLINE_INTERVAL_MONTHS months (a slow
+// fade, not a monthly cliff), floored so it never craters to $0. The UI
+// (PlayerDetailModal.jsx) warns a business is APPROACHING the grace period
+// (yellow name) BUSINESS_DECLINE_WARNING_MONTHS months out, then marks it
+// as actively DECLINING (red name) once the clock actually runs out.
+export const BUSINESS_DECLINE_GRACE_MONTHS = 6;
+export const BUSINESS_DECLINE_WARNING_MONTHS = 2;
+export const BUSINESS_DECLINE_INTERVAL_MONTHS = 3;
+export const BUSINESS_DECLINE_PCT_MIN = 0.05;
+export const BUSINESS_DECLINE_PCT_MAX = 0.1;
+export const BUSINESS_DECLINE_INCOME_FLOOR = 10;
 
 // ---------------------------------------------------------------------------
 // Business exit events — rare "someone wants to buy a business" offers

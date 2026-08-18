@@ -1,3 +1,12 @@
+// Log entries whose numbers were just decided by a random roll (see
+// game/businessUpgrades.js's percentOfIncome) get a brief "landing" flash
+// instead of just flatly appearing — a cheap way to make the gamble feel
+// like a gamble. Pure CSS (see game.css's .vf-log__entry--reveal), so it
+// only ever plays once, exactly when the entry first mounts — a log entry
+// never gets removed/re-added, so there's no risk of it replaying on an
+// unrelated re-render.
+const REVEAL_KINDS = new Set(['businessUpgrade', 'businessRnd']);
+
 export default function EventLog({ log }) {
   const recent = [...log].slice(-40).reverse();
   return (
@@ -10,7 +19,7 @@ export default function EventLog({ log }) {
         {recent.length === 0 && <span className="vf-log__empty">The story of your months will show up here...</span>}
         {recent.map((entry) => (
           <div key={entry.id}>
-            <div className="vf-log__entry">
+            <div className={`vf-log__entry ${REVEAL_KINDS.has(entry.kind) ? 'vf-log__entry--reveal' : ''}`}>
               <span>{entry.icon}</span>
               <span>{entry.message}</span>
             </div>

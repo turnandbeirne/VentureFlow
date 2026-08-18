@@ -26,6 +26,7 @@ import VentureMakerLink from './VentureMakerLink';
 import LeaderboardModal from './LeaderboardModal';
 import InfoModal from './InfoModal';
 import UnlocksModal from './UnlocksModal';
+import CareerStatsModal from './CareerStatsModal';
 
 const MODES = [
   {
@@ -53,6 +54,7 @@ export default function SetupScreen({ onStart }) {
   ]);
   const [showLeaderboard, setShowLeaderboard] = useState(false);
   const [showUnlocks, setShowUnlocks] = useState(false);
+  const [showCareerStats, setShowCareerStats] = useState(false);
   const [difficultyId, setDifficultyId] = useState(DEFAULT_DIFFICULTY_ID);
   const [scenarioId, setScenarioId] = useState(DEFAULT_SCENARIO_ID);
   const [infoScenarioId, setInfoScenarioId] = useState(null);
@@ -161,6 +163,11 @@ export default function SetupScreen({ onStart }) {
     setShowUnlocks(true);
   }
 
+  function openCareerStats() {
+    playSound('click');
+    setShowCareerStats(true);
+  }
+
   return (
     <div className="vf-setup">
       <div className="vf-topbar-corner">
@@ -168,6 +175,9 @@ export default function SetupScreen({ onStart }) {
         <MusicControl />
         <button type="button" className="vf-btn vf-btn--sm vf-btn--ghost" onClick={openUnlocks}>
           🏅 Unlocks
+        </button>
+        <button type="button" className="vf-btn vf-btn--sm vf-btn--ghost" onClick={openCareerStats}>
+          📊 Career Stats
         </button>
         <button type="button" className="vf-btn vf-btn--sm vf-btn--ghost" onClick={openLeaderboard}>
           🏆 Leaderboard
@@ -425,6 +435,7 @@ export default function SetupScreen({ onStart }) {
         themeProgress={themeProgress}
         onSelectTheme={selectTheme}
       />
+      <CareerStatsModal open={showCareerStats} onClose={() => setShowCareerStats(false)} profile={profile} />
       <InfoModal
         open={Boolean(infoScenario)}
         icon={infoScenario?.icon}

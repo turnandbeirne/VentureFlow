@@ -20,6 +20,14 @@ function defaultProfile() {
     bestNetWorth: 0,
     bestPassiveIncome: 0,
     selectedTheme: 'classic',
+    // Lifetime "career" totals — separate from the best-ever figures above,
+    // which only ever go up on a new personal best. These accumulate every
+    // game, win or lose, so there's a reason to keep playing even once a
+    // personal best feels out of reach for a while. Surfaced on the setup
+    // screen's Career Stats view (see components/CareerStatsModal.jsx).
+    totalNetWorthEarned: 0,
+    totalBusinessesStarted: 0,
+    totalBusinessesSold: 0,
   };
 }
 
@@ -92,7 +100,13 @@ export function themeUnlockProgress(profile) {
  * so the caller can show a "you unlocked something!" celebration for
  * whatever crossed a threshold this game.
  */
-export function recordGameResult({ netWorth, passiveIncome, badgesEarnedThisGame }) {
+export function recordGameResult({
+  netWorth,
+  passiveIncome,
+  badgesEarnedThisGame,
+  businessesStartedThisGame,
+  businessesSoldThisGame,
+}) {
   const before = loadProfile();
   const beforeAvatars = new Set(unlockedAvatars(before));
   const beforeThemeIds = new Set(unlockedThemes(before).map((t) => t.id));
@@ -103,6 +117,9 @@ export function recordGameResult({ netWorth, passiveIncome, badgesEarnedThisGame
     badgesEarned: before.badgesEarned + (badgesEarnedThisGame || 0),
     bestNetWorth: Math.max(before.bestNetWorth, Math.round(netWorth || 0)),
     bestPassiveIncome: Math.max(before.bestPassiveIncome, Math.round(passiveIncome || 0)),
+    totalNetWorthEarned: (before.totalNetWorthEarned || 0) + Math.round(netWorth || 0),
+    totalBusinessesStarted: (before.totalBusinessesStarted || 0) + (businessesStartedThisGame || 0),
+    totalBusinessesSold: (before.totalBusinessesSold || 0) + (businessesSoldThisGame || 0),
   };
   persist(after);
 

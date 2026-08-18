@@ -9,7 +9,7 @@ import {
   totalUnitsOwned,
   businessMonthlyIncome,
 } from '../game/players';
-import { upgradeCost, canUpgradeTrack, activeMarketingBoostTotal } from '../game/businessUpgrades';
+import { upgradeCost, canUpgradeTrack, activeMarketingBoostTotal, businessHealthStatus } from '../game/businessUpgrades';
 import { playSound } from '../audio/soundEngine';
 
 const UPGRADE_TRACK_ORDER = ['marketing', 'sales', 'ops', 'rnd'];
@@ -219,10 +219,41 @@ export default function PlayerDetailModal({ player, prices, allPlayers, month, w
               <p className="vf-portfolio__empty">No businesses started yet.</p>
             ) : (
               <div className="vf-portfolio__businesses">
-                {player.businesses.map((biz, i) => (
+                {player.businesses.map((biz, i) => {
+                  const health = businessHealthStatus(biz, month);
+                  return (
                   <div key={biz.id} className="vf-portfolio__business-card">
                     <div className="vf-portfolio__business-row">
-                      <span>🚀 {biz.name || `Business #${i + 1}`}</span>
+                      <span>
+                        🚀{' '}
+                        <span
+                          className={
+                            health === 'declining'
+                              ? 'vf-portfolio__business-name--declining'
+                              : health === 'warning'
+                              ? 'vf-portfolio__business-name--warning'
+                              : ''
+                          }
+                        >
+                          {biz.name || `Business #${i + 1}`}
+                        </span>
+                        {health === 'declining' && (
+                          <span
+                            className="vf-portfolio__business-health-tag vf-portfolio__business-health-tag--declining"
+                            title="Losing income from neglect — buy any upgrade to turn it around."
+                          >
+                            📉 declining
+                          </span>
+                        )}
+                        {health === 'warning' && (
+                          <span
+                            className="vf-portfolio__business-health-tag vf-portfolio__business-health-tag--warning"
+                            title="Hasn't been reinvested in for a while — will start losing income soon if left alone."
+                          >
+                            ⚠️ needs attention
+                          </span>
+                        )}
+                      </span>
                       <span className="vf-portfolio__business-income">+${businessMonthlyIncome(biz, month)}/mo</span>
                     </div>
                     <BusinessUpgrades
@@ -233,7 +264,8 @@ export default function PlayerDetailModal({ player, prices, allPlayers, month, w
                       onUpgrade={handleUpgrade}
                     />
                   </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>

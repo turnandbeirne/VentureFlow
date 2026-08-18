@@ -77,6 +77,10 @@ export function useGame() {
     dispatch({ type: 'ACK_FORTUNE_CARD' });
   }, []);
 
+  const resolveExitOffer = useCallback((playerId, accept) => {
+    dispatch({ type: 'RESOLVE_EXIT_OFFER', playerId, accept });
+  }, []);
+
   const sendChat = useCallback((playerId, message, targetPlayerId) => {
     dispatch({ type: 'SEND_CHAT', playerId, message, targetPlayerId });
   }, []);
@@ -97,6 +101,7 @@ export function useGame() {
     upgradeBusiness,
     endTurn,
     ackFortuneCard,
+    resolveExitOffer,
     sendChat,
     clearError,
   };

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import '../styles/game.css';
 import { LEADERBOARD_TOP_HIGHLIGHT, getScenario } from '../data/gameConfig';
 import { netWorth, passiveIncome, snapshotPortfolio } from '../game/players';
+import { buildDailyChallengeShareText } from '../game/dailyChallenge';
 import { isOffensiveName } from '../game/nameFilter';
 import { playSound } from '../audio/soundEngine';
 import { playMusicTrack } from '../audio/musicEngine';
@@ -38,6 +39,7 @@ export default function GameOverScreen({ state, onPlayAgain, onRecordProfileResu
   const [savedRank, setSavedRank] = useState(null);
   const [showLeaderboard, setShowLeaderboard] = useState(false);
   const [showRecap, setShowRecap] = useState(false);
+  const [shareCopied, setShareCopied] = useState(false);
   const [unlockCelebration, setUnlockCelebration] = useState(null);
   // Which standings row (if any) has its full portfolio breakdown open —
   // read-only here (game's over, nothing left to upgrade), but this is
@@ -69,6 +71,11 @@ export default function GameOverScreen({ state, onPlayAgain, onRecordProfileResu
       netWorth: netWorth(bestHuman, assetPrices),
       passiveIncome: passiveIncome(bestHuman, { allPlayers: players, prices: assetPrices, month, weatherIncomeAmounts: state.weatherIncomeAmounts }),
       badgesEarnedThisGame: bestHuman.badges.length,
+      // businessSeq is a monotonic "how many businesses has this player
+      // EVER started" counter (see game/actions.js's startBusiness) — the
+      // right lifetime count even though some may have since been sold.
+      businessesStartedThisGame: bestHuman.businessSeq || 0,
+      businessesSoldThisGame: (bestHuman.soldBusinesses || []).length,
     });
     if (result && (result.newlyUnlockedAvatars.length > 0 || result.newlyUnlockedThemes.length > 0)) {
       setUnlockCelebration(result);
@@ -122,6 +129,29 @@ export default function GameOverScreen({ state, onPlayAgain, onRecordProfileResu
   function openRecap() {
     playSound('click');
     setShowRecap(true);
+  }
+
+  async function handleShareResult() {
+    playSound('click');
+    const human = players.find((p) => p.type === 'human');
+    if (!human) return;
+    const text = buildDailyChallengeShareText({
+      dateString: dailyChallengeDate,
+      finalNetWorth: netWorth(human, assetPrices),
+      netWorthHistory: human.netWorthHistory,
+      rank: savedRank,
+    });
+    try {
+      await navigator.clipboard.writeText(text);
+      setShareCopied(true);
+      setTimeout(() => setShareCopied(false), 2500);
+    } catch {
+      // Clipboard API unavailable/denied — fall back to a prompt so the
+      // text is still reachable (select-all, copy) rather than silently
+      // doing nothing.
+      // eslint-disable-next-line no-alert
+      window.prompt('Copy your result:', text);
+    }
   }
 
   // Which players (if any) hit the scenario's objective — see
@@ -289,6 +319,11 @@ export default function GameOverScreen({ state, onPlayAgain, onRecordProfileResu
         </div>
 
         <div className="vf-gameover__actions">
+          {dailyChallengeDate && (
+            <button type="button" className="vf-btn vf-btn--ghost" onClick={handleShareResult}>
+              {shareCopied ? '✅ Copied!' : '📤 Share Result'}
+            </button>
+          )}
           <button type="button" className="vf-btn vf-btn--ghost" onClick={openRecap}>
             📋 Family Recap
           </button>

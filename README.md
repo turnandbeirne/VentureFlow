@@ -1090,3 +1090,246 @@ checks all three placements across all three screens: the Brand link's
 `href`/`target`/`rel` on setup, board, and game-over; the setup-screen
 callout's link and exact wording; and — after playing a full 24-month game
 through to game over — the same callout's link and wording there too.
+
+## Business-upgrade payoffs: percentage of income instead of flat dollars
+
+Marketing, Sales, and R&D used to pay out a fixed dollar figure no matter
+how big the business already was — Marketing was always +$25/mo, Sales was
+always +$15/mo, R&D was always +$40 or +$15/mo. The exact same purchase
+felt huge on a brand-new $30/mo business and trivial on one that had
+already grown, and — worse — it meant a bigger, more successful business
+got no more benefit from the same kind of investment than a tiny one did,
+which is backwards from how a real ad campaign or sales hire actually
+pays off. All three tracks now pay out a random **percentage of the
+business's current income** instead (`percentOfIncome()` in
+`game/businessUpgrades.js`), so the same purchase is worth more dollars on
+a business that's already grown — including from earlier Sales/R&D
+upgrades — the same way reinvesting more in something that's already
+paying off should compound:
+
+- **📣 Marketing** — a temporary boost, still fading after 3 months, now
+  sized as 8%–30% of the business's current permanent income
+  (`MARKETING_BOOST_PCT_MIN`/`MAX` in `gameConfig.js`) rather than a flat
+  $25. Rolled against income *not* including any other still-active
+  Marketing boost, so stacking campaigns can't inflate each other's roll.
+- **🤝 Sales** — same 8%–30% range, still permanent, still capped at 3
+  purchases per business — but each purchase now applies to whatever
+  income the business already has, so three purchases in a row compound
+  on top of each other rather than adding three identical flat amounts.
+- **🔬 R&D** — keeps its own big-vs-small split so a big payoff still
+  reliably reads as bigger than a small one, just expressed as two
+  percentage sub-ranges instead of two dollar constants: a small payoff is
+  now 8%–18% of current income, a big one (still a 65% chance) is 20%–30%.
+  Multiple R&D projects resolving in the same month still compound on the
+  running (already-bumped) income within that same resolution, same as
+  before.
+
+The 8% floor (rather than a literal 0%) is a deliberate choice, made after
+checking in on it directly rather than guessing: a genuine 0% roll would
+read as a bug or a wasted turn rather than "a real letdown compared to a
+great roll," so every purchase is guaranteed to do *something*, even on a
+bad roll — the gap between an 8% and a 30% outcome is still wide enough to
+feel like it mattered.
+
+**Also adjusted, beyond the literal ask:** Marketing's cost dropped from
+$120 to $75. This wasn't optional — under the old flat-dollar system,
+Marketing's maximum possible return (3 months × $25 = $75) never covered
+its $120 cost, so buying Marketing was a guaranteed loss no matter how the
+dice fell, which lines up exactly with the "marketing investment never
+makes sense" complaint that prompted this change. Converting to a % of
+income without also revisiting the cost would have left that same
+guaranteed-loss math in place for any business smaller than roughly
+$150/mo (120 ÷ 0.30 ≈ $400 needed at a lucky 30% roll to break even in one
+campaign, well above where most businesses sit for a while). At $75, even
+a below-average roll on a modest business is a real, if modest, gain — and
+Marketing now genuinely grows into being worth more as the business it's
+attached to scales, instead of only ever being a guaranteed drain.
+
+Verified with a new dedicated Node test
+(`test_business_upgrades_pct.mjs`, run through the same seeded-RNG
+harness as the rest of the suite) covering: every Marketing/Sales roll
+landing inside the configured 8%–30% band and never rounding to $0; R&D's
+small and big sub-bands never overlapping and both appearing over many
+trials; three successive Sales purchases and two same-month R&D
+resolutions each compounding on the running (not the original) income;
+and a bigger business earning a proportionally bigger average dollar
+payout than a smaller one for the identical purchase. The existing
+`test_economy1.mjs` suite was updated in the same pass (range checks
+instead of exact-equality against the old flat constants) and still
+passes in full, along with the rest of the Node and Playwright
+regression suites.
+
+## AI players reinvest in businesses they already own
+
+Robots used to completely ignore the Marketing/Sales/Operations/R&D
+upgrade system — every one of the four business tracks above was a
+human-only lever. A bot with a thriving business and cash sitting idle
+would just start another business (or buy more assets) rather than ever
+growing what it already had, which looked passive and a little dumb next
+to a human player actively upgrading.
+
+`game/aiEngine.js`'s greedy candidate-scoring loop now generates upgrade
+candidates too: for every business a bot owns, and every still-upgradeable
+track on it (skipping anything already maxed or unaffordable — the exact
+same `canUpgradeTrack`/`upgradeCost` checks a human's upgrade buttons use,
+so a bot can never buy something a human couldn't), a weighted candidate
+gets added to the same pool the bot already uses to compare Piggy Banks,
+Treasure, starting a new business, and so on. Each of the seven bot
+personalities got its own weighting across the four tracks
+(`upgradeMarketing/upgradeSales/upgradeOps/upgradeRnd` in `STRATEGIES`),
+matching each personality's existing flavor — **Tycoon** leans hard into
+Sales and R&D (aggressive compounding growth), **Hoarder** barely touches
+any of them (prefers piling up cash and assets over reinvesting), **Saver**
+favors Operations (a safer, steadier upgrade) over anything flashy, and so
+on. Base scores also shift with the weather — during a storm, upgrade
+candidates score much lower across the board (10–20 vs. 50–85 in good
+weather), the same "play it safer when the market's bad" instinct the rest
+of the AI's candidate list already follows for buying assets.
+
+An emergent (and correct, not a bug) behavior surfaced while testing this:
+a bot sitting on a big cash surplus often buys uncapped, repeatable,
+higher-scoring assets like Treasure or Lemonade Stands *before* it ever
+gets to an upgrade candidate, for several personalities — the upgrade
+candidates aren't meant to always win, just to be real options a bot can
+and will take when they're competitive. Verified with a new dedicated Node
+test (`test_ai_reinvest.mjs`): rather than relying on "give a bot lots of
+cash and hope an upgrade wins out of many options" (which is exactly the
+unreliable design that surfaced the behavior above), the test isolates the
+actual claim — every option *other* than a Marketing upgrade is made
+unaffordable/unavailable, proving each of the 7 personalities takes the
+upgrade when it's genuinely their best (only) move — plus a full-game
+integration check that a Tycoon bot buys at least one upgrade over the
+course of a real game.
+
+## Business buyout offers: a real accept/decline decision
+
+A buyout offer used to auto-resolve the instant it landed — the business
+was just sold, with no say from whoever owned it, human or bot. That
+removed all the tension from what's meant to be a real decision: cash in
+hand right now, or keep a business that might be worth even more later.
+
+Buyout offers targeting a **human** player now pause the game on a
+dedicated decision modal (`BusinessExitOfferModal.jsx`) showing the offer
+amount, the multiple it represents, and a plain-language "why" explainer,
+with two real buttons: **🤝 Keep Building** (decline — the business stays,
+nothing changes) or **💼 Accept $X** (sell it — cash in hand, business
+gone). Under the hood, month-end resolution is now a two-phase process
+(`game/turnEngine.js`'s `beginMonthEnd`/`finishMonthEnd` split): a
+human-targeted offer pauses mid-resolution (`status: 'exitOffer'`,
+`pendingExitOffer` holding the offer) until `resolveExitOfferDecision` is
+called with the player's choice, at which point the same `finishMonthEnd`
+that would've run immediately picks back up — payday, fortune cards, price
+drift, badges, and so on, all identical either way.
+
+A buyout offer targeting an **AI** player is still decided instantly, the
+same as before this round, so bot turns don't grind to a halt waiting on
+nobody — but it's no longer a coin flip. `aiDecideExitOffer` makes a
+deterministic call based on the offer's multiple and the bot's own
+strategy (Tycoon holds out for an 8x+ offer; Hoarder/Saver always take
+guaranteed cash; everyone else takes 5x+) — deliberately **not** using any
+RNG draw at all, so it can never affect the environment-stream's fixed
+draw order that Daily Challenge fairness depends on (see the Daily
+Challenge section below, and `game/businessExits.js`'s own notes on why
+that stream stays untouched by player choices).
+
+Declining isn't a free lunch, either — it's a real gamble, flavored as
+one: the fortune-card recap that follows a decline ("Offer Declined")
+spells out that there's no guarantee a better offer ever comes again.
+
+Verified with a new dedicated Node test (`test_business_exit_decision.mjs`,
+14 checks) covering both the decline and accept paths in isolation (state
+changes, payout math, log entries, offer clearing) plus a full-game
+integration check confirming both a human-paused decision *and* an
+AI-instant decision genuinely occur within the same game. The existing
+`test_business_exits1.mjs` Playwright/Node coverage was updated for the
+new pause behavior, and a new Playwright UI test
+(`test_ui_new_features.js`) exercises the actual Accept/Decline buttons
+end-to-end, including confirming a sold business disappears from the
+portfolio view.
+
+## Businesses decline when left untended
+
+Every upgrade track above is worth investing in — but until now, a
+business that was *never* upgraded had no downside at all, just a
+permanently flat income. Real businesses don't work that way: neglect a
+business operationally for long enough and it starts losing ground.
+
+A business now tracks `lastTendedMonth` — stamped when it's first started,
+and re-stamped every time any upgrade (Marketing, Sales, Ops, or R&D) is
+*purchased* on it (deliberately not on an R&D payoff resolving later,
+since that's not a fresh act of attention, just an earlier one paying
+off). Once a business goes 6 months (`BUSINESS_DECLINE_GRACE_MONTHS`)
+without a single upgrade purchase, it starts losing **5%–10%** of its
+current income every 3 months (`BUSINESS_DECLINE_INTERVAL_MONTHS`) —
+resolved automatically at month-end alongside R&D payoffs
+(`applyBusinessDecline` in `game/businessUpgrades.js`), logged with a
+`businessDecline` entry, and floored so it can never be shrunk to $0
+(`BUSINESS_DECLINE_INCOME_FLOOR`) — a neglected business can wither, but
+it doesn't disappear.
+
+The UI gives fair warning before any money is actually lost:
+`businessHealthStatus()` reads as **healthy** (no coloring), **⚠️ warning**
+(the business's name renders in yellow) starting 2 months
+(`BUSINESS_DECLINE_WARNING_MONTHS`) before the decline threshold, or
+**📉 declining** (name renders in red, plus a "declining" tag) once it's
+actually losing money — both shown in the full portfolio breakdown
+(`PlayerDetailModal.jsx`) next to every business. The player panel's
+"Invest in your businesses!" button also picks up on this: it switches to
+a red danger-styled "📉 A business is losing money — reinvest now!" call
+to action once anything at the table is actively declining, or a softer
+"⚠️ A business needs attention soon" once anything's in the warning
+window — so the fix (any upgrade purchase, on any track) is never more
+than a glance away.
+
+Verified with a new dedicated Node test (`test_business_decline.mjs`, 21
+checks) covering the health-status thresholds, decline timing (no decay
+before the grace period, firing exactly on the interval boundaries, never
+going below the floor), that any upgrade purchase resets the tending
+clock, and a full-game integration check that a genuinely neglected
+business logs a real decline and loses income. The new Playwright UI test
+(`test_ui_new_features.js`) confirms the red/yellow name coloring and
+health tag chips actually render for a crafted long-neglected business.
+
+## Career stats, shareable Daily Challenge results, and an upgrade-roll reveal
+
+Three smaller additions, aimed at giving the game more reasons to come
+back to:
+
+- **📊 Career Stats** — a new lifetime totals screen
+  (`CareerStatsModal.jsx`, opened from a button next to Unlocks/
+  Leaderboard on the setup screen) that accumulates across *every* game
+  ever played on the device, win or lose — games played, career net worth
+  earned, best single-game net worth, best passive income, businesses
+  started, businesses sold in a buyout, and badges earned. This is
+  deliberately separate from `game/profile.js`'s existing "best-ever"
+  figures (which only move on a new personal best): the running totals
+  give a reason to keep playing even between one-off games that don't set
+  any new record.
+- **📤 Share Result** — on a finished Daily Challenge game, a new button on
+  the game-over screen (`buildDailyChallengeShareText()` in
+  `game/dailyChallenge.js`) copies a short, spoiler-free, Wordle-style
+  summary to the clipboard: the date, final net worth, leaderboard rank
+  (if saved), and a row of colored squares tracking net-worth growth
+  month-to-month (🟩 up, 🟥 down, ⬜ flat, 🟦 the starting month) — no
+  specific numbers or strategy given away, just shareable bragging rights.
+  Falls back to a `window.prompt()` if the Clipboard API is unavailable or
+  denied, so the text is still reachable even then.
+- **A suspenseful reveal for upgrade payoffs** — Marketing/Sales/R&D
+  payoffs are randomized percentages (see the "percentage of income"
+  section above), but the log entry announcing one used to just flatly
+  appear like any other line. A `businessUpgrade`/`businessRnd` log entry
+  now gets a brief CSS-only "landing" flash on mount
+  (`.vf-log__entry--reveal` in `game.css`) — a cheap way to make a
+  percentage roll actually feel like a roll. Pure CSS keyed off the
+  entry's stable `id` (never reused, never remounted), so it plays exactly
+  once, right when the entry is genuinely new.
+
+Verified with a new dedicated Node test (`test_career_stats.mjs`, 20
+checks) covering the lifetime-total accumulation math across multiple
+games and the share-text formatting (including a fix for an
+astral-character regex bug — the trend emoji need the `u` regex flag and
+`Array.from()` character counting, not `.length`, since they're outside
+the BMP). The new Playwright UI test (`test_ui_new_features.js`) confirms
+the Career Stats modal opens and shows injected totals, and that clicking
+Share Result actually copies the expected text to the clipboard on a
+crafted Daily Challenge game-over state.

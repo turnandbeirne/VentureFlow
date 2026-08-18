@@ -30,6 +30,32 @@ export function todayChallengeDate(now = new Date()) {
   return now.toISOString().slice(0, 10);
 }
 
+/**
+ * Wordle-style shareable result text for a just-finished Daily Challenge
+ * run: a final net-worth figure plus a month-by-month "shape" of the
+ * journey (🟩 grew / ⬜ held steady / 🟥 shrank that month, vs a flat ±2%
+ * threshold — 🟦 marks the starting month, which has nothing to compare
+ * against yet) rather than exact per-month numbers, so it's fun to compare
+ * with friends without spoiling anything about the (identical, shared)
+ * weather/card timeline for anyone who hasn't played today's challenge yet.
+ * Pure string — no login/account needed, just copy-paste anywhere.
+ */
+export function buildDailyChallengeShareText({ dateString, finalNetWorth, netWorthHistory, rank }) {
+  const trend = (netWorthHistory || [])
+    .map((entry, i) => {
+      if (i === 0) return '🟦';
+      const prev = netWorthHistory[i - 1].netWorth;
+      const diff = entry.netWorth - prev;
+      const pct = prev !== 0 ? diff / prev : diff > 0 ? 1 : 0;
+      if (pct > 0.02) return '🟩';
+      if (pct < -0.02) return '🟥';
+      return '⬜';
+    })
+    .join('');
+  const rankLine = rank ? `\n🏅 Leaderboard rank: #${rank}` : '';
+  return `VentureFlow Daily Challenge — ${dateString}\n💰 Final net worth: $${Math.round(finalNetWorth || 0).toLocaleString()}${rankLine}\n${trend}\nPlay today's challenge yourself at VentureMaker!`;
+}
+
 /** A small, fast string hash (djb2) turned into a seed for game/rng.js's
  * seedRng() — deterministic per date string, so every player who opens the
  * game on the same UTC date gets the exact same seed, and therefore the
