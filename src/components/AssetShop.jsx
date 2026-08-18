@@ -1,6 +1,6 @@
 import { useCallback } from 'react';
-import { ASSETS, RENT_OVERSUPPLY_FREE_UNITS } from '../data/gameConfig';
-import { effectiveRentPerUnit, totalUnitsOwned } from '../game/players';
+import { ASSETS, RENT_OVERSUPPLY_FREE_UNITS, WEATHER_STAGES, getAssetIncomeRange } from '../data/gameConfig';
+import { effectiveRentPerUnit, perUnitIncome, totalUnitsOwned } from '../game/players';
 import { useHoldRepeat } from '../hooks/useHoldRepeat';
 
 /** A quick 1-4 dot risk meter from an asset's volatility, paired with its
@@ -23,7 +23,7 @@ function crowdingLabel(totalOwned) {
   return 'Market: very crowded';
 }
 
-function AssetCard({ asset, price, previousPrice, owned, cash, totalOwned, onBuy, onSell, disabled }) {
+function AssetCard({ asset, price, previousPrice, owned, cash, totalOwned, weather, weatherIncomeAmounts, onBuy, onSell, disabled }) {
   const trendUp = price >= previousPrice;
   const trendPct = previousPrice ? Math.round(((price - previousPrice) / previousPrice) * 100) : 0;
   const canBuy = !disabled && cash >= price;
@@ -65,6 +65,20 @@ function AssetCard({ asset, price, previousPrice, owned, cash, totalOwned, onBuy
           +${effectiveRentPerUnit(asset, price, totalOwned).toFixed(0)}/mo each
           {crowdingLabel(totalOwned) && <span className="vf-asset-card__crowding"> · {crowdingLabel(totalOwned)}</span>}
         </span>
+      ) : asset.weatherIncomeRange ? (
+        <span
+          className="vf-asset-card__weather-income"
+          title="Income per unit is rolled fresh every month based on the current weather, plus a bump (or hit) from fortune cards."
+        >
+          +${perUnitIncome(asset, { weatherIncomeAmounts }).toFixed(0)}/mo each right now
+          {weather && WEATHER_STAGES[weather.stageId] && ` (${WEATHER_STAGES[weather.stageId].icon} ${WEATHER_STAGES[weather.stageId].name})`}
+          {(() => {
+            const range = getAssetIncomeRange(asset);
+            return range ? (
+              <span className="vf-asset-card__income-range"> · Range: ${range[0]}–${range[1]}/mo each</span>
+            ) : null;
+          })()}
+        </span>
       ) : (
         <span className="vf-asset-card__no-income">💵 Price only — no monthly income</span>
       )}
@@ -81,7 +95,7 @@ function AssetCard({ asset, price, previousPrice, owned, cash, totalOwned, onBuy
   );
 }
 
-export default function AssetShop({ prices, previousPrices, player, allPlayers, disabled, onBuy, onSell }) {
+export default function AssetShop({ prices, previousPrices, player, allPlayers, weather, weatherIncomeAmounts, disabled, onBuy, onSell }) {
   return (
     <div>
       <div className="vf-section-title">
@@ -99,6 +113,8 @@ export default function AssetShop({ prices, previousPrices, player, allPlayers, 
             owned={player.holdings[asset.id] || 0}
             cash={player.cash}
             totalOwned={totalUnitsOwned(allPlayers, asset.id)}
+            weather={weather}
+            weatherIncomeAmounts={weatherIncomeAmounts}
             disabled={disabled}
             onBuy={() => onBuy(asset.id)}
             onSell={() => onSell(asset.id)}

@@ -2,7 +2,7 @@
 // New-game factory
 // ============================================================================
 import { GAME_LENGTH_MONTHS, getDifficulty, DEFAULT_DIFFICULTY_ID } from '../data/gameConfig';
-import { createPlayerRoster } from './players';
+import { createPlayerRoster, rollWeatherIncomeAmounts } from './players';
 import { createInitialPrices } from './market';
 import { createWeatherState } from './weather';
 import { getScenario, DEFAULT_SCENARIO_ID, scenarioStartingWeather } from './scenarios';
@@ -30,6 +30,11 @@ export function createNewGame(
     month: 1,
     totalMonths: GAME_LENGTH_MONTHS,
     weather,
+    // This period's rolled per-unit weather income (Lemonade Stand) for
+    // month 1, so it's available before the first payday ever happens —
+    // see players.js's rollWeatherIncomeAmounts and turnEngine.js, which
+    // rerolls this every month-end after.
+    weatherIncomeAmounts: rollWeatherIncomeAmounts(weather),
     assetPrices: createInitialPrices(),
     previousAssetPrices: createInitialPrices(),
     players: createPlayerRoster(mode, humanNames, difficulty, botConfigs, humanAvatars),

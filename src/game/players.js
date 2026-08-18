@@ -16,7 +16,12 @@ import {
   RENT_OVERSUPPLY_RATE,
   RENT_MIN_YIELD_FACTOR,
 } from '../data/gameConfig';
-import { pickRandom } from './rng';
+// pickRandom — the default (player-choice) stream — for picking a robot's
+// personality, exactly like before. envRandomInt — the ENVIRONMENT stream —
+// is used ONLY by rollWeatherIncomeAmounts below, which is driven by the
+// shared weather, not a player's own choices; see game/rng.js's module
+// comment for why that boundary matters (Daily Challenge fairness).
+import { pickRandom, envRandomInt } from './rng';
 import { activeMarketingBoostTotal } from './businessUpgrades';
 
 export function createPlayer({
@@ -196,14 +201,53 @@ function baseYield(asset) {
  * price and how many units are owned across the whole table right now. The
  * first couple of units anyone owns pay the full baseline yield; every unit
  * beyond that crowds the rental market a bit more and pulls the per-unit
- * yield down, floored so it never goes to nothing. Non-rent-bearing assets
- * (Lemonade Co., Treasure Chest, Piggy Bank) always return 0 — they're
- * price-only, with no monthly income at all. */
+ * yield down, floored so it never goes to nothing. Every asset that isn't
+ * rent-bearing (including Lemonade Stand, whose income instead comes from
+ * perUnitIncome/rollWeatherIncomeAmounts below) always returns 0 here —
+ * Treasure Chest and Piggy Bank are genuinely price-only, with no monthly
+ * income at all. */
 export function effectiveRentPerUnit(asset, price, totalOwned) {
   if (!asset || asset.rentPerMonth <= 0) return 0;
   const excess = Math.max(0, (totalOwned || 0) - RENT_OVERSUPPLY_FREE_UNITS);
   const yieldFactor = Math.max(RENT_MIN_YIELD_FACTOR, 1 / (1 + RENT_OVERSUPPLY_RATE * excess));
   return price * baseYield(asset) * yieldFactor;
+}
+
+/**
+ * Roll this "period's" per-unit income for every asset that has a
+ * `weatherIncomeRange` (currently just Lemonade Stand — see gameConfig.js),
+ * keyed by the CURRENT weather stage. Rolled on the ENVIRONMENT stream (see
+ * game/rng.js's module comment) since it's driven by the shared weather,
+ * not any player's own choices — every Daily Challenge player must see the
+ * identical sequence of amounts regardless of what they buy/sell. Called
+ * once per month at month-end (for the upcoming month — see
+ * game/turnEngine.js) plus once at game creation for month 1 (see
+ * game/newGame.js). The result is stored on state.weatherIncomeAmounts so
+ * the UI can show a stable, already-rolled figure instead of re-rolling on
+ * every render.
+ */
+export function rollWeatherIncomeAmounts(weather) {
+  const stageId = weather?.stageId;
+  const amounts = {};
+  for (const asset of ASSETS) {
+    if (!asset.weatherIncomeRange) continue;
+    const range = asset.weatherIncomeRange[stageId] || Object.values(asset.weatherIncomeRange)[0];
+    const [min, max] = range;
+    amounts[asset.id] = envRandomInt(min, max);
+  }
+  return amounts;
+}
+
+/** What one unit of ANY asset currently earns per month, dispatching to the
+ * right model: a rent-bearing asset (Tree House) uses the live-price cap
+ * rate above; a weather-driven asset (Lemonade Stand) uses this period's
+ * already-rolled amount from `weatherIncomeAmounts` (see
+ * rollWeatherIncomeAmounts); everything else (Piggy Bank, Treasure Chest) is
+ * price-only and earns 0. */
+export function perUnitIncome(asset, { price, totalOwned, weatherIncomeAmounts } = {}) {
+  if (asset.rentPerMonth > 0) return effectiveRentPerUnit(asset, price, totalOwned);
+  if (asset.weatherIncomeRange) return weatherIncomeAmounts?.[asset.id] ?? 0;
+  return 0;
 }
 
 /** A business's current effective monthly income: its permanent base
@@ -218,30 +262,32 @@ export function businessMonthlyIncome(business, month) {
 }
 
 /**
- * A player's total passive (no-extra-effort) monthly income: dynamic rent
- * from rent-bearing assets (see effectiveRentPerUnit above — this is why
- * `allPlayers` and `prices` are needed now, not just this one player),
- * every business's current effective income, and any permanent
- * fortune-card passiveBonus. `context` is optional so a caller that only
- * has this one player can still get a (less precise, single-player-only)
- * answer rather than crashing; `month` defaults to "unknown," which safely
- * excludes any temporary Marketing boosts rather than guessing they're
- * active.
+ * A player's total passive (no-extra-effort) monthly income: per-unit
+ * income from every asset that has any (dynamic rent from Tree House, this
+ * period's rolled weather income from Lemonade Stand — see perUnitIncome
+ * above, which is why `allPlayers`/`prices`/`weatherIncomeAmounts` are
+ * needed now, not just this one player), every business's current
+ * effective income, and any permanent fortune-card passiveBonus. `context`
+ * is optional so a caller that only has this one player can still get a
+ * (less precise, single-player-only) answer rather than crashing; `month`
+ * defaults to "unknown," which safely excludes any temporary Marketing
+ * boosts rather than guessing they're active.
  */
 export function passiveIncome(player, context = {}) {
   const allPlayers = context.allPlayers || [player];
   const prices = context.prices || {};
   const month = context.month;
+  const weatherIncomeAmounts = context.weatherIncomeAmounts || {};
 
-  const rent = ASSETS.filter((a) => a.rentPerMonth > 0).reduce((sum, a) => {
+  const assetIncome = ASSETS.reduce((sum, a) => {
     const qty = player.holdings[a.id] || 0;
     if (qty === 0) return sum;
     const total = totalUnitsOwned(allPlayers, a.id);
     const price = prices[a.id] ?? a.basePrice;
-    return sum + qty * effectiveRentPerUnit(a, price, total);
+    return sum + qty * perUnitIncome(a, { price, totalOwned: total, weatherIncomeAmounts });
   }, 0);
   const businessIncome = player.businesses.reduce((sum, b) => sum + businessMonthlyIncome(b, month), 0);
-  return Math.round(rent + businessIncome + (player.passiveBonus || 0));
+  return Math.round(assetIncome + businessIncome + (player.passiveBonus || 0));
 }
 
 /**

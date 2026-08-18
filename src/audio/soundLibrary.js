@@ -151,7 +151,7 @@ export const SOUNDS = {
   buy_piggy: [note(440, 0, 0.08, 'sine', 0.5), note(440, 0.09, 0.11, 'sine', 0.45)],
   sell_piggy: [note(392, 0, 0.13, 'sine', 0.4)],
 
-  // Lemonade Co. — bright and bouncy, like a little "sproing."
+  // Lemonade Stand (or similar service) — bright and bouncy, like a little "sproing."
   buy_lemonade: [
     note(660, 0, 0.06, 'triangle', 0.55),
     note(830, 0.05, 0.06, 'triangle', 0.5),

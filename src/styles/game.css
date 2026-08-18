@@ -214,6 +214,10 @@
   opacity: 0.75;
 }
 
+.vf-player-card__invest-btn {
+  margin-top: 0.4rem;
+}
+
 .vf-badge-chip {
   display: inline-flex;
   align-items: center;
@@ -359,6 +363,17 @@
 
 .vf-asset-card__no-income {
   font-size: 0.78rem;
+  color: var(--vf-ink-soft);
+  font-weight: 500;
+}
+
+.vf-asset-card__weather-income {
+  font-size: 0.78rem;
+  color: var(--vf-green-dark);
+  font-weight: 600;
+}
+
+.vf-asset-card__income-range {
   color: var(--vf-ink-soft);
   font-weight: 500;
 }

@@ -48,10 +48,12 @@ export function passiveIncomeTarget(scenario, difficultyId) {
  * `scenarioGoalMonth` set (so this only ever fires once per player) and an
  * announcement log entry (kind: 'objectiveMet', which both the event log
  * and the bot-chat reaction system already know how to display/react to —
- * see chatEngine.js). `prices` is only needed for the passiveIncomeTarget
- * check (dynamic Tree House rent depends on live price — see players.js).
+ * see chatEngine.js). `prices` and `weatherIncomeAmounts` are only needed
+ * for the passiveIncomeTarget check (dynamic Tree House rent depends on
+ * live price, and Lemonade Stand income on this month's roll — see
+ * players.js).
  */
-export function checkScenarioObjective(scenario, difficultyId, players, month, prices) {
+export function checkScenarioObjective(scenario, difficultyId, players, month, prices, weatherIncomeAmounts) {
   if (!scenario?.objective) return { players, logEntries: [] };
   const logEntries = [];
 
@@ -59,7 +61,7 @@ export function checkScenarioObjective(scenario, difficultyId, players, month, p
     const target = passiveIncomeTarget(scenario, difficultyId);
     const nextPlayers = players.map((p) => {
       if (p.scenarioGoalMonth != null) return p;
-      if (passiveIncome(p, { allPlayers: players, prices, month }) >= target) {
+      if (passiveIncome(p, { allPlayers: players, prices, month, weatherIncomeAmounts }) >= target) {
         logEntries.push({
           icon: '🏁',
           message: `${p.name} reached the Passive Income Race goal — $${target}/mo!`,

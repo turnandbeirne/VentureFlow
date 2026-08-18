@@ -294,14 +294,33 @@ export const ASSETS = [
   },
   {
     id: 'lemonade',
-    name: 'Lemonade Co.',
+    name: 'Lemonade Stand (or similar service)',
     icon: '🍋',
-    tagline: 'Bounces around',
+    tagline: 'Income swings with the weather (and luck)',
     kind: 'bouncy',
     basePrice: 75,
     volatility: 0.15,
     rentPerMonth: 0,
     riskLabel: 'Medium Risk',
+    // Unlike a rent-bearing asset (Tree House), this one's per-unit
+    // monthly income isn't derived from its price at all — it's rolled
+    // fresh every month (see players.js's rollWeatherIncomeAmounts) from
+    // whichever range below matches the CURRENT weather stage, then
+    // further nudged by the 3 lemonade-specific fortune cards (a one-time
+    // perUnitCash bump — see decks.js/OPPORTUNITY_DECK+SETBACK_DECK below).
+    // Sunny weather means thirsty customers; storms mean nobody's buying
+    // lemonade (or ice cream, or umbrellas — whatever "similar service"
+    // this stand actually is) outside. getAssetIncomeRange() below turns
+    // this into the overall "$X–$Y/mo" figure shown in the shop/portfolio
+    // UI, since players can't see the hidden weather-duration timer to know
+    // which stage's exact range applies next.
+    weatherIncomeRange: {
+      sunnyBoom: [18, 34],
+      cloudyPeak: [10, 20],
+      rainyDip: [2, 10],
+      stormyBust: [0, 4],
+      rainbowRebound: [8, 18],
+    },
   },
   {
     id: 'treehouse',
@@ -326,6 +345,20 @@ export const ASSETS = [
     riskLabel: 'High Risk',
   },
 ];
+
+/** The overall min/max monthly per-unit income across every weather stage
+ * for an asset with a weatherIncomeRange (currently just Lemonade Stand) —
+ * the headline "$X–$Y/mo" figure shown in the shop/portfolio UI, since
+ * players can't see the hidden weather-duration timer to know which stage's
+ * exact range applies next. Returns null for an asset with no
+ * weatherIncomeRange (nothing to show). */
+export function getAssetIncomeRange(asset) {
+  if (!asset?.weatherIncomeRange) return null;
+  const ranges = Object.values(asset.weatherIncomeRange);
+  const min = Math.min(...ranges.map(([lo]) => lo));
+  const max = Math.max(...ranges.map(([, hi]) => hi));
+  return [min, max];
+}
 
 // ---------------------------------------------------------------------------
 // Weather / market cycle — hidden-timer state machine
@@ -410,20 +443,25 @@ export const WEATHER_STAGES = {
 // Fortune card decks
 // ---------------------------------------------------------------------------
 // Every card carries a kid-friendly "why" — the money lesson behind what
-// just happened. Effect kinds understood by the engine (src/game/decks.js):
+// just happened. A card carries either a single `effect` object OR an
+// `effects` array (for a card that does more than one thing at once, e.g.
+// the 3 lemonade cards below, which bump the price AND give a one-time
+// per-unit cash bonus/penalty) — both are read by src/game/decks.js's
+// applyCardEffect. Effect kinds understood by the engine:
 //   cash          { amount }                flat dollars, + or -
 //   cashPercent   { percent }                % of current net worth, + or -
 //   assetPrice    { assetId | 'all', percent } bumps a price (or all prices)
 //   skillToken    { amount }                 + or - skill tokens (floors at 0)
 //   passiveBonus  { amount }                 permanent $/mo passive income, + or -
+//   perUnitCash   { assetId, amount }        one-time $ per unit OWNED of that asset, + or -
 export const OPPORTUNITY_DECK = [
-  { id: 'lemonade-rush', title: 'Lemonade Rush', icon: '🍋', flavor: 'A summer heat wave has everyone thirsty!', why: 'When lots of people want the same thing at once, businesses that sell it can do great — that’s called demand.', effect: { type: 'assetPrice', assetId: 'lemonade', percent: 12 } },
+  { id: 'lemonade-rush', title: 'Lemonade Rush', icon: '🍋', flavor: 'A summer heat wave has everyone thirsty!', why: 'When lots of people want the same thing at once, businesses that sell it can do great — that’s called demand.', effects: [{ type: 'assetPrice', assetId: 'lemonade', percent: 12 }, { type: 'perUnitCash', assetId: 'lemonade', amount: 10 }] },
   { id: 'piggy-interest', title: 'Piggy Bank Interest', icon: '🐷', flavor: 'Your piggy bank paid you a little bonus for saving.', why: 'Banks pay you a small reward called interest just for keeping your money safely saved with them.', effect: { type: 'cash', amount: 25 } },
   { id: 'birthday-money', title: 'Birthday Money', icon: '🎂', flavor: 'Grandma sent you birthday cash!', why: 'Gifts are a fun way money can come to you — you still get to choose how to save or spend it wisely.', effect: { type: 'cash', amount: 80 } },
   { id: 'treasure-found', title: 'Treasure Found', icon: '💎', flavor: 'An old treasure map actually led somewhere real!', why: 'Sometimes risky investments pay off big — that extra reward is why people take the chance.', effect: { type: 'assetPrice', assetId: 'treasure', percent: 25 } },
   { id: 'treehouse-tourists', title: 'Tree House Tourists', icon: '🏠', flavor: 'Kids from the whole neighborhood want to rent your tree house for a party!', why: 'Owning something useful, like property, can earn you money from people who want to use it.', effect: { type: 'cash', amount: 50 } },
   { id: 'skill-scholarship', title: 'Skill Scholarship', icon: '📚', flavor: 'You won a free workshop spot!', why: 'Learning new skills doesn’t always cost money — sometimes an opportunity is handed right to you.', effect: { type: 'skillToken', amount: 1 } },
-  { id: 'stand-review', title: 'Lucky Stand Review', icon: '🌟', flavor: 'A local newspaper wrote a nice story about your lemonade stand!', why: 'A good reputation brings more customers, which means more money coming in.', effect: { type: 'assetPrice', assetId: 'lemonade', percent: 10 } },
+  { id: 'stand-review', title: 'Lucky Stand Review', icon: '🌟', flavor: 'A local newspaper wrote a nice story about your lemonade stand!', why: 'A good reputation brings more customers, which means more money coming in.', effects: [{ type: 'assetPrice', assetId: 'lemonade', percent: 10 }, { type: 'perUnitCash', assetId: 'lemonade', amount: 8 }] },
   { id: 'garage-sale', title: 'Garage Sale', icon: '🧺', flavor: 'You sold some old toys you didn’t need anymore.', why: 'Selling things you don’t use is a smart, easy way to earn a little extra cash.', effect: { type: 'cash', amount: 40 } },
   { id: 'market-rally', title: 'Market Rally', icon: '📈', flavor: 'The whole town is feeling good about spending and investing!', why: 'When everyone feels confident about the future, prices often rise together — that’s a rally.', effect: { type: 'cashPercent', percent: 5 } },
   { id: 'bright-idea', title: 'Bright Idea Bonus', icon: '💡', flavor: 'Your business found a clever way to save money.', why: 'Being creative and solving problems is one of the best ways a business can grow stronger.', effect: { type: 'passiveBonus', amount: 15 } },
@@ -433,7 +471,7 @@ export const OPPORTUNITY_DECK = [
 
 export const SETBACK_DECK = [
   { id: 'tooth-trouble', title: 'Tooth Trouble', icon: '🦷', flavor: 'Oops — a trip to the dentist wasn’t free!', why: 'Surprises happen to everyone. That’s why it’s smart to always keep a little cash saved for emergencies.', effect: { type: 'cash', amount: -40 } },
-  { id: 'lemonade-spill', title: 'Lemonade Spill', icon: '🍋', flavor: 'A sudden storm ruined your lemonade stand’s ingredients.', why: 'Bouncy businesses can lose value fast — but they can also bounce back. That’s the risk of volatility.', effect: { type: 'assetPrice', assetId: 'lemonade', percent: -15 } },
+  { id: 'lemonade-spill', title: 'Lemonade Spill', icon: '🍋', flavor: 'A sudden storm ruined your lemonade stand’s ingredients.', why: 'Bouncy businesses can lose value fast — but they can also bounce back. That’s the risk of volatility.', effects: [{ type: 'assetPrice', assetId: 'lemonade', percent: -15 }, { type: 'perUnitCash', assetId: 'lemonade', amount: -6 }] },
   { id: 'treasure-sinks', title: 'Treasure Chest Sinks', icon: '💎', flavor: 'The market got spooked and treasure prices dropped fast.', why: 'Risky investments can lose a lot of value quickly — never put in money you can’t afford to lose.', effect: { type: 'assetPrice', assetId: 'treasure', percent: -30 } },
   { id: 'broken-toy', title: 'Broken Toy', icon: '🧸', flavor: 'You accidentally broke something and had to pay to fix it.', why: 'Unexpected costs pop up in life — a little emergency savings helps you handle them without stress.', effect: { type: 'cash', amount: -35 } },
   { id: 'roof-repair', title: 'Rainy Roof Repair', icon: '🏠', flavor: 'Your tree house needs a new roof after the storm.', why: 'Owning property means sometimes paying for repairs — that’s part of the cost of owning things.', effect: { type: 'cash', amount: -50 } },

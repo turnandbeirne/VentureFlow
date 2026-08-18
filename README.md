@@ -108,7 +108,7 @@ load, license, or go stale, and it works offline once the page has loaded
 
 Buying and selling each of the four assets has its own distinct personality
 instead of one generic "buy"/"sell" sound: Piggy Bank gets a soft, cute
-double "boop"; Lemonade Co. gets a bright, bouncy triangle "sproing"; Tree
+double "boop"; Lemonade Stand gets a bright, bouncy triangle "sproing"; Tree
 House gets a warm, woody chime triad; Treasure Chest gets a shimmery
 sawtooth sparkle with a bigger flourish, matching its higher risk/reward
 personality. A generic `buy`/`sell` sound is kept as a fallback so a new
@@ -681,16 +681,15 @@ already used for other big moments) now also covers these swing moments,
 making a genuine overtake feel like the game event it is instead of quietly
 scrolling past in the log.
 
-## Clearer Lemonade Co. and dynamic Tree House rent
+## Clearer zero-income asset labels and dynamic Tree House rent
 
 Two related fixes to what was actually a confusing pair of mechanics: an
-asset with `rentPerMonth: 0` (Lemonade Co., Treasure Chest, Piggy Bank)
+asset with `rentPerMonth: 0` (originally Lemonade Co., Treasure Chest, and
+Piggy Bank — see the next section for how Lemonade's since changed)
 generated no visible label at all in `AssetShop.jsx`, which read as a gap
-rather than as "this one pays no monthly income" — Lemonade Co. in
-particular is pure price appreciation/depreciation (weather + its own
-volatility + a couple of specific fortune cards), never cash flow, and nothing
-about the old blank space said so. Every zero-income asset card now shows an
-explicit "💵 Price only — no monthly income" line instead of nothing.
+rather than as "this one pays no monthly income." Every zero-income asset
+card now shows an explicit "💵 Price only — no monthly income" line instead
+of nothing; Treasure Chest and Piggy Bank still show it today.
 
 Tree House's rent was the other half: `rentPerMonth: 40` was a flat
 constant regardless of price or how many were ever bought, even though the
@@ -728,6 +727,60 @@ income rolls, robot decision-making, R&D payoffs). `seedRng()` seeds both
 from one input seed with two independently-derived starting points, so
 Daily Challenge is still fully deterministic per date — just correctly
 isolated from anything player choices can perturb.
+
+## Lemonade Stand's weather-driven variable income
+
+Lemonade Co. is now **Lemonade Stand (or similar service)** — the new name
+is deliberately generic, since the mechanic is really "a small weather-
+sensitive business," whatever a given table imagines it to be. More than a
+rename, it used to be pure price appreciation/depreciation (weather + its
+own volatility + a couple of specific fortune cards) and, unlike Tree
+House, never generated any actual cash flow — a real gap given the mechanic
+was originally described (and expected) to behave like unpredictable
+business income. It now does, on top of its existing price swings:
+
+- **A per-unit monthly income that's rolled fresh every month**, from a
+  range that depends on the *current weather stage* —
+  `weatherIncomeRange` in `gameConfig.js`'s `ASSETS` entry, e.g. $18–$34/mo
+  per unit in a Sunny Boom (thirsty customers) vs. $0–$4/mo in a Stormy
+  Bust (nobody's buying lemonade outside). `players.js`'s
+  `rollWeatherIncomeAmounts()` does the actual roll, keyed by
+  `weather.stageId`; `turnEngine.js`'s month-end resolution rolls it right
+  before payday (so this month's roll pays out this month, not a month
+  late) and stores the result on `state.weatherIncomeAmounts`, and
+  `newGame.js` rolls an initial value for month 1 so it's never undefined.
+  `players.js`'s `perUnitIncome()` is the new generic dispatcher `passiveIncome()`
+  loops every asset through — a rent-bearing asset (Tree House) uses the
+  live-price cap-rate model from the section above, a weather-income asset
+  (Lemonade Stand) uses this month's rolled amount, and everything else is
+  still 0.
+- **A one-time nudge from the 3 lemonade-specific fortune cards** —
+  Lemonade Rush, Lucky Stand Review, and Lemonade Spill — on top of their
+  existing price-percent effect. `decks.js`'s `applyCardEffect()` now
+  understands a new `perUnitCash` effect type (a flat $ amount **times
+  however many units the player currently owns**) and a card can carry
+  either a single legacy `effect` object or an `effects` array to do more
+  than one thing at once — every pre-existing single-effect card keeps
+  working byte-for-byte unchanged.
+- **The rolled amount is on the ENVIRONMENT random-number stream**
+  (`envRandomInt`, same stream as weather/price/cards — see the dual-stream
+  fix above), since it's driven by the shared weather, not any player's own
+  choices. Getting this wrong would have reintroduced the exact class of
+  Daily Challenge desync bug just fixed for Tree House rent; a dedicated
+  regression test (`test_economy3_determinism.mjs`) specifically checks that
+  the month-by-month roll sequence stays identical between a human who
+  trades heavily and one who does nothing at all.
+
+Both the shop (`AssetShop.jsx`) and the portfolio breakdown
+(`PlayerDetailModal.jsx`) show Lemonade Stand with a live "+$X/mo each
+right now (⛅ Cloudy Peak)" figure plus the overall range across every
+weather stage ("Range: $0–$34/mo each" — `gameConfig.js`'s
+`getAssetIncomeRange()`), so the variability is visible up front instead of
+only ever showing up quietly in the cash total. Bots don't factor this
+income into their buy/sell decisions yet — `aiEngine.js`'s scoring still
+only looks at price — the same kind of deliberate scope cut as "bots don't
+use business upgrades yet" below; teaching a bot personality to actually
+chase weather-driven income is future work.
 
 ## Business upgrades: Marketing, Sales, Operations, and R&D
 
@@ -789,9 +842,22 @@ businesses, but that's future work, not something this round claims to do.
 Tapping a player's card always showed a live gain/loss breakdown per asset
 (average price paid vs. current price) and each business's income, but
 that view — `PlayerDetailModal.jsx` — was never wired up on the game-over
-screen, which is exactly when "how did my Lemonade Co. actually do this
+screen, which is exactly when "how did my Lemonade Stand actually do this
 game?" is the more interesting question. Every row in the final standings
 is now tappable (`GameOverScreen.jsx`), opening the same portfolio
 breakdown in its normal read-only mode (no upgrade buttons — the game's
 over, there's nothing left to invest in) for any player, not just the
 winner.
+
+## Player card: explicit "Invest in your businesses!" button
+
+The "🔍 Tap for portfolio details" hint on each player card was the only
+way to discover that the whole card is clickable — there was nothing
+pointing specifically at the business-upgrade system introduced earlier.
+`PlayerPanel.jsx`'s `PlayerCard` now has an explicit ⚙️ "Invest in your
+businesses!" button under that hint, which opens the exact same portfolio
+breakdown as tapping anywhere else on the card. Cosmetic only — no new
+behavior, just a second, more specific way in. (Nesting a real `<button>`
+inside the outer clickable card meant the card itself could no longer be a
+`<button>` — it's now a `<div role="button">` with the same click handler
+plus Enter/Space keyboard support, so accessibility didn't regress.)

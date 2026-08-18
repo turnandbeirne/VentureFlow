@@ -20,8 +20,19 @@ import PlayerDetailModal from './PlayerDetailModal';
 
 export default function GameBoard({ game }) {
   const { state } = game;
-  const { players, activePlayerIndex, weather, assetPrices, previousAssetPrices, month, totalMonths, log, chat, status } =
-    state;
+  const {
+    players,
+    activePlayerIndex,
+    weather,
+    assetPrices,
+    previousAssetPrices,
+    month,
+    totalMonths,
+    log,
+    chat,
+    status,
+    weatherIncomeAmounts,
+  } = state;
   const difficulty = getDifficulty(state.difficultyId);
   const [showLeaderboard, setShowLeaderboard] = useState(false);
   const [selectedPlayerId, setSelectedPlayerId] = useState(null);
@@ -102,6 +113,7 @@ export default function GameBoard({ game }) {
             players={players}
             prices={assetPrices}
             month={month}
+            weatherIncomeAmounts={weatherIncomeAmounts}
             activePlayerIndex={activePlayerIndex}
             onSelectPlayer={(playerId) => {
               playSound('click');
@@ -124,6 +136,8 @@ export default function GameBoard({ game }) {
             previousPrices={previousAssetPrices}
             player={activePlayer}
             allPlayers={players}
+            weather={weather}
+            weatherIncomeAmounts={weatherIncomeAmounts}
             disabled={!isHumanTurn}
             onBuy={(assetId) => game.buyAsset(activePlayer.id, assetId, 1)}
             onSell={(assetId) => game.sellAsset(activePlayer.id, assetId, 1)}
@@ -161,6 +175,8 @@ export default function GameBoard({ game }) {
           prices={assetPrices}
           allPlayers={players}
           month={month}
+          weather={weather}
+          weatherIncomeAmounts={weatherIncomeAmounts}
           // Upgrade buttons only appear when viewing YOUR OWN active turn —
           // opening any other player's card (including mid-turn, including
           // AI) stays read-only, same as it always has been.

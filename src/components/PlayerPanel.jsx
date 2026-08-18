@@ -10,12 +10,24 @@ function botTooltip(player) {
   return `${player.name} · ${skill.icon} ${skill.name}`;
 }
 
-function PlayerCard({ player, prices, allPlayers, month, isActive, onSelect }) {
+function PlayerCard({ player, prices, allPlayers, month, weatherIncomeAmounts, isActive, onSelect }) {
+  // A <button> can't legally contain another <button> (the invest CTA
+  // below), so the whole-card tap target is a div with button semantics
+  // bolted on (role/tabIndex/Enter+Space) instead of a real <button> — see
+  // game.css's .vf-player-card, which was already styled generically
+  // enough (appearance: none, cursor: pointer) not to depend on the tag.
   return (
-    <button
-      type="button"
+    <div
+      role="button"
+      tabIndex={0}
       className={`vf-card vf-player-card ${isActive ? 'vf-player-card--active' : ''}`}
       onClick={onSelect}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onSelect();
+        }
+      }}
     >
       <div className="vf-player-card__name">
         <span>{player.avatar}</span>
@@ -25,7 +37,7 @@ function PlayerCard({ player, prices, allPlayers, month, isActive, onSelect }) {
       <div className="vf-player-card__networth">${netWorth(player, prices).toLocaleString()}</div>
       <div className="vf-player-card__stat">💵 Cash: ${Math.round(player.cash).toLocaleString()}</div>
       <div className="vf-player-card__stat">
-        🌱 Passive: ${passiveIncome(player, { allPlayers, prices, month })}/mo · 💡 {player.skillTokens}
+        🌱 Passive: ${passiveIncome(player, { allPlayers, prices, month, weatherIncomeAmounts })}/mo · 💡 {player.skillTokens}
       </div>
       {player.badges.length > 0 && (
         <div className="vf-player-card__badges">
@@ -41,11 +53,21 @@ function PlayerCard({ player, prices, allPlayers, month, isActive, onSelect }) {
         </div>
       )}
       <div className="vf-player-card__tap-hint">🔍 Tap for portfolio details</div>
-    </button>
+      <button
+        type="button"
+        className="vf-btn vf-btn--sm vf-btn--warm vf-btn--block vf-player-card__invest-btn"
+        onClick={(e) => {
+          e.stopPropagation();
+          onSelect();
+        }}
+      >
+        ⚙️ Invest in your businesses!
+      </button>
+    </div>
   );
 }
 
-export default function PlayerPanel({ players, prices, month, activePlayerIndex, onSelectPlayer }) {
+export default function PlayerPanel({ players, prices, month, weatherIncomeAmounts, activePlayerIndex, onSelectPlayer }) {
   return (
     <div className="vf-players">
       {players.map((player, i) => (
@@ -55,6 +77,7 @@ export default function PlayerPanel({ players, prices, month, activePlayerIndex,
           prices={prices}
           allPlayers={players}
           month={month}
+          weatherIncomeAmounts={weatherIncomeAmounts}
           isActive={i === activePlayerIndex}
           onSelect={() => onSelectPlayer(player.id)}
         />

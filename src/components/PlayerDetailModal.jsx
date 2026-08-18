@@ -1,11 +1,11 @@
-import { ASSETS, BUSINESS_UPGRADE_TRACKS, getBotPersonality, getSkillLevel } from '../data/gameConfig';
+import { ASSETS, BUSINESS_UPGRADE_TRACKS, WEATHER_STAGES, getAssetIncomeRange, getBotPersonality, getSkillLevel } from '../data/gameConfig';
 import {
   assetValue,
   businessValue,
   netWorth,
   passiveIncome,
   avgPurchasePrice,
-  effectiveRentPerUnit,
+  perUnitIncome,
   totalUnitsOwned,
   businessMonthlyIncome,
 } from '../game/players';
@@ -71,7 +71,7 @@ function BusinessUpgrades({ business, month, cash, canUpgrade, onUpgrade }) {
  * any player, including AI, at any time, even mid-turn or after the game
  * has ended.
  */
-export default function PlayerDetailModal({ player, prices, allPlayers, month, canUpgrade = false, onUpgradeBusiness, onClose }) {
+export default function PlayerDetailModal({ player, prices, allPlayers, month, weather, weatherIncomeAmounts, canUpgrade = false, onUpgradeBusiness, onClose }) {
   if (!player) return null;
 
   function handleClose() {
@@ -129,7 +129,7 @@ export default function PlayerDetailModal({ player, prices, allPlayers, month, c
             </div>
             <div className="vf-portfolio__summary-stat">
               <span className="vf-portfolio__summary-label">Passive / mo</span>
-              <span className="vf-portfolio__summary-value">${passiveIncome(player, { allPlayers, prices, month })}</span>
+              <span className="vf-portfolio__summary-value">${passiveIncome(player, { allPlayers, prices, month, weatherIncomeAmounts })}</span>
             </div>
           </div>
 
@@ -142,7 +142,15 @@ export default function PlayerDetailModal({ player, prices, allPlayers, month, c
                 const currentPrice = prices[asset.id];
                 const currentValue = qty * currentPrice;
                 const gainPct = avgPrice ? ((currentPrice - avgPrice) / avgPrice) * 100 : null;
-                const rentPerUnit = asset.rentPerMonth > 0 ? effectiveRentPerUnit(asset, currentPrice, totalUnitsOwned(allPlayers, asset.id)) : 0;
+                const isWeatherIncome = !!asset.weatherIncomeRange;
+                const perUnit = perUnitIncome(asset, {
+                  price: currentPrice,
+                  totalOwned: totalUnitsOwned(allPlayers, asset.id),
+                  weatherIncomeAmounts,
+                });
+                const incomeRange = isWeatherIncome ? getAssetIncomeRange(asset) : null;
+                const stageName = weather ? WEATHER_STAGES[weather.stageId]?.name : null;
+                const priceOnly = !isWeatherIncome && asset.rentPerMonth === 0;
 
                 if (qty === 0 && avgPrice === null) {
                   return (
@@ -151,7 +159,9 @@ export default function PlayerDetailModal({ player, prices, allPlayers, month, c
                       <div>
                         <div className="vf-portfolio__asset-name">{asset.name}</div>
                         <div className="vf-portfolio__asset-detail">
-                          Never bought{asset.rentPerMonth === 0 && ' · price only, no monthly income'}
+                          Never bought
+                          {priceOnly && ' · price only, no monthly income'}
+                          {isWeatherIncome && incomeRange && ` · income varies with weather & cards ($${incomeRange[0]}–$${incomeRange[1]}/mo per unit)`}
                         </div>
                       </div>
                       <span className="vf-portfolio__asset-value">—</span>
@@ -169,10 +179,17 @@ export default function PlayerDetailModal({ player, prices, allPlayers, month, c
                       <div className="vf-portfolio__asset-detail">
                         Avg paid: {avgPrice !== null ? `$${avgPrice.toFixed(2)}` : '—'} · Now: $
                         {currentPrice.toFixed(2)}
-                        {asset.rentPerMonth > 0 && qty > 0 && rentPerUnit > 0 && (
-                          <> · +${(qty * rentPerUnit).toFixed(0)}/mo rent</>
+                        {asset.rentPerMonth > 0 && qty > 0 && perUnit > 0 && (
+                          <> · +${(qty * perUnit).toFixed(0)}/mo rent</>
                         )}
-                        {asset.rentPerMonth === 0 && <> · price only, no monthly income</>}
+                        {isWeatherIncome && qty > 0 && (
+                          <>
+                            {' '}
+                            · +${(qty * perUnit).toFixed(0)}/mo right now{stageName ? ` (${stageName})` : ''}
+                            {incomeRange && <> · range ${incomeRange[0]}–${incomeRange[1]}/mo per unit</>}
+                          </>
+                        )}
+                        {priceOnly && <> · price only, no monthly income</>}
                       </div>
                     </div>
                     <div>

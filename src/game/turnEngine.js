@@ -11,7 +11,7 @@ import { driftPrices } from './market';
 import { tickWeather, getStageInfo } from './weather';
 import { drawFortuneCard, applyCardEffect } from './decks';
 import { evaluateBadges } from './badges';
-import { netWorth, passiveIncome } from './players';
+import { netWorth, passiveIncome, rollWeatherIncomeAmounts } from './players';
 import { getScenario, checkScenarioObjective } from './scenarios';
 import { resolvePendingRnd, pruneExpiredBoosts } from './businessUpgrades';
 
@@ -67,21 +67,31 @@ function resolveMonthEnd(state) {
     return { ...p, businesses };
   });
 
-  // 2) Allowance + rent + business income + card bonuses. Allowance comes
-  // from the difficulty preset chosen at setup (state.monthlyAllowance);
-  // MONTHLY_ALLOWANCE is only a fallback for a game saved before difficulty
-  // presets existed. passiveIncome() needs the whole table (not just this
-  // player) and the live pre-drift prices now, since Tree House rent is
-  // dynamic — see players.js's effectiveRentPerUnit.
+  // 2) Roll this month's weather-driven per-unit income (Lemonade Stand —
+  // see players.js's rollWeatherIncomeAmounts) using the CURRENT (pre-tick)
+  // weather stage, since this is the income for the month that's ending.
+  // Stored on nextState below so the UI shows a stable already-rolled
+  // figure until the next month-end reroll, instead of re-rolling on every
+  // render.
+  const weatherIncomeAmounts = rollWeatherIncomeAmounts(state.weather);
+
+  // 3) Allowance + rent + business income + weather-driven asset income +
+  // card bonuses. Allowance comes from the difficulty preset chosen at
+  // setup (state.monthlyAllowance); MONTHLY_ALLOWANCE is only a fallback
+  // for a game saved before difficulty presets existed. passiveIncome()
+  // needs the whole table (not just this player), the live pre-drift
+  // prices, and this month's weatherIncomeAmounts now, since Tree House
+  // rent is dynamic and Lemonade Stand income is rolled — see players.js's
+  // effectiveRentPerUnit/perUnitIncome.
   const allowance = state.monthlyAllowance ?? MONTHLY_ALLOWANCE;
-  const incomeContext = { allPlayers: players, prices: state.assetPrices, month };
+  const incomeContext = { allPlayers: players, prices: state.assetPrices, month, weatherIncomeAmounts };
   players = players.map((p) => {
     const income = allowance + passiveIncome(p, incomeContext);
     return { ...p, cash: p.cash + income };
   });
   logEntries.push({ icon: '💰', message: `Payday! Everyone collected their allowance and passive income.`, kind: 'payday' });
 
-  // 3) Fortune cards — drawn using the weather that governed this month.
+  // 4) Fortune cards — drawn using the weather that governed this month.
   const startingPrices = state.assetPrices;
   let prices = state.assetPrices;
   const fortuneRecap = [];
@@ -107,15 +117,16 @@ function resolveMonthEnd(state) {
     });
   }
 
-  // 4) Price drift for the month that's ending.
+  // 5) Price drift for the month that's ending.
   const drift = driftPrices(prices, state.weather);
   prices = drift.prices;
 
-  // 5) Badges — passiveIncomeAtLeast needs the same allPlayers/prices
-  // context passiveIncome() takes everywhere else now (dynamic Tree House
-  // rent); use the post-drift prices since that's the live figure going
-  // forward into next month.
-  const badgeContext = { allPlayers: players, prices };
+  // 6) Badges — passiveIncomeAtLeast needs the same allPlayers/prices/
+  // weatherIncomeAmounts context passiveIncome() takes everywhere else now
+  // (dynamic Tree House rent + rolled Lemonade Stand income); use the
+  // post-drift prices since that's the live figure going forward into next
+  // month.
+  const badgeContext = { allPlayers: players, prices, weatherIncomeAmounts };
   const newlyEarnedLog = [];
   players = players.map((p) => {
     const { player, newlyEarned } = evaluateBadges(p, month, badgeContext);
@@ -126,29 +137,29 @@ function resolveMonthEnd(state) {
   });
   logEntries.push(...newlyEarnedLog);
 
-  // 6) Scenario objective check (Passive Income Race / Business Sprint —
+  // 7) Scenario objective check (Passive Income Race / Business Sprint —
   // Classic Growth and Survive the Crash have no objective and no-op here).
   // Uses this month's post-income/post-badge numbers, same as everything
   // else below. See game/scenarios.js.
-  const objectiveCheck = checkScenarioObjective(scenario, state.difficultyId, players, month, prices);
+  const objectiveCheck = checkScenarioObjective(scenario, state.difficultyId, players, month, prices, weatherIncomeAmounts);
   players = objectiveCheck.players;
   logEntries.push(...objectiveCheck.logEntries);
 
-  // 7) Weather tick for the month ahead.
+  // 8) Weather tick for the month ahead.
   const tick = tickWeather(state.weather);
   if (tick.changed) {
     const info = getStageInfo(tick.weather);
     logEntries.push({ icon: info.icon, message: `The weather shifted to ${info.name}!`, kind: 'weather' });
   }
 
-  // 8) Net worth history snapshot — one point per completed month, used by
+  // 9) Net worth history snapshot — one point per completed month, used by
   // the game-over screen's growth chart (see components/NetWorthChart.jsx).
   players = players.map((p) => ({
     ...p,
     netWorthHistory: [...p.netWorthHistory, { month, netWorth: netWorth(p, prices) }],
   }));
 
-  // 9) Lead-change callout — a bit of extra excitement when the standings
+  // 10) Lead-change callout — a bit of extra excitement when the standings
   // actually flip (skipped in a solo/no-real-leader-yet situation — see
   // currentLeaderId above). Reacted to by game/chatEngine.js and given its
   // own celebratory sound by hooks/useGameSounds.js.
@@ -165,7 +176,7 @@ function resolveMonthEnd(state) {
     }
   }
 
-  // 10) Advance the calendar.
+  // 11) Advance the calendar.
   const nextMonth = month + 1;
   const isGameOver = nextMonth > GAME_LENGTH_MONTHS;
 
@@ -175,6 +186,7 @@ function resolveMonthEnd(state) {
     assetPrices: prices,
     previousAssetPrices: startingPrices,
     weather: tick.weather,
+    weatherIncomeAmounts,
     month: isGameOver ? state.month : nextMonth,
     activePlayerIndex: 0,
     status: isGameOver ? 'gameover' : 'monthRecap',

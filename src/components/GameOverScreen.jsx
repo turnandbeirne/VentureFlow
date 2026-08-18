@@ -66,7 +66,7 @@ export default function GameOverScreen({ state, onPlayAgain, onRecordProfileResu
     const bestHuman = [...humans].sort((a, b) => netWorth(b, assetPrices) - netWorth(a, assetPrices))[0];
     const result = onRecordProfileResult({
       netWorth: netWorth(bestHuman, assetPrices),
-      passiveIncome: passiveIncome(bestHuman, { allPlayers: players, prices: assetPrices, month }),
+      passiveIncome: passiveIncome(bestHuman, { allPlayers: players, prices: assetPrices, month, weatherIncomeAmounts: state.weatherIncomeAmounts }),
       badgesEarnedThisGame: bestHuman.badges.length,
     });
     if (result && (result.newlyUnlockedAvatars.length > 0 || result.newlyUnlockedThemes.length > 0)) {
@@ -305,6 +305,8 @@ export default function GameOverScreen({ state, onPlayAgain, onRecordProfileResu
           prices={assetPrices}
           allPlayers={players}
           month={month}
+          weather={state.weather}
+          weatherIncomeAmounts={state.weatherIncomeAmounts}
           onClose={() => setSelectedPlayerId(null)}
         />
       )}
