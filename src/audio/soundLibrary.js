@@ -237,8 +237,9 @@ export const SOUNDS = {
   // noises instead of (or alongside) a spoken line. All original
   // synthesized bits — no sampled/licensed audio — just built to hit the
   // same goofy notes as a fart, a burp, a hype shout, a groan, a "take
-  // that back!", a cartoon laugh, a screech, and a mock-dramatic hero
-  // sting.
+  // that back!", a cartoon laugh, a screech, a mock-dramatic hero sting, a
+  // hiccup, a chicken squawk, an airhorn blast, a smooch, a mic drop, and a
+  // sneeze.
   // ---------------------------------------------------------------------
   botFart: [
     note(150, 0, 0.06, 'sawtooth', 0.45),
@@ -270,6 +271,32 @@ export const SOUNDS = {
     note(196, 0, 0.14, 'sawtooth', 0.5),
     note(196, 0.16, 0.14, 'sawtooth', 0.5),
     sweep(220, 440, 0.32, 0.24, 'sawtooth', 0.55),
+  ],
+  // A sudden interrupted little "hic!"
+  botHiccup: [note(300, 0, 0.05, 'square', 0.4), note(520, 0.09, 0.045, 'square', 0.45)],
+  // A chicken-ish squawk — perfect for Leeroy's avatar.
+  botSquawk: [
+    note(600, 0, 0.05, 'sawtooth', 0.4),
+    note(750, 0.04, 0.05, 'sawtooth', 0.42),
+    note(550, 0.09, 0.05, 'sawtooth', 0.4),
+    note(800, 0.13, 0.07, 'sawtooth', 0.45),
+    noise(0, 0.22, { gain: 0.2, filterType: 'bandpass', filterFreq: 1800, filterFreqEnd: 2400, filterQ: 3, attack: 0.005 }),
+  ],
+  // A hype airhorn blast — two slightly-detuned tones beating against each
+  // other for texture, with a little pitch droop at the end.
+  botAirhorn: [
+    note(220, 0, 0.4, 'sawtooth', 0.55),
+    note(221, 0, 0.4, 'square', 0.3),
+    sweep(220, 190, 0.25, 0.2, 'sawtooth', 0.4),
+  ],
+  // A quick, cute "mwah!"
+  botKiss: [sweep(500, 900, 0, 0.08, 'sine', 0.4), sweep(900, 500, 0.08, 0.1, 'sine', 0.35)],
+  // A confident low thud, like dropping a mic.
+  botMicDrop: [note(90, 0, 0.18, 'sine', 0.5), noise(0, 0.15, { gain: 0.3, filterType: 'lowpass', filterFreq: 300, filterQ: 0.7, attack: 0.002 })],
+  // Building sniffle, then the "AH-CHOO!" release.
+  botSneeze: [
+    sweep(300, 500, 0, 0.18, 'sawtooth', 0.35),
+    noise(0.18, 0.15, { gain: 0.4, filterType: 'highpass', filterFreq: 1200, filterQ: 0.6, attack: 0.001 }),
   ],
 
   // Something couldn't be done (reserved for future use).

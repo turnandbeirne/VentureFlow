@@ -5,13 +5,45 @@
   justify-content: center;
 }
 
+/* Two-column layout: the main board (setup, shop, actions) on the left,
+   a sticky sidebar (weather detail, event log, chat) on the right — so
+   the game's "what's happening" info stays visible without scrolling
+   past it. Collapses to the original single stacked column on narrower
+   screens, where there's no room for two columns side by side. */
+.vf-board-layout {
+  width: 100%;
+  max-width: 1360px;
+  display: grid;
+  grid-template-columns: minmax(0, 1000px) minmax(300px, 360px);
+  gap: 1.25rem;
+  align-items: start;
+}
+
+@media (max-width: 1020px) {
+  .vf-board-layout {
+    grid-template-columns: 1fr;
+    max-width: 1000px;
+  }
+
+  .vf-board-sidebar {
+    position: static !important;
+  }
+}
+
 .vf-board {
   width: 100%;
-  max-width: 1000px;
   padding: 1.5rem;
   display: flex;
   flex-direction: column;
   gap: 1.1rem;
+}
+
+.vf-board-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+  position: sticky;
+  top: 1.25rem;
 }
 
 /* Header ------------------------------------------------------------- */
@@ -55,6 +87,32 @@
 
 .vf-weather-badge__icon {
   font-size: 1.3rem;
+}
+
+/* Fuller weather readout for the sidebar (WeatherCard.jsx) — the header's
+   WeatherBadge pill above stays for a quick glance from anywhere. */
+.vf-weather-card {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.9rem 1.1rem;
+}
+
+.vf-weather-card__icon {
+  font-size: 2.1rem;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.vf-weather-card__name {
+  font-weight: 700;
+  font-size: 1rem;
+}
+
+.vf-weather-card__blurb {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--vf-ink-soft);
 }
 
 /* Month progress ------------------------------------------------------ */
@@ -301,7 +359,7 @@
 
 /* Log ----------------------------------------------------------------- */
 .vf-log {
-  max-height: 190px;
+  max-height: 340px;
   overflow-y: auto;
   padding: 0.9rem 1.1rem;
   display: flex;
@@ -326,8 +384,13 @@
 }
 
 /* Bot chat --------------------------------------------------------------- */
+.vf-chat-panel {
+  padding: 0;
+  overflow: hidden;
+}
+
 .vf-chat {
-  max-height: 190px;
+  max-height: 340px;
   overflow-y: auto;
   padding: 0.9rem 1.1rem;
   display: flex;
@@ -383,6 +446,48 @@
 .vf-chat__entry--sfx .vf-chat__message {
   font-style: italic;
   color: var(--vf-ink-soft);
+}
+
+/* A real player-typed message — highlighted solid so it's obviously not a
+   canned bot line. */
+.vf-chat__entry--human .vf-chat__bubble {
+  background: var(--vf-yellow);
+  border-left-style: solid;
+}
+
+.vf-chat__target {
+  font-weight: 500;
+  opacity: 0.75;
+}
+
+.vf-chat-composer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  padding: 0.7rem 0.9rem;
+  border-top: var(--vf-border-width) solid var(--vf-border);
+  background: var(--vf-cream);
+  position: relative;
+}
+
+.vf-chat-composer__from {
+  flex: 0 0 auto;
+  min-width: 90px;
+}
+
+.vf-chat-composer__input {
+  flex: 1 1 140px;
+  min-height: 40px;
+  padding: 0.5rem 0.75rem;
+}
+
+.vf-chat-composer__to {
+  flex: 0 0 auto;
+  min-width: 100px;
+}
+
+.vf-chat-composer__error {
+  flex-basis: 100%;
 }
 
 .vf-gameover__chat {

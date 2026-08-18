@@ -4,6 +4,7 @@ import { getDifficulty } from '../data/gameConfig';
 import { playSound } from '../audio/soundEngine';
 import { playMusicTrack } from '../audio/musicEngine';
 import WeatherBadge from './WeatherBadge';
+import WeatherCard from './WeatherCard';
 import MonthProgress from './MonthProgress';
 import PlayerPanel from './PlayerPanel';
 import AssetShop from './AssetShop';
@@ -61,81 +62,89 @@ export default function GameBoard({ game }) {
 
   return (
     <div className="vf-page">
-      <div className="vf-card vf-board">
-        <div className="vf-header">
-          <Brand size="sm" align="left" />
-          <div className="vf-header__right">
-            <VolumeControl />
-            <MusicControl />
-            <button
-              type="button"
-              className="vf-btn vf-btn--sm vf-btn--ghost"
-              onClick={() => {
-                playSound('click');
-                setShowLeaderboard(true);
-              }}
-            >
-              🏆
-            </button>
-            <span className="vf-pill" title={difficulty.tagline}>
-              {difficulty.icon} {difficulty.name}
-            </span>
-            <WeatherBadge weather={weather} />
-            <button
-              type="button"
-              className="vf-btn vf-btn--sm vf-btn--ghost"
-              onClick={() => {
-                playSound('click');
-                game.newGame();
-              }}
-            >
-              New Game
-            </button>
+      <div className="vf-board-layout">
+        <div className="vf-card vf-board">
+          <div className="vf-header">
+            <Brand size="sm" align="left" />
+            <div className="vf-header__right">
+              <VolumeControl />
+              <MusicControl />
+              <button
+                type="button"
+                className="vf-btn vf-btn--sm vf-btn--ghost"
+                onClick={() => {
+                  playSound('click');
+                  setShowLeaderboard(true);
+                }}
+              >
+                🏆
+              </button>
+              <span className="vf-pill" title={difficulty.tagline}>
+                {difficulty.icon} {difficulty.name}
+              </span>
+              <WeatherBadge weather={weather} />
+              <button
+                type="button"
+                className="vf-btn vf-btn--sm vf-btn--ghost"
+                onClick={() => {
+                  playSound('click');
+                  game.newGame();
+                }}
+              >
+                New Game
+              </button>
+            </div>
           </div>
+
+          <MonthProgress month={month} totalMonths={totalMonths} />
+
+          <PlayerPanel
+            players={players}
+            prices={assetPrices}
+            activePlayerIndex={activePlayerIndex}
+            onSelectPlayer={(playerId) => {
+              playSound('click');
+              setSelectedPlayerId(playerId);
+            }}
+          />
+
+          <div className={`vf-turn-banner ${isHumanTurn ? '' : 'vf-turn-banner--ai'}`}>
+            {status === 'monthRecap'
+              ? '📬 Reading this month\'s fortune cards...'
+              : isHumanTurn
+              ? `${activePlayer.avatar} ${
+                  activePlayer.name.toLowerCase() === 'you' ? 'Your' : `${activePlayer.name}'s`
+                } turn — what will you do?`
+              : `🤖 ${activePlayer?.name} is thinking...`}
+          </div>
+
+          <AssetShop
+            prices={assetPrices}
+            previousPrices={previousAssetPrices}
+            player={activePlayer}
+            disabled={!isHumanTurn}
+            onBuy={(assetId) => game.buyAsset(activePlayer.id, assetId, 1)}
+            onSell={(assetId) => game.sellAsset(activePlayer.id, assetId, 1)}
+          />
+
+          <ActionBar
+            player={activePlayer}
+            disabled={!isHumanTurn}
+            onStartBusiness={() => game.startBusiness(activePlayer.id)}
+            onLearnSkill={() => game.learnSkill(activePlayer.id)}
+            onDone={() => game.endTurn(activePlayer.id)}
+          />
         </div>
 
-        <MonthProgress month={month} totalMonths={totalMonths} />
-
-        <PlayerPanel
-          players={players}
-          prices={assetPrices}
-          activePlayerIndex={activePlayerIndex}
-          onSelectPlayer={(playerId) => {
-            playSound('click');
-            setSelectedPlayerId(playerId);
-          }}
-        />
-
-        <div className={`vf-turn-banner ${isHumanTurn ? '' : 'vf-turn-banner--ai'}`}>
-          {status === 'monthRecap'
-            ? '📬 Reading this month\'s fortune cards...'
-            : isHumanTurn
-            ? `${activePlayer.avatar} ${
-                activePlayer.name.toLowerCase() === 'you' ? 'Your' : `${activePlayer.name}'s`
-              } turn — what will you do?`
-            : `🤖 ${activePlayer?.name} is thinking...`}
+        {/* Sidebar: weather detail, chat, and the event log all stay in view
+            at once on wider screens (sticky) instead of requiring scrolling
+            past the board below them — falls back to stacking under the
+            board on narrow screens, see game.css's .vf-board-layout. */}
+        <div className="vf-board-sidebar">
+          <WeatherCard weather={weather} />
+          <ChatPanel chat={chat} players={players} onSendChat={game.sendChat} />
+          <EventLog log={log} />
         </div>
-
-        <AssetShop
-          prices={assetPrices}
-          previousPrices={previousAssetPrices}
-          player={activePlayer}
-          disabled={!isHumanTurn}
-          onBuy={(assetId) => game.buyAsset(activePlayer.id, assetId, 1)}
-          onSell={(assetId) => game.sellAsset(activePlayer.id, assetId, 1)}
-        />
-
-        <ActionBar
-          player={activePlayer}
-          disabled={!isHumanTurn}
-          onStartBusiness={() => game.startBusiness(activePlayer.id)}
-          onLearnSkill={() => game.learnSkill(activePlayer.id)}
-          onDone={() => game.endTurn(activePlayer.id)}
-        />
-
-        <ChatPanel chat={chat} />
-
-        <EventLog log={log} />
       </div>
 
       {showModalForHuman && (

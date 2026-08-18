@@ -10,7 +10,16 @@ import { createNewGame } from './newGame';
 import { buyAsset, sellAsset, startBusiness, learnSkill } from './actions';
 import { endTurn, acknowledgeFortuneCard } from './turnEngine';
 import { runAiTurn } from './aiEngine';
-import { reactToLogEntries, generateGreeting, generateBotTurnFlavor } from './chatEngine';
+import {
+  reactToLogEntries,
+  generateGreeting,
+  generateBotTurnFlavor,
+  createHumanChatEntry,
+  reactToHumanChat,
+} from './chatEngine';
+import { isOffensiveName } from './nameFilter';
+
+const CHAT_MAX_LENGTH = 140;
 
 let logCounter = 0;
 function nextLogId() {
@@ -107,6 +116,23 @@ export function gameReducer(state, action) {
         return appendChat(nextState, chat);
       }
       return nextState;
+    }
+
+    case 'SEND_CHAT': {
+      // The composer (ChatPanel.jsx) already validates before dispatching,
+      // but the reducer re-checks too — never trust the UI as the only
+      // guard against an empty or offensive message slipping into
+      // localStorage/the shared log.
+      const sender = state.players.find((p) => p.id === action.playerId);
+      const trimmed = (action.message || '').trim().slice(0, CHAT_MAX_LENGTH);
+      if (!sender || !trimmed || isOffensiveName(trimmed)) return state;
+      const humanEntry = createHumanChatEntry(sender, trimmed, action.targetPlayerId);
+      let next = appendChat(state, [humanEntry]);
+      // A targeted (or random) bot has a chance to chime back — see
+      // chatEngine.js's reactToHumanChat for why this is a canned line, not
+      // an actual understanding of what was typed.
+      next = appendChat(next, reactToHumanChat(next, humanEntry));
+      return next;
     }
 
     case 'CLEAR_ERROR':

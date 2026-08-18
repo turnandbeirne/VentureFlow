@@ -828,7 +828,7 @@ export const BOT_PERSONALITIES = [
     // (soundLibrary.js) this personality is likely to reach for — see
     // chatEngine.js's generateBotTurnFlavor().
     color: '#e8590c',
-    sfxPool: ['botOhYeah', 'botScreech', 'botHeroSting', 'botLaugh'],
+    sfxPool: ['botOhYeah', 'botScreech', 'botHeroSting', 'botLaugh', 'botSquawk', 'botAirhorn'],
   },
   {
     id: 'bossemby',
@@ -837,7 +837,7 @@ export const BOT_PERSONALITIES = [
     strategyId: 'flipper',
     blurb: 'Buys low, sells high, never sits still.',
     color: '#1098ad',
-    sfxPool: ['botLaugh', 'botOhYeah', 'botTakeItBack'],
+    sfxPool: ['botLaugh', 'botOhYeah', 'botTakeItBack', 'botMicDrop'],
   },
   {
     id: 'mrb',
@@ -846,7 +846,7 @@ export const BOT_PERSONALITIES = [
     strategyId: 'balanced',
     blurb: 'Cool, calm, and steady all around.',
     color: '#5c5f66',
-    sfxPool: ['botGroan', 'botTakeItBack', 'botLaugh'],
+    sfxPool: ['botGroan', 'botTakeItBack', 'botLaugh', 'botHiccup'],
   },
   {
     id: 'mrgrinch',
@@ -855,7 +855,7 @@ export const BOT_PERSONALITIES = [
     strategyId: 'hoarder',
     blurb: 'Every dollar saved is a dollar loved.',
     color: '#2f9e44',
-    sfxPool: ['botGroan', 'botBurp', 'botTakeItBack'],
+    sfxPool: ['botGroan', 'botBurp', 'botTakeItBack', 'botSneeze'],
   },
   {
     id: 'daddybigbux',
@@ -864,7 +864,7 @@ export const BOT_PERSONALITIES = [
     strategyId: 'tycoon',
     blurb: 'Businesses, businesses, and more businesses.',
     color: '#f08c00',
-    sfxPool: ['botOhYeah', 'botHeroSting', 'botBurp', 'botLaugh'],
+    sfxPool: ['botOhYeah', 'botHeroSting', 'botBurp', 'botLaugh', 'botAirhorn', 'botMicDrop'],
   },
   {
     id: 'moneymama',
@@ -873,7 +873,7 @@ export const BOT_PERSONALITIES = [
     strategyId: 'saver',
     blurb: 'Smart, patient, and always prepared.',
     color: '#d6336c',
-    sfxPool: ['botLaugh', 'botOhYeah'],
+    sfxPool: ['botLaugh', 'botOhYeah', 'botKiss'],
   },
   {
     id: 'grumpymommy',
@@ -882,7 +882,7 @@ export const BOT_PERSONALITIES = [
     strategyId: 'contrarian',
     blurb: 'Buys the dip, sells the hype, grumbles the whole time.',
     color: '#9c36b5',
-    sfxPool: ['botGroan', 'botTakeItBack', 'botFart', 'botScreech'],
+    sfxPool: ['botGroan', 'botTakeItBack', 'botFart', 'botScreech', 'botSneeze'],
   },
 ];
 

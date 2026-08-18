@@ -63,7 +63,24 @@ const SFX_CAPTION = {
   botLaugh: '*big cartoon laugh*',
   botScreech: '*SCREEEECH*',
   botHeroSting: '"You haven\'t seen the last of me!"',
+  botHiccup: '*HIC!*',
+  botSquawk: '*SQUAWK!*',
+  botAirhorn: '*BWAAAAP!* (airhorn)',
+  botKiss: '"Mwah!"',
+  botMicDrop: '*drops the mic*',
+  botSneeze: '"AH-CHOO!"',
 };
+
+// A human-typed message (see createHumanChatEntry/reactToHumanChat below)
+// always uses this color rather than a bot personality color, so a real
+// player's line is visually distinct from every robot's at a glance.
+const HUMAN_CHAT_COLOR = '#1c7ed6';
+
+// Chance a bot chimes back after a human types something. There's no real
+// language understanding here — just a canned, personality-flavored line —
+// so this stays well under 100% to avoid the illusion of a bot that
+// actually read the message.
+const HUMAN_REPLY_CHANCE = 0.45;
 
 function aiSpeakers(state) {
   return state.players.filter((p) => p.type === 'ai' && p.personalityId);
@@ -294,4 +311,40 @@ export function generateBotTurnFlavor(state, playerId) {
   }
 
   return entries;
+}
+
+/**
+ * Build the chat entry for a human-typed message — see reducer.js's
+ * SEND_CHAT case, which calls this after already trimming/validating the
+ * text (offensive-word check via game/nameFilter.js, length cap). Doesn't
+ * touch state; just shapes the entry the same way say() does for bots, so
+ * ChatEntryRow doesn't need to special-case where an entry came from.
+ */
+export function createHumanChatEntry(sender, message, targetPlayerId) {
+  return {
+    speakerId: sender.id,
+    speakerName: sender.name,
+    speakerAvatar: sender.avatar,
+    color: HUMAN_CHAT_COLOR,
+    message,
+    category: 'human',
+    targetPlayerId: targetPlayerId || null,
+  };
+}
+
+/**
+ * A small chance a robot "replies" after a human sends a chat message.
+ * There's no actual language model reading the text — this just picks an
+ * in-character line the same way any other reaction does, from whichever
+ * bot was targeted (if it was a bot and can talk) or a random one
+ * otherwise, so a typed message doesn't just vanish into silence.
+ */
+export function reactToHumanChat(state, humanEntry) {
+  if (!humanEntry || Math.random() >= HUMAN_REPLY_CHANCE) return [];
+  const target = humanEntry.targetPlayerId ? state.players.find((p) => p.id === humanEntry.targetPlayerId) : null;
+  const speaker = target?.type === 'ai' && target.personalityId ? target : pickSpeaker(state, humanEntry.speakerId);
+  if (!speaker) return [];
+  const category = pickRandom(['question', 'tease', 'compliment', 'challenge']);
+  const said = say(speaker, category, { player: humanEntry.speakerName }, humanEntry.speakerId);
+  return said ? [said] : [];
 }

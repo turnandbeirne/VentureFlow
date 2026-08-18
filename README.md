@@ -191,6 +191,27 @@ click/tap/keypress rather than erroring, so the very first thing a player
 does (picking a game mode, moving a slider) is what actually starts the
 music.
 
+### Why music volume/mute is routed through a GainNode, not `audio.volume`
+
+iOS Safari (and every other browser on iPhone/iPad, since Apple requires
+them all to run on WebKit under the hood) silently ignores
+`HTMLMediaElement.volume` — the setter is a documented no-op there, and
+actual playback volume is locked to the hardware buttons instead. An
+earlier version of `musicEngine.js` controlled music volume by setting
+`audio.volume` directly, which meant the volume slider and mute button
+worked everywhere except iPhone, where they visibly moved but did nothing
+audible. The fix: `ensureAudio()` now routes the `<audio>` element's output
+through a Web Audio `GainNode` (`audioContext.createMediaElementSource(el)`
+→ `GainNode` → `destination`), the same mechanism the synthesized sound
+effects in `soundEngine.js` already use — iOS *does* honor Web Audio gain
+automation. `setMusicVolume`/`setMusicMuted`/the fade helper all move
+`gainNode.gain.value` now instead of `audio.volume`; a browser with no Web
+Audio support at all (essentially none in practice) falls back to the old
+`audio.volume` behavior rather than going silent. `playMusicTrack()` and the
+existing "retry on next user gesture" autoplay-unlock logic also now resume
+the `AudioContext` itself (`audioContext.resume()`), since iOS gates that
+the same way it gates `audio.play()`.
+
 ## Player portfolio details
 
 Tapping any player's card (your own or an AI robot's) opens a read-only
@@ -436,3 +457,69 @@ profanity-filter false positive of blocking innocent names that merely
 a local/offline game; if the leaderboard ever becomes shared/online, names
 should be re-checked server-side too, since a client-side filter is
 inherently bypassable.
+
+## Sidebar layout: weather, log, and chat always in view
+
+`components/GameBoard.jsx` renders inside a `.vf-board-layout` CSS grid
+(`styles/game.css`) with two columns: the main board (header, month
+progress, player panel, shop, action bar) on the left, and a sticky sidebar
+on the right holding three separate panels — `components/WeatherCard.jsx`
+(a fuller version of the header's quick-glance `WeatherBadge`, showing the
+current stage's name and blurb, which previously only appeared as a
+tooltip), `ChatPanel.jsx`, and `EventLog.jsx`. `position: sticky` on the
+sidebar keeps all three in view while the board's own content scrolls past
+underneath, on screens wide enough for two columns (1020px and up). Below
+that breakpoint, `.vf-board-layout` collapses to a single column and the
+sidebar falls back to stacking normally below the board — the original
+layout, unchanged — so the game still works on a phone or a narrow window.
+The log and chat panels also each got taller (`max-height` bumped from
+190px to 340px) since the sidebar has the vertical room to show more at
+once. This was a deliberate choice to keep weather/log/chat as three
+distinct panels rather than tabs, so nothing is ever hidden behind a click.
+
+## More goof-off sounds
+
+The goof-off SFX pool (see "Goof-off sound effects and hype quotes" above)
+grew from 8 to 14 original synthesized sounds — added a hiccup
+(`botHiccup`), a chicken-ish squawk (`botSquawk`, fitting for Leeroy
+Jenkins' avatar), a hype airhorn blast (`botAirhorn`), a cute "mwah!" kiss
+(`botKiss`), a confident low mic-drop thud (`botMicDrop`), and a
+building-sneeze-then-"AH-CHOO!" (`botSneeze`) — all in `audio/
+soundLibrary.js`, same approach as every other sound in the game (Web Audio
+oscillators/noise bursts, no sampled or licensed audio). Each personality's
+`sfxPool` in `gameConfig.js`'s `BOT_PERSONALITIES` was also rebalanced to
+pull from a wider, more distinct mix — e.g. Leeroy can now squawk and blast
+an airhorn, MoneyMama got the kiss sound, GrumpyMommy picked up a sneeze —
+so two robots' goof-off moments overlap less than before.
+
+## Player chat input
+
+Alongside robot chat, a human player can now type their own message
+straight into the chat feed — `components/ChatPanel.jsx`'s `ChatComposer`
+renders a small form under the chat list: an optional "from" selector
+(shown only in hot-seat mode, when more than one human is playing — solo
+mode skips it since there's only one human to be), a text input (140-char
+cap, matching the same cap the reducer enforces), and a "to" selector
+defaulting to "Everyone" but able to target any other player at the table,
+human or robot. Sending dispatches a new `SEND_CHAT` action
+(`hooks/useGame.js`'s `sendChat(playerId, message, targetPlayerId)` →
+`game/reducer.js`), which re-validates (never trusting the UI alone) and
+appends the message via `game/chatEngine.js`'s new `createHumanChatEntry()`
+— tagged `category: 'human'` and given its own color (`#1c7ed6`, a blue
+that's visually distinct from every bot's color) so it's immediately
+obvious which lines are player-typed versus robot-generated.
+`ChatEntryRow` shows the target as a small "→ 🐔 Leeroy Jenkins"-style chip
+when one was picked. A typed message is checked against the same
+`game/nameFilter.js`'s `isOffensiveName()` already used for player names,
+both client-side (so a blocked message shows an inline error immediately
+and never appears in the feed) and again in the reducer as defense in depth.
+
+If the message was aimed at a robot (or, if aimed at "Everyone," a random
+one), that robot has a capped 45% chance to "reply" via `chatEngine.js`'s
+new `reactToHumanChat()` — worth being clear about what this actually is:
+there's no language model reading and understanding the typed text, so a
+reply is just one of that robot's existing canned `question`/`tease`/
+`compliment`/`challenge` lines (the same banks used for reacting to game
+events), picked at random and addressed back to the sender. It reads as a
+lighthearted in-character response to *being talked to*, not as an actual
+answer to whatever was said.

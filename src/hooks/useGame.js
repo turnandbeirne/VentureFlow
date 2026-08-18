@@ -64,6 +64,10 @@ export function useGame() {
     dispatch({ type: 'ACK_FORTUNE_CARD' });
   }, []);
 
+  const sendChat = useCallback((playerId, message, targetPlayerId) => {
+    dispatch({ type: 'SEND_CHAT', playerId, message, targetPlayerId });
+  }, []);
+
   const clearError = useCallback(() => {
     dispatch({ type: 'CLEAR_ERROR' });
   }, []);
@@ -79,6 +83,7 @@ export function useGame() {
     learnSkill,
     endTurn,
     ackFortuneCard,
+    sendChat,
     clearError,
   };
 }
