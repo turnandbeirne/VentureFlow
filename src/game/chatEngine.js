@@ -37,6 +37,7 @@ const REACT_CHANCE = {
   leadChange: 0.5, // the net-worth standings just flipped — see game/turnEngine.js
   businessUpgrade: 0.35, // investing in Marketing/Sales/Ops/R&D — see game/businessUpgrades.js
   businessRnd: 0.6, // an R&D project actually paid off — see game/turnEngine.js
+  businessExit: 0.85, // a buyout offer landed — see game/businessExits.js/turnEngine.js
 };
 
 // After a bot speaks, this is the chance a *different* bot chimes in with a
@@ -179,6 +180,19 @@ function reactionsForEntry(state, entry) {
     if (!speaker) return entries;
     const said = say(speaker, 'compliment', { player: actorName }, entry.playerId);
     if (said) entries.push(said);
+    return entries;
+  }
+
+  if (kind === 'businessExit') {
+    if (Math.random() >= REACT_CHANCE.businessExit) return entries;
+    const speaker = pickSpeaker(state, entry.playerId);
+    if (!speaker) return entries;
+    const category = Math.random() < 0.25 ? 'challenge' : 'compliment';
+    const said = say(speaker, category, { player: actorName }, entry.playerId);
+    if (said) {
+      entries.push(said);
+      maybeBanterFollowup(state, entries, said);
+    }
     return entries;
   }
 

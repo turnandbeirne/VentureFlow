@@ -10,6 +10,7 @@ import { buildInsights } from '../game/insights';
 import VolumeControl from './VolumeControl';
 import MusicControl from './MusicControl';
 import Brand from './Brand';
+import VentureMakerLink from './VentureMakerLink';
 import LeaderboardModal from './LeaderboardModal';
 import Fireworks from './Fireworks';
 import { ChatEntryRow } from './ChatPanel';
@@ -294,6 +295,10 @@ export default function GameOverScreen({ state, onPlayAgain, onRecordProfileResu
           <button type="button" className="vf-btn vf-btn--go vf-btn--lg" onClick={handlePlayAgain}>
             Play Again 🔁
           </button>
+        </div>
+
+        <div className="vf-gameover__venturemaker">
+          <VentureMakerLink />
         </div>
       </div>
 

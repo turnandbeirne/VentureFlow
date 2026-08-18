@@ -3,10 +3,10 @@
 // ----------------------------------------------------------------------------
 // Orchestrates what happens when a player ends their turn: advance to the
 // next player, or — once everyone has gone — resolve the whole month
-// (income, price drift, weather tick, fortune cards, badges) and either
-// start the next month or end the game.
+// (income, price drift, weather tick, fortune cards, business exit offers,
+// badges) and either start the next month or end the game.
 // ============================================================================
-import { GAME_LENGTH_MONTHS, MONTHLY_ALLOWANCE } from '../data/gameConfig';
+import { GAME_LENGTH_MONTHS, MONTHLY_ALLOWANCE, BUSINESS_EXIT_RARITY_LABELS } from '../data/gameConfig';
 import { driftPrices } from './market';
 import { tickWeather, getStageInfo } from './weather';
 import { drawFortuneCard, applyCardEffect } from './decks';
@@ -14,6 +14,7 @@ import { evaluateBadges } from './badges';
 import { netWorth, passiveIncome, rollWeatherIncomeAmounts } from './players';
 import { getScenario, checkScenarioObjective } from './scenarios';
 import { resolvePendingRnd, pruneExpiredBoosts } from './businessUpgrades';
+import { rollBusinessExit } from './businessExits';
 
 export function endTurn(state, playerId) {
   const currentIndex = state.players.findIndex((p) => p.id === playerId);
@@ -67,7 +68,63 @@ function resolveMonthEnd(state) {
     return { ...p, businesses };
   });
 
-  // 2) Roll this month's weather-driven per-unit income (Lemonade Stand —
+  // 2) Business exit offers — roughly once every ~6 months (a per-month
+  // coin flip, not a fixed schedule), one random player — if they own any
+  // business — gets a buyout offer for a multiple of their most lucrative
+  // business's current monthly income. Resolved BEFORE payday so a sold
+  // business doesn't also collect this month's regular income on top of
+  // its lump-sum payout. See game/businessExits.js for exactly why every
+  // draw here is unconditional/fixed-order on the environment stream.
+  const fortuneRecap = [];
+  const exit = rollBusinessExit(players, month);
+  if (exit) {
+    players = players.map((p) => {
+      if (p.id !== exit.playerId) return p;
+      return {
+        ...p,
+        businesses: p.businesses.filter((b) => b.id !== exit.businessId),
+        cash: p.cash + exit.payout,
+        soldBusinesses: [
+          ...p.soldBusinesses,
+          {
+            id: exit.businessId,
+            name: exit.business.name,
+            income: exit.income,
+            multiplier: exit.multiplier,
+            payout: exit.payout,
+            month,
+          },
+        ],
+      };
+    });
+    const exitPlayer = players.find((p) => p.id === exit.playerId);
+    const rarity = BUSINESS_EXIT_RARITY_LABELS[exit.multiplier] || 'rare';
+    const bizName = exit.business.name || 'a business';
+    logEntries.push({
+      icon: '💼',
+      message: `${exitPlayer.name} got a buyout offer for ${bizName} — sold for $${exit.payout} (${exit.multiplier}x monthly revenue, a ${rarity} offer)!`,
+      kind: 'businessExit',
+      playerId: exit.playerId,
+    });
+    // Piggybacks on the existing fortune-card recap modal (see
+    // FortuneCardModal.jsx / GameBoard.jsx) instead of building a whole
+    // parallel popup system — it just needs the same shape.
+    fortuneRecap.push({
+      playerId: exitPlayer.id,
+      playerName: exitPlayer.name,
+      avatar: exitPlayer.avatar,
+      deckId: 'opportunity',
+      card: {
+        icon: '💼',
+        title: 'Buyout Offer!',
+        flavor: `A buyer wants ${bizName} — and they're not lowballing.`,
+        why: 'Selling a business for a multiple of what it earns each month is called an "exit" — the more monthly income you had built up before the offer came, the bigger the payday.',
+      },
+      description: `Sold for $${exit.payout} (${exit.multiplier}x monthly revenue)!`,
+    });
+  }
+
+  // 3) Roll this month's weather-driven per-unit income (Lemonade Stand —
   // see players.js's rollWeatherIncomeAmounts) using the CURRENT (pre-tick)
   // weather stage, since this is the income for the month that's ending.
   // Stored on nextState below so the UI shows a stable already-rolled
@@ -75,7 +132,7 @@ function resolveMonthEnd(state) {
   // render.
   const weatherIncomeAmounts = rollWeatherIncomeAmounts(state.weather);
 
-  // 3) Allowance + rent + business income + weather-driven asset income +
+  // 4) Allowance + rent + business income + weather-driven asset income +
   // card bonuses. Allowance comes from the difficulty preset chosen at
   // setup (state.monthlyAllowance); MONTHLY_ALLOWANCE is only a fallback
   // for a game saved before difficulty presets existed. passiveIncome()
@@ -91,10 +148,9 @@ function resolveMonthEnd(state) {
   });
   logEntries.push({ icon: '💰', message: `Payday! Everyone collected their allowance and passive income.`, kind: 'payday' });
 
-  // 4) Fortune cards — drawn using the weather that governed this month.
+  // 5) Fortune cards — drawn using the weather that governed this month.
   const startingPrices = state.assetPrices;
   let prices = state.assetPrices;
-  const fortuneRecap = [];
   for (let i = 0; i < players.length; i++) {
     const player = players[i];
     const { deckId, card } = drawFortuneCard(state.weather);
@@ -117,11 +173,11 @@ function resolveMonthEnd(state) {
     });
   }
 
-  // 5) Price drift for the month that's ending.
+  // 6) Price drift for the month that's ending.
   const drift = driftPrices(prices, state.weather);
   prices = drift.prices;
 
-  // 6) Badges — passiveIncomeAtLeast needs the same allPlayers/prices/
+  // 7) Badges — passiveIncomeAtLeast needs the same allPlayers/prices/
   // weatherIncomeAmounts context passiveIncome() takes everywhere else now
   // (dynamic Tree House rent + rolled Lemonade Stand income); use the
   // post-drift prices since that's the live figure going forward into next
@@ -141,7 +197,7 @@ function resolveMonthEnd(state) {
   });
   logEntries.push(...newlyEarnedLog);
 
-  // 7) Scenario objective check (Passive Income Race / Business Sprint —
+  // 8) Scenario objective check (Passive Income Race / Business Sprint —
   // Classic Growth and Survive the Crash have no objective and no-op here).
   // Uses this month's post-income/post-badge numbers, same as everything
   // else below. See game/scenarios.js.
@@ -149,21 +205,21 @@ function resolveMonthEnd(state) {
   players = objectiveCheck.players;
   logEntries.push(...objectiveCheck.logEntries);
 
-  // 8) Weather tick for the month ahead.
+  // 9) Weather tick for the month ahead.
   const tick = tickWeather(state.weather);
   if (tick.changed) {
     const info = getStageInfo(tick.weather);
     logEntries.push({ icon: info.icon, message: `The weather shifted to ${info.name}!`, kind: 'weather' });
   }
 
-  // 9) Net worth history snapshot — one point per completed month, used by
+  // 10) Net worth history snapshot — one point per completed month, used by
   // the game-over screen's growth chart (see components/NetWorthChart.jsx).
   players = players.map((p) => ({
     ...p,
     netWorthHistory: [...p.netWorthHistory, { month, netWorth: netWorth(p, prices) }],
   }));
 
-  // 10) Lead-change callout — a bit of extra excitement when the standings
+  // 11) Lead-change callout — a bit of extra excitement when the standings
   // actually flip (skipped in a solo/no-real-leader-yet situation — see
   // currentLeaderId above). Reacted to by game/chatEngine.js and given its
   // own celebratory sound by hooks/useGameSounds.js.
@@ -180,7 +236,7 @@ function resolveMonthEnd(state) {
     }
   }
 
-  // 11) Advance the calendar.
+  // 12) Advance the calendar.
   const nextMonth = month + 1;
   const isGameOver = nextMonth > GAME_LENGTH_MONTHS;
 

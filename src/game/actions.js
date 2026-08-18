@@ -101,8 +101,14 @@ export function startBusiness(state, playerId) {
 
   const income = randomInt(BUSINESS_INCOME_MIN, BUSINESS_INCOME_MAX);
   const name = pickBusinessName(player.businesses);
+  // player.businessSeq (not businesses.length + 1 — see its comment in
+  // players.js) so an id never gets reused after a business exit removes
+  // one from the array; a game saved before businessSeq existed falls back
+  // to businesses.length, which is still correct for a player who has
+  // never had a business removed.
+  const nextSeq = (player.businessSeq ?? player.businesses.length) + 1;
   const business = {
-    id: `${playerId}-biz-${player.businesses.length + 1}`,
+    id: `${playerId}-biz-${nextSeq}`,
     name,
     income,
     totalInvested: BUSINESS_COST, // grows with every upgrade bought — see businessValue() in players.js
@@ -118,6 +124,7 @@ export function startBusiness(state, playerId) {
     cash: p.cash - BUSINESS_COST,
     skillTokens: p.skillTokens - BUSINESS_SKILL_COST,
     businesses: [...p.businesses, business],
+    businessSeq: nextSeq,
   }));
 
   return {

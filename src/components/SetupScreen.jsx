@@ -22,6 +22,7 @@ import { useProfile } from '../hooks/useProfile';
 import VolumeControl from './VolumeControl';
 import MusicControl from './MusicControl';
 import Brand from './Brand';
+import VentureMakerLink from './VentureMakerLink';
 import LeaderboardModal from './LeaderboardModal';
 import InfoModal from './InfoModal';
 import UnlocksModal from './UnlocksModal';
@@ -408,6 +409,10 @@ export default function SetupScreen({ onStart }) {
           <button type="button" className="vf-btn vf-btn--go vf-btn--lg" onClick={handleStart} disabled={hasInvalidName}>
             Let's Play! 🎉
           </button>
+        </div>
+
+        <div className="vf-setup__venturemaker">
+          <VentureMakerLink />
         </div>
       </div>
 

@@ -135,5 +135,6 @@ export function pickRandom(arr) {
 // comment above for why that boundary is what keeps Daily Challenge fair.
 export const envRandomInt = (min, max) => envGen.randomInt(min, max);
 export const envNoise = (magnitude) => envGen.noise(magnitude);
+export const envChance = (p) => envGen.chance(p);
 export const envWeightedPick = (weights) => envGen.weightedPick(weights);
 export const envPickRandom = (arr) => envGen.pickRandom(arr);

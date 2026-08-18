@@ -370,3 +370,11 @@
   display: flex;
   justify-content: center;
 }
+
+.vf-setup__venturemaker {
+  display: flex;
+  justify-content: center;
+  margin-top: 1.75rem;
+  padding-top: 1.25rem;
+  border-top: 2px dashed var(--vf-border);
+}

@@ -151,7 +151,7 @@ export const SOUNDS = {
   buy_piggy: [note(440, 0, 0.08, 'sine', 0.5), note(440, 0.09, 0.11, 'sine', 0.45)],
   sell_piggy: [note(392, 0, 0.13, 'sine', 0.4)],
 
-  // Lemonade Stand (or similar service) — bright and bouncy, like a little "sproing."
+  // Lemonade Stands & More — bright and bouncy, like a little "sproing."
   buy_lemonade: [
     note(660, 0, 0.06, 'triangle', 0.55),
     note(830, 0.05, 0.06, 'triangle', 0.5),
@@ -216,6 +216,19 @@ export const SOUNDS = {
     note(659.25, 0.1, 0.11, 'square', 0.4),
     note(783.99, 0.2, 0.11, 'square', 0.42),
     note(1046.5, 0.3, 0.26, 'square', 0.48),
+  ],
+
+  // Business exit / buyout offer — a "cha-ching!" jackpot: a quick cash-
+  // register-ish double ding followed by a bright ascending flourish, bigger
+  // than the badge fanfare since a 20x offer is the rarest payday in the
+  // game.
+  businessExit: [
+    note(1046.5, 0, 0.07, 'square', 0.5),
+    note(1318.51, 0.06, 0.09, 'square', 0.5),
+    note(659.25, 0.16, 0.09, 'sine', 0.5),
+    note(880, 0.24, 0.09, 'sine', 0.55),
+    note(1108.73, 0.32, 0.1, 'sine', 0.58),
+    note(1567.98, 0.41, 0.26, 'sine', 0.6),
   ],
 
   // Game over — the victory fanfare plus a fresh, randomized burst of

@@ -1408,6 +1408,14 @@
   flex-wrap: wrap;
 }
 
+.vf-gameover__venturemaker {
+  display: flex;
+  justify-content: center;
+  margin-top: 1.5rem;
+  padding-top: 1.25rem;
+  border-top: 2px dashed var(--vf-border);
+}
+
 .vf-standings {
   display: flex;
   flex-direction: column;

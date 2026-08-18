@@ -24,6 +24,7 @@ const CONCEPT_BY_KIND = {
   skill: 'investInYourself',
   badge: 'goodHabits',
   businessUpgrade: 'reinvestment',
+  businessExit: 'businessValuation',
 };
 
 // A badge earning entry is `kind: 'badge'` for every badge (see
@@ -33,6 +34,7 @@ const CONCEPT_BY_KIND = {
 // 'badge' -> 'goodHabits' mapping for every other badge.
 const CONCEPT_BY_BADGE_ID = {
   balancedInvestor: 'diversification',
+  cashedOut: 'businessValuation',
 };
 
 /**

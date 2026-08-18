@@ -182,6 +182,12 @@ export const FINANCIAL_LESSONS = {
     blurb:
       "Spreading your money across a few different things instead of going all-in on one is called diversification. If one thing drops, the others can help balance it out — it's one of the simplest ways to lower your risk without giving up on growth.",
   },
+  businessValuation: {
+    icon: '💼',
+    title: 'What a business is actually worth',
+    blurb:
+      "Businesses are often bought and sold for a MULTIPLE of what they earn each month or year — that's called a valuation. A business earning more per month is worth more the instant someone wants to buy it, which is exactly why growing a business's income pays off even before you ever sell it.",
+  },
 };
 
 // ---------------------------------------------------------------------------
@@ -261,6 +267,24 @@ export const RND_BIG_PAYOFF_AMOUNT = 40;
 export const RND_SMALL_PAYOFF_AMOUNT = 15;
 
 // ---------------------------------------------------------------------------
+// Business exit events — rare "someone wants to buy a business" offers
+// ---------------------------------------------------------------------------
+// Roughly once every six months, on average (a per-month coin flip rather
+// than a fixed schedule — see game/businessExits.js), the table gets a shot
+// at an acquisition offer: one random player, IF they currently own any
+// business, gets bought out for a multiple of that business's current
+// monthly income. This directly rewards every dollar put into Marketing/
+// Sales/Ops/R&D (see BUSINESS_UPGRADE_TRACKS above) — a business earning
+// more per month is worth more the instant an offer shows up.
+export const BUSINESS_EXIT_CHANCE_PER_MONTH = 1 / 6;
+// Keyed by multiplier (envWeightedPick reads plain {key: weight} objects —
+// see game/rng.js); weights sum to 100 so they read directly as percentages
+// of a fired exit event. 5x/8x are the common outcomes, 2x/10x are rarer,
+// and 20x is a true jackpot.
+export const BUSINESS_EXIT_MULTIPLIER_WEIGHTS = { 2: 9, 5: 40, 8: 40, 10: 9, 20: 2 };
+export const BUSINESS_EXIT_RARITY_LABELS = { 2: 'rare', 5: 'common', 8: 'common', 10: 'rare', 20: 'very rare' };
+
+// ---------------------------------------------------------------------------
 // Tree House rent dynamics
 // ---------------------------------------------------------------------------
 // A rent-bearing asset's "baseline yield" is derived from its own
@@ -300,9 +324,9 @@ export const ASSETS = [
   },
   {
     id: 'lemonade',
-    name: 'Lemonade Stand (or similar service)',
+    name: 'Lemonade Stands & More',
     icon: '🍋',
-    tagline: 'Income swings with the weather (and luck)',
+    tagline: 'Seasonal services like food trucks, lawncare, & more!',
     kind: 'bouncy',
     basePrice: 75,
     volatility: 0.15,
@@ -341,9 +365,9 @@ export const ASSETS = [
   },
   {
     id: 'treasure',
-    name: 'Treasure Chest (or speculative crypto)',
+    name: 'Treasure Chest',
     icon: '💎',
-    tagline: 'No income — pure speculation',
+    tagline: 'Collectibles, meme stocks, crypto tokens, and the new things',
     kind: 'risky',
     basePrice: 100,
     volatility: 0.40,
@@ -539,6 +563,30 @@ export const BADGES = [
     description: 'Own 3 or more different kinds of assets at once',
     kind: 'assetDiversityAtLeast',
     value: 3,
+  },
+  {
+    id: 'cashedOut',
+    name: 'Cashed Out',
+    icon: '💼',
+    description: 'Sell a business for a buyout offer',
+    kind: 'businessesSoldAtLeast',
+    value: 1,
+  },
+  {
+    id: 'empireBuilder',
+    name: 'Empire Builder',
+    icon: '🏙️',
+    description: 'Own the most businesses at the table (2 or more)',
+    kind: 'mostBusinessesAtTable',
+    value: 2,
+  },
+  {
+    id: 'topEarner',
+    name: 'Top Earner',
+    icon: '💎',
+    description: 'Have the most lucrative businesses at the table ($100+/mo)',
+    kind: 'mostLucrativeBusinessesAtTable',
+    value: 100,
   },
 ];
 
@@ -1377,6 +1425,12 @@ export const LOCAL_STORAGE_KEY = 'ventureflow-save-v1';
 export const GAME_NAME = 'VentureFlow';
 export const PARENT_BRAND = 'VentureMaker';
 export const BRAND_TAGLINE = `A ${PARENT_BRAND}™ game`;
+// Where the VentureMaker brand mark and the "learn more / connect with
+// entrepreneurs" callouts link out to (see components/Brand.jsx and
+// components/VentureMakerLink.jsx) — one place to update if it ever moves.
+export const VENTUREMAKER_URL = 'https://venturemaker.org/';
+export const VENTUREMAKER_BLURB =
+  'Learn more about winning entrepreneurship and connect with future and proven entrepreneurs at VentureMaker.';
 
 // ---------------------------------------------------------------------------
 // Leaderboard

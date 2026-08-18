@@ -925,3 +925,168 @@ one-shot badge doesn't, so it's the one that should yield. Verified with a
 dedicated Playwright test that reproduces exactly this scenario (diversify
 into 3 assets on turn one) and confirms the diversification lesson now
 actually appears.
+
+## Business exits, refined asset labels, and 3 new badges
+
+Three additions this round, all in service of the same idea: growing a
+business's income should pay off in more ways than the slow monthly
+trickle.
+
+**Treasure Chest and Lemonade Stand naming, refined again.** The previous
+round's `Treasure Chest (or speculative crypto)` name is now just
+**Treasure Chest** again, with the specifics moved into its tagline —
+*"Collectibles, meme stocks, crypto tokens, and the new things"* — which
+reads better in the shop card's limited space while keeping the same
+honest point (it's the one purely speculative asset, no cash flow of any
+kind). Lemonade Stand is now **Lemonade Stands & More**, tagline *"Seasonal
+services like food trucks, lawncare, & more!"* — broadening what the asset
+represents beyond literally just lemonade, matching the fact that its
+weather-driven variable income already models any seasonal side-hustle
+kids might run. Both are cosmetic — `gameConfig.js`'s `ASSETS` entries
+only, no mechanics changed.
+
+**Business exit offers — a rare, high-upside "sell for a multiple" event.**
+About once every 6 months on average (a per-month coin flip, not a fixed
+schedule, so it stays a surprise — `BUSINESS_EXIT_CHANCE_PER_MONTH = 1/6`
+in `gameConfig.js`), the table gets a shot at an acquisition offer: one
+random player, if they currently own a business, gets a buyout offer for a
+multiple of that business's current monthly income —
+**2x** (rare), **5x** (common), **8x** (common), **10x** (rare), or a
+jackpot **20x** (very rare), weighted via `BUSINESS_EXIT_MULTIPLIER_WEIGHTS`.
+If someone owns more than one business, the offer targets whichever one
+currently earns the most. The whole point is to make every dollar sunk
+into Marketing/Sales/Ops/R&D upgrades (see the "Business upgrades" section
+above) pay off twice over: once as steady monthly income, and again as a
+bigger number if an exit happens to land on that business — a $200/mo
+business worth $400 at 2x is worth $4,000 at a 20x jackpot.
+
+The event reuses the existing fortune-card recap modal (`FortuneCardModal`)
+instead of a new UI — it queues a synthetic recap entry shaped exactly like
+a real fortune card (`deckId: 'opportunity'` for the green "good" styling),
+so it shows up, plays its own sound, and gets a bot-chat reaction through
+all the same systems a real card does, with zero new UI code. A new
+"why" financial lesson (`FINANCIAL_LESSONS.businessValuation`) explains the
+real-world idea the first time it fires: *businesses are bought and sold
+for a multiple of what they earn — which is why growing a business's
+income pays off even before you ever sell it.*
+
+New game-state: each player now has `soldBusinesses`, a permanent record of
+every exit they've cashed in on (`{ id, name, income, multiplier, payout,
+month }`), which feeds the new "Cashed Out" badge below.
+
+*RNG determinism note, since this game supports a shared Daily Challenge
+mode:* the exit's chance/multiplier/target-player draws happen
+**unconditionally, in the same fixed order, every single month** — on the
+environment RNG stream (`envChance`, a new export added to `game/rng.js`
+alongside the existing `envRandomInt`/`envNoise`/`envWeightedPick`) — even
+in a month where nobody at the table owns a business. Skipping those draws
+based on who currently owns a business would make the environment stream's
+draw count depend on player choices, silently desyncing the shared
+weather/price/fortune-card sequence between two Daily Challenge players the
+moment their choices diverge — the exact bug class fixed earlier for
+dynamic Tree House rent. If the randomly-targeted player turns out to own
+nothing, the offer is simply a quiet no-op, same spirit as an existing
+fortune-card effect that already no-ops for a non-owner. Whether a *real*
+transfer happens (vs. a no-op) is allowed to depend on player state — that
+part is by design, the same as any other ownership-gated card effect — only
+the RNG draw *count and order* has to stay fixed. Covered by a dedicated
+determinism test (`test_business_exits_determinism.mjs`, mirroring the
+existing Tree House rent one) that plays two runs with wildly different
+business-building behavior and confirms the exit fires on identical months
+regardless.
+
+**3 new badges**, added to `gameConfig.js`'s `BADGES` with new checker
+kinds in `badges.js`:
+
+- **Cashed Out** 💼 — sell a business for a buyout offer (`soldBusinesses`
+  has at least one entry). Shares the business-valuation lesson above via
+  `CONCEPT_BY_BADGE_ID` in `lessons.js`, the same "give this specific badge
+  its own explanation" mechanism the Balanced Investor badge introduced
+  last round.
+- **Empire Builder** 🏙️ — own the most businesses at the table (2 or
+  more; ties all get the badge).
+- **Top Earner** 💎 — have the most lucrative businesses at the table
+  combined ($100+/mo; ties all get the badge).
+
+The latter two are a new checker *shape*, not just new data: every prior
+badge only ever looked at one player's own state, but "most" is inherently
+relative to everyone else at the table. Both new checkers take
+`context.allPlayers` (already threaded through from `turnEngine.js`'s
+month-end badge evaluation) and compare against the max across the whole
+roster, awarding the badge to every player tied for that max rather than
+picking an arbitrary single winner.
+
+A new sound (`SOUNDS.businessExit` — a "cha-ching!" cash-register flourish,
+bigger than the badge fanfare) and bot-chat reaction category
+(`REACT_CHANCE.businessExit`, `chatEngine.js`) round out the exit event so
+it feels like a genuine table-wide moment rather than a quiet log line.
+
+**Assumptions made, stated here for the record:** "once every six
+months/turns" in the request was read as a per-game, table-wide cadence
+(the coin flip happens once per month for the whole table, not once per
+player) — the qualifying phrase "in a typical game" pointed that way, and
+the config constant is named accordingly
+(`BUSINESS_EXIT_CHANCE_PER_MONTH`, not per-player). Bots don't yet factor
+exit odds into their own buy/upgrade decisions (`aiEngine.js` is
+unchanged) — the mechanic affects everyone equally when it fires, but
+nobody's strategy adapts to its existence yet.
+
+**A real bug came out of building this**, caught by a Playwright run before
+shipping: business ids were generated as
+`` `${playerId}-biz-${businesses.length + 1}` `` — fine as long as
+businesses only ever got added, but a business exit can now *remove* one,
+shrinking that length. Sell business #2 of 3, start a new one, and the new
+business silently reused business #2's old id — a duplicate React key
+(caught as a real console warning, not a guess) and a corrupted id shared
+between two different businesses under the hood (soldBusinesses history,
+badge math, anything keyed by business id). Fixed with a monotonic
+`businessSeq` counter on the player (`players.js`) that only ever counts
+up, threaded through `startBusiness` in `actions.js` instead of deriving
+the id from the live array length. Covered by a dedicated regression test
+(`test_business_id_seq.mjs`) that reproduces the exact
+start-3/sell-one/start-another repro shape directly.
+
+Tested with new unit coverage (`test_business_exits1.mjs` — multiplier
+distribution matches configured weights over 20k trials, payout math,
+silent no-op on a business-less target, full-game integration; plus
+`test_badges_exit.mjs` for all 3 new badge checkers including ties and
+threshold edges, and `test_business_id_seq.mjs` for the id-collision fix
+above) and a Playwright run that plays 18+ months of real UI
+interaction and confirms the buyout-offer modal, its lesson callout, and
+the new badges all render correctly with no console errors.
+
+## VentureMaker links: title card, setup screen, and game over
+
+Three link placements out to the parent brand's site
+(`https://venturemaker.org/`, `VENTUREMAKER_URL` in `gameConfig.js` — one
+constant, so it only ever needs updating in one place):
+
+- **The title card/logo.** `components/Brand.jsx` — the "VentureFlow"
+  wordmark + "A VentureMaker™ game" tagline shown on every screen (setup,
+  board, game over) — is now itself a link out to VentureMaker, opening in
+  a new tab (`target="_blank" rel="noopener noreferrer"`, so nobody loses
+  their in-progress game). Visually unchanged from before (same size/
+  color/spacing); only a subtle hover/focus opacity cue was added
+  (`.vf-brand--link` in `theme.css`) so it still reads like a wordmark, not
+  a generic blue hyperlink.
+- **A clear callout at the bottom of the setup screen.** New
+  `components/VentureMakerLink.jsx` — a small pill-styled link (not a
+  plain text link — deliberately styled to look clickable at a glance,
+  `.vf-venturemaker-link` in `theme.css`) reading *"Learn more about
+  winning entrepreneurship and connect with future and proven entrepreneurs
+  at VentureMaker."* Sits below the "Let's Play!" button, separated by a
+  dashed rule (`.vf-setup__venturemaker`).
+- **The same callout on the game-over screen**, right after the "Play
+  Again" actions row (`.vf-gameover__venturemaker`) — the natural spot
+  since that's the screen where a session actually wraps up.
+
+Both callout placements render the exact same `VentureMakerLink`
+component (and the exact same `VENTUREMAKER_BLURB` string from
+`gameConfig.js`) rather than separately copy-pasted markup/text, so the
+wording only ever needs to change in one place.
+
+Verified with a new Playwright test (`test_ui_venturemaker.js`) that
+checks all three placements across all three screens: the Brand link's
+`href`/`target`/`rel` on setup, board, and game-over; the setup-screen
+callout's link and exact wording; and — after playing a full 24-month game
+through to game over — the same callout's link and wording there too.

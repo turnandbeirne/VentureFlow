@@ -186,6 +186,41 @@ button {
 }
 
 /* ---------------------------------------------------------------------- */
+/* VentureMaker callout link (components/VentureMakerLink.jsx) — the       */
+/* "learn more / connect with entrepreneurs" line at the bottom of the     */
+/* setup screen and on game-over. Deliberately styled like a small pill    */
+/* button rather than a plain text link, so it reads as an unmistakable,   */
+/* clickable invitation rather than a footnote.                            */
+/* ---------------------------------------------------------------------- */
+.vf-venturemaker-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  border: var(--vf-border-width) solid var(--vf-border);
+  border-radius: var(--vf-radius-pill);
+  padding: 0.65rem 1.2rem;
+  background: var(--vf-teal);
+  color: var(--vf-white);
+  font-weight: 600;
+  text-decoration: none;
+  text-align: center;
+  box-shadow: var(--vf-shadow-sm);
+  transition: transform 0.1s ease, box-shadow 0.1s ease;
+}
+
+.vf-venturemaker-link:hover,
+.vf-venturemaker-link:focus-visible {
+  transform: translateY(-1px);
+  box-shadow: var(--vf-shadow);
+  background: var(--vf-teal-dark);
+}
+
+.vf-venturemaker-link:active {
+  transform: translateY(1px);
+  box-shadow: none;
+}
+
+/* ---------------------------------------------------------------------- */
 /* Scrollbars (log panel etc.) — keep them chunky-friendly too             */
 /* ---------------------------------------------------------------------- */
 .vf-scroll::-webkit-scrollbar {
@@ -258,6 +293,21 @@ button {
   display: flex;
   flex-direction: column;
   gap: 0.1rem;
+}
+
+/* The brand mark is an <a> to VentureMaker (see Brand.jsx) — reset the
+   default link styling so it reads exactly like the plain wordmark it used
+   to be, with just a subtle hover/focus cue that it's clickable. */
+.vf-brand--link {
+  text-decoration: none;
+  color: inherit;
+  cursor: pointer;
+  transition: opacity 0.15s ease;
+}
+
+.vf-brand--link:hover,
+.vf-brand--link:focus-visible {
+  opacity: 0.8;
 }
 
 .vf-brand--center {

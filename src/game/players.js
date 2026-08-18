@@ -58,6 +58,20 @@ export function createPlayer({
     holdings, // { assetId: quantity currently owned }
     purchaseStats, // { assetId: { qty, spent } } — lifetime buys, for avg purchase price
     businesses: [], // [{ id, income }]
+    // Monotonically-increasing counter feeding each new business's id (see
+    // actions.js's startBusiness) — NOT the same as businesses.length,
+    // which can now shrink (a business exit — see game/businessExits.js —
+    // removes one from the array). Deriving the id from array length alone
+    // would let a business started AFTER a sale reuse an id that's still
+    // referenced elsewhere (a stale React key, an old soldBusinesses/
+    // badgeEvents record, ...), so this only ever counts up, never down.
+    businessSeq: 0,
+    // A permanent record of every business exit this player has cashed in
+    // on (see game/businessExits.js) — { id, name, income, multiplier,
+    // payout, month }. Never cleared; used for the "sold a business"
+    // badge and (eventually) a game-over recap of exits, same spirit as
+    // badgeEvents below.
+    soldBusinesses: [],
     skillTokens: startingSkillTokens,
     passiveBonus: 0, // permanent $/mo from fortune cards
     badges: [], // [badgeId]

@@ -12,7 +12,15 @@
 // — see exportBadgeEvents() below.
 // ============================================================================
 import { ASSETS, BADGES } from '../data/gameConfig';
-import { passiveIncome } from './players';
+import { passiveIncome, businessMonthlyIncome } from './players';
+
+/** Every business's current monthly income, summed, for one player — used
+ * by the "most lucrative businesses at the table" checker below. Needs
+ * `month` (see businessMonthlyIncome in players.js) since a business's
+ * income can grow over time via Marketing/Sales/Ops/R&D upgrades. */
+function totalBusinessIncome(player, month) {
+  return player.businesses.reduce((sum, b) => sum + businessMonthlyIncome(b, month), 0);
+}
 
 const CHECKERS = {
   passiveIncomeAtLeast: (player, badge, context) => passiveIncome(player, context) >= badge.value,
@@ -25,6 +33,26 @@ const CHECKERS = {
   // thing.
   assetDiversityAtLeast: (player, badge) =>
     ASSETS.filter((a) => (player.holdings[a.id] || 0) > 0).length >= badge.value,
+  // How many business-exit buyouts this player has ever cashed in on — see
+  // game/businessExits.js/turnEngine.js, which append to soldBusinesses
+  // every time one lands.
+  businessesSoldAtLeast: (player, badge) => (player.soldBusinesses || []).length >= badge.value,
+  // Relative, table-wide checks (unlike every checker above, which only
+  // looks at one player) — need context.allPlayers, the full player list
+  // for this month, threaded through from turnEngine.js's badgeContext.
+  // Ties count as "the most" (multiple players can earn these the same
+  // month) rather than picking a single arbitrary winner.
+  mostBusinessesAtTable: (player, badge, context) => {
+    const allPlayers = context.allPlayers || [player];
+    const maxCount = Math.max(...allPlayers.map((p) => p.businesses.length));
+    return maxCount > 0 && player.businesses.length >= badge.value && player.businesses.length === maxCount;
+  },
+  mostLucrativeBusinessesAtTable: (player, badge, context) => {
+    const allPlayers = context.allPlayers || [player];
+    const mine = totalBusinessIncome(player, context.month);
+    const maxIncome = Math.max(...allPlayers.map((p) => totalBusinessIncome(p, context.month)));
+    return maxIncome > 0 && mine >= badge.value && mine === maxIncome;
+  },
 };
 
 /**
