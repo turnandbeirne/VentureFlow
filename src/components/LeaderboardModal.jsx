@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { getDifficulty } from '../data/gameConfig';
 import { useLeaderboard } from '../hooks/useLeaderboard';
 import { playSound } from '../audio/soundEngine';
+import { todayChallengeDate } from '../game/dailyChallenge';
 
 const MODE_LABEL = { solo: '🤖 Solo', hotseat: '🪑 Hot-Seat' };
 
@@ -83,6 +84,7 @@ function PortfolioSnapshot({ portfolio }) {
 export default function LeaderboardModal({ open, onClose, highlightId }) {
   const { entries, refresh } = useLeaderboard();
   const [expandedId, setExpandedId] = useState(null);
+  const [tab, setTab] = useState('all');
 
   useEffect(() => {
     if (open) refresh();
@@ -91,6 +93,16 @@ export default function LeaderboardModal({ open, onClose, highlightId }) {
   useEffect(() => {
     if (!open) setExpandedId(null);
   }, [open]);
+
+  const today = todayChallengeDate();
+  // "Today's Challenge" is its own segment — every entry there played the
+  // identical weather timeline/fortune-card draws (see
+  // game/dailyChallenge.js), so those scores are a fair apples-to-apples
+  // comparison in a way mixing them with regular runs wouldn't be.
+  const visibleEntries = useMemo(
+    () => (tab === 'daily' ? entries.filter((e) => e.dailyChallengeDate === today) : entries),
+    [entries, tab, today]
+  );
 
   if (!open) return null;
 
@@ -104,6 +116,11 @@ export default function LeaderboardModal({ open, onClose, highlightId }) {
     setExpandedId((prev) => (prev === id ? null : id));
   }
 
+  function selectTab(id) {
+    playSound('click');
+    setTab(id);
+  }
+
   return (
     <div className="vf-modal-overlay" onClick={handleClose}>
       <div className="vf-card vf-leaderboard" onClick={(e) => e.stopPropagation()}>
@@ -114,11 +131,32 @@ export default function LeaderboardModal({ open, onClose, highlightId }) {
           </button>
         </div>
 
-        {entries.length === 0 ? (
-          <p className="vf-log__empty">No scores saved yet — finish a game and add yours!</p>
+        <div className="vf-leaderboard__tabs">
+          <button
+            type="button"
+            className={`vf-btn vf-btn--sm ${tab === 'all' ? 'vf-btn--primary' : 'vf-btn--ghost'}`}
+            onClick={() => selectTab('all')}
+          >
+            All-Time
+          </button>
+          <button
+            type="button"
+            className={`vf-btn vf-btn--sm ${tab === 'daily' ? 'vf-btn--primary' : 'vf-btn--ghost'}`}
+            onClick={() => selectTab('daily')}
+          >
+            🗓️ Today's Challenge
+          </button>
+        </div>
+
+        {visibleEntries.length === 0 ? (
+          <p className="vf-log__empty">
+            {tab === 'daily'
+              ? "No one's played today's challenge yet — be the first!"
+              : 'No scores saved yet — finish a game and add yours!'}
+          </p>
         ) : (
           <div className="vf-leaderboard__list vf-scroll">
-            {entries.map((entry, i) => (
+            {visibleEntries.map((entry, i) => (
               <div key={entry.id}>
                 <button
                   type="button"

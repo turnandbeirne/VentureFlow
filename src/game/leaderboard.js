@@ -48,7 +48,7 @@ function persist(entries) {
  * frozen snapshot (see header) — stored as-is, never read for rendering
  * except by the leaderboard's own expandable detail view.
  */
-export function addLeaderboardEntry({ name, avatar, netWorth, mode, difficultyId, email, portfolio }) {
+export function addLeaderboardEntry({ name, avatar, netWorth, mode, difficultyId, email, portfolio, dailyChallengeDate }) {
   const entries = loadLeaderboard();
   const entry = {
     id: `lb-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
@@ -59,6 +59,12 @@ export function addLeaderboardEntry({ name, avatar, netWorth, mode, difficultyId
     difficultyId: difficultyId || null,
     email: email ? email.trim() : null,
     portfolio: portfolio || null,
+    // Set only for a Daily Challenge run (see game/dailyChallenge.js) — the
+    // 'YYYY-MM-DD' the challenge was played on, used to segment a separate
+    // "Today's Challenge" leaderboard view (see LeaderboardModal.jsx) where
+    // every entry played the identical weather/cards, so scores are a fair
+    // apples-to-apples comparison. Regular runs leave this null.
+    dailyChallengeDate: dailyChallengeDate || null,
     playedAt: Date.now(),
   };
 

@@ -31,6 +31,7 @@
 import { buyAsset, sellAsset, startBusiness, learnSkill } from './actions';
 import { BUSINESS_COST, BUSINESS_SKILL_COST, SKILL_COST } from '../data/gameConfig';
 import { getStageInfo } from './weather';
+import { chance, randomInt } from './rng';
 
 const GOOD_MOODS = new Set(['boom', 'peak', 'rebound']);
 
@@ -187,8 +188,12 @@ function buildCandidates(state, playerId, strategy, cashBuffer) {
  */
 function chooseMove(candidates, skill) {
   candidates.sort((a, b) => b.score - a.score);
-  if (candidates.length > 1 && Math.random() < skill.mistakeChance) {
-    return candidates[Math.floor(Math.random() * candidates.length)];
+  // Routed through game/rng.js (rather than a raw Math.random()) so a
+  // robot's "mistakes" are part of the same seedable sequence as
+  // everything else in the engine — see rng.js's header comment for why
+  // that matters for Daily Challenge mode.
+  if (candidates.length > 1 && chance(skill.mistakeChance)) {
+    return candidates[randomInt(0, candidates.length - 1)];
   }
   return candidates[0];
 }

@@ -15,6 +15,12 @@ function resolveSound(kind) {
   if (SOUNDS[kind]) return kind;
   if (kind.startsWith('buy_')) return 'buy';
   if (kind.startsWith('sell_')) return 'sell';
+  // A scenario objective landing reuses the badge chime (it IS a kind of
+  // achievement); a lead change gets the bigger crowd-cheering sound
+  // (SOUNDS.cheering, the same one layered into the game-over fanfare) —
+  // see game/scenarios.js and game/turnEngine.js for what triggers these.
+  if (kind === 'objectiveMet') return 'badge';
+  if (kind === 'leadChange') return 'cheering';
   return null;
 }
 

@@ -316,6 +316,18 @@ button {
   margin-top: 0.3rem;
 }
 
+/* ---------------------------------------------------------------------- */
+/* Board themes — cosmetic-only accent swaps, unlocked via game/profile.js */
+/* and applied as a data-theme attribute on the app root (see App.jsx).    */
+/* ---------------------------------------------------------------------- */
+[data-theme='gold'] {
+  --vf-yellow: #f4c542;
+  --vf-teal: #b8860b;
+  --vf-teal-dark: #8a6508;
+  --vf-cream: #fff8e7;
+  --vf-cream-deep: #fbe9b8;
+}
+
 @keyframes vf-pop-in {
   from {
     opacity: 0;

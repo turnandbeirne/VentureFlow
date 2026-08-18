@@ -33,6 +33,47 @@
   margin-bottom: 1.75rem;
 }
 
+.vf-daily-challenge {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  padding: 1rem 1.25rem;
+  margin-bottom: 1.25rem;
+  cursor: pointer;
+  text-align: left;
+  background: var(--vf-yellow);
+}
+
+.vf-daily-challenge__icon {
+  font-size: 2rem;
+  flex: 0 0 auto;
+}
+
+.vf-daily-challenge__body {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.vf-daily-challenge__title {
+  font-weight: 700;
+  font-size: 1.05rem;
+}
+
+.vf-daily-challenge__desc {
+  color: var(--vf-ink-soft);
+  font-size: 0.82rem;
+  font-weight: 500;
+}
+
+.vf-daily-challenge__go {
+  flex: 0 0 auto;
+  font-weight: 700;
+}
+
 .vf-mode-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -205,6 +246,116 @@
   font-size: 0.8rem;
   font-weight: 500;
   margin-top: 0.4rem;
+}
+
+.vf-scenario-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+}
+
+@media (max-width: 560px) {
+  .vf-scenario-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.vf-scenario-card {
+  position: relative;
+  padding: 0;
+  background: var(--vf-white);
+}
+
+.vf-scenario-card--active {
+  background: var(--vf-yellow);
+}
+
+.vf-scenario-card__pick {
+  width: 100%;
+  padding: 0.9rem;
+  padding-right: 2.4rem;
+  cursor: pointer;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  background: transparent;
+  border: none;
+}
+
+.vf-scenario-card__icon {
+  font-size: 1.4rem;
+}
+
+.vf-scenario-card__pick h3 {
+  font-size: 0.95rem;
+}
+
+.vf-scenario-card__pick p {
+  color: var(--vf-ink-soft);
+  font-size: 0.78rem;
+  font-weight: 500;
+}
+
+.vf-scenario-card__info {
+  position: absolute;
+  top: 0.6rem;
+  right: 0.6rem;
+  width: 28px;
+  height: 28px;
+  min-height: 28px;
+  padding: 0;
+  border-radius: var(--vf-radius-pill);
+  border: 2px solid var(--vf-border);
+  background: var(--vf-white);
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: none;
+}
+
+.vf-scenario-card__info:active {
+  transform: translateY(1px);
+}
+
+.vf-avatar-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.vf-avatar-picker--compact {
+  margin-top: 0.4rem;
+}
+
+.vf-avatar-picker__option {
+  width: 42px;
+  height: 42px;
+  min-height: 42px;
+  padding: 0;
+  border-radius: var(--vf-radius-md);
+  border: var(--vf-border-width) solid var(--vf-border);
+  background: var(--vf-white);
+  font-size: 1.3rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: none;
+}
+
+.vf-avatar-picker__option--active {
+  background: var(--vf-yellow);
+  box-shadow: var(--vf-shadow-sm);
+}
+
+.vf-name-inputs__row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
 }
 
 .vf-setup__starting-info {

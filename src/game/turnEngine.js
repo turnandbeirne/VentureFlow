@@ -12,6 +12,7 @@ import { tickWeather, getStageInfo } from './weather';
 import { drawFortuneCard, applyCardEffect } from './decks';
 import { evaluateBadges } from './badges';
 import { netWorth, passiveIncome } from './players';
+import { getScenario, checkScenarioObjective } from './scenarios';
 
 export function endTurn(state, playerId) {
   const currentIndex = state.players.findIndex((p) => p.id === playerId);
@@ -28,9 +29,22 @@ export function endTurn(state, playerId) {
   return resolveMonthEnd(state);
 }
 
+/** Who's currently ahead by net worth, or null if there's no meaningful
+ * leader yet (a single-player game, or the very first month — everyone
+ * starts from the same difficulty preset, so "the leader" at that point is
+ * just whoever happens to be first in the array, not a real lead). Used to
+ * detect a lead change at month-end below. */
+function currentLeaderId(players, prices, month) {
+  if (players.length < 2 || month <= 1) return null;
+  const ranked = [...players].sort((a, b) => netWorth(b, prices) - netWorth(a, prices));
+  return ranked[0].id;
+}
+
 function resolveMonthEnd(state) {
   const logEntries = [];
   const month = state.month;
+  const scenario = getScenario(state.scenarioId);
+  const leaderBefore = currentLeaderId(state.players, state.assetPrices, month);
 
   // 1) Allowance + rent + business income + card bonuses. Allowance comes
   // from the difficulty preset chosen at setup (state.monthlyAllowance);
@@ -84,14 +98,46 @@ function resolveMonthEnd(state) {
   });
   logEntries.push(...newlyEarnedLog);
 
-  // 5) Weather tick for the month ahead.
+  // 5) Scenario objective check (Passive Income Race / Business Sprint —
+  // Classic Growth and Survive the Crash have no objective and no-op here).
+  // Uses this month's post-income/post-badge numbers, same as everything
+  // else below. See game/scenarios.js.
+  const objectiveCheck = checkScenarioObjective(scenario, state.difficultyId, players, month);
+  players = objectiveCheck.players;
+  logEntries.push(...objectiveCheck.logEntries);
+
+  // 6) Weather tick for the month ahead.
   const tick = tickWeather(state.weather);
   if (tick.changed) {
     const info = getStageInfo(tick.weather);
     logEntries.push({ icon: info.icon, message: `The weather shifted to ${info.name}!`, kind: 'weather' });
   }
 
-  // 6) Advance the calendar.
+  // 7) Net worth history snapshot — one point per completed month, used by
+  // the game-over screen's growth chart (see components/NetWorthChart.jsx).
+  players = players.map((p) => ({
+    ...p,
+    netWorthHistory: [...p.netWorthHistory, { month, netWorth: netWorth(p, prices) }],
+  }));
+
+  // 8) Lead-change callout — a bit of extra excitement when the standings
+  // actually flip (skipped in a solo/no-real-leader-yet situation — see
+  // currentLeaderId above). Reacted to by game/chatEngine.js and given its
+  // own celebratory sound by hooks/useGameSounds.js.
+  const leaderAfter = currentLeaderId(players, prices, month);
+  if (leaderAfter && leaderBefore && leaderAfter !== leaderBefore) {
+    const newLeader = players.find((p) => p.id === leaderAfter);
+    if (newLeader) {
+      logEntries.push({
+        icon: '📈',
+        message: `${newLeader.name} took the lead!`,
+        kind: 'leadChange',
+        playerId: newLeader.id,
+      });
+    }
+  }
+
+  // 9) Advance the calendar.
   const nextMonth = month + 1;
   const isGameOver = nextMonth > GAME_LENGTH_MONTHS;
 

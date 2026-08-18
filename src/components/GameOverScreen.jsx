@@ -1,22 +1,26 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import '../styles/game.css';
-import { LEADERBOARD_TOP_HIGHLIGHT } from '../data/gameConfig';
-import { netWorth, snapshotPortfolio } from '../game/players';
+import { LEADERBOARD_TOP_HIGHLIGHT, getScenario } from '../data/gameConfig';
+import { netWorth, passiveIncome, snapshotPortfolio } from '../game/players';
 import { isOffensiveName } from '../game/nameFilter';
 import { playSound } from '../audio/soundEngine';
 import { playMusicTrack } from '../audio/musicEngine';
 import { useLeaderboard } from '../hooks/useLeaderboard';
+import { buildInsights } from '../game/insights';
 import VolumeControl from './VolumeControl';
 import MusicControl from './MusicControl';
 import Brand from './Brand';
 import LeaderboardModal from './LeaderboardModal';
 import Fireworks from './Fireworks';
 import { ChatEntryRow } from './ChatPanel';
+import NetWorthChart from './NetWorthChart';
+import FamilyRecapModal from './FamilyRecapModal';
 
-export default function GameOverScreen({ state, onPlayAgain }) {
-  const { players, assetPrices, winnerId, mode, difficultyId } = state;
+export default function GameOverScreen({ state, onPlayAgain, onRecordProfileResult }) {
+  const { players, assetPrices, winnerId, mode, difficultyId, scenarioId, dailyChallengeDate } = state;
   const ranked = [...players].sort((a, b) => netWorth(b, assetPrices) - netWorth(a, assetPrices));
   const winner = players.find((p) => p.id === winnerId) || ranked[0];
+  const scenario = getScenario(scenarioId);
 
   // The robots' closing thoughts — gloating if one of them won, applauding
   // whoever did (see game/chatEngine.js's 'gameover' reaction). Naturally
@@ -31,6 +35,38 @@ export default function GameOverScreen({ state, onPlayAgain }) {
   const [savedEntryId, setSavedEntryId] = useState(null);
   const [savedRank, setSavedRank] = useState(null);
   const [showLeaderboard, setShowLeaderboard] = useState(false);
+  const [showRecap, setShowRecap] = useState(false);
+  const [unlockCelebration, setUnlockCelebration] = useState(null);
+
+  const insights = buildInsights(winner);
+
+  // Whichever human player did best this game "counts" toward the lifetime
+  // profile (see game/profile.js) — the natural choice in solo mode (only
+  // one human); in hot-seat, the best-performing human of the table. Fires
+  // exactly once, when this screen first shows for a finished game. The
+  // recordedRef guard (rather than relying on the empty dep array alone)
+  // is what actually makes that true: React 18 StrictMode intentionally
+  // double-invokes mount effects in development to surface exactly this
+  // kind of non-idempotent side effect, which would otherwise double-count
+  // gamesPlayed/badgesEarned for every game in dev builds.
+  const recordedRef = useRef(false);
+  useEffect(() => {
+    if (recordedRef.current) return;
+    const humans = players.filter((p) => p.type === 'human');
+    if (humans.length === 0 || !onRecordProfileResult) return;
+    recordedRef.current = true;
+    const bestHuman = [...humans].sort((a, b) => netWorth(b, assetPrices) - netWorth(a, assetPrices))[0];
+    const result = onRecordProfileResult({
+      netWorth: netWorth(bestHuman, assetPrices),
+      passiveIncome: passiveIncome(bestHuman),
+      badgesEarnedThisGame: bestHuman.badges.length,
+    });
+    if (result && (result.newlyUnlockedAvatars.length > 0 || result.newlyUnlockedThemes.length > 0)) {
+      setUnlockCelebration(result);
+      playSound('badge');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Back to the opening theme for the big finish — same track SetupScreen
   // uses, so "Play Again" (GameOver → Setup) doesn't restart it.
@@ -58,6 +94,7 @@ export default function GameOverScreen({ state, onPlayAgain }) {
       mode: mode?.type,
       difficultyId,
       email: scoreEmail,
+      dailyChallengeDate: dailyChallengeDate || null,
       // A frozen "hard copy" of exactly what the winner owned when they
       // saved — see game/players.js snapshotPortfolio + game/leaderboard.js.
       portfolio: snapshotPortfolio(winner, assetPrices),
@@ -72,6 +109,16 @@ export default function GameOverScreen({ state, onPlayAgain }) {
       playSound('badge');
     }
   }
+
+  function openRecap() {
+    playSound('click');
+    setShowRecap(true);
+  }
+
+  // Which players (if any) hit the scenario's objective — see
+  // game/scenarios.js; Classic Growth and Survive the Crash have none.
+  const objectiveAchievers = scenario.objective ? players.filter((p) => p.scenarioGoalMonth != null) : [];
+  const survivedCrash = scenario.id === 'survivalCrash' ? netWorth(winner, assetPrices) > winner.cash : false;
 
   return (
     <div className="vf-gameover">
@@ -89,6 +136,43 @@ export default function GameOverScreen({ state, onPlayAgain }) {
           {netWorth(winner, assetPrices).toLocaleString()}!
         </div>
 
+        <div className="vf-gameover__scenario-pill">
+          <span className="vf-pill">
+            {scenario.icon} {scenario.name}
+            {dailyChallengeDate && ' · 🗓️ Today\'s Challenge'}
+          </span>
+        </div>
+
+        {scenario.objective && (
+          <p className="vf-gameover__objective">
+            {objectiveAchievers.length > 0
+              ? `🎯 Goal reached! ${objectiveAchievers.map((p) => `${p.avatar} ${p.name}`).join(', ')} hit the scenario objective.`
+              : "🎯 Nobody quite reached this scenario's goal this time — give it another shot!"}
+          </p>
+        )}
+        {scenario.id === 'survivalCrash' && (
+          <p className="vf-gameover__objective">
+            {survivedCrash
+              ? `⛈️ You started this game in a storm and still grew your money — nice recovery!`
+              : `⛈️ Starting in a storm is tough — you finished lower than you started this time. Try again?`}
+          </p>
+        )}
+
+        {unlockCelebration && (
+          <div className="vf-gameover__unlock">
+            🎉 New unlock!{' '}
+            {unlockCelebration.newlyUnlockedAvatars.map((a) => (
+              <span key={a}>{a} </span>
+            ))}
+            {unlockCelebration.newlyUnlockedThemes.map((t) => (
+              <span key={t.id}>
+                {t.icon} {t.name} theme{' '}
+              </span>
+            ))}
+            — check "🏅 Unlocks" on the setup screen!
+          </div>
+        )}
+
         <div className="vf-standings">
           {ranked.map((player, i) => (
             <div key={player.id} className={`vf-standing-row ${player.id === winnerId ? 'vf-standing-row--winner' : ''}`}>
@@ -99,6 +183,23 @@ export default function GameOverScreen({ state, onPlayAgain }) {
               <span>${netWorth(player, assetPrices).toLocaleString()}</span>
             </div>
           ))}
+        </div>
+
+        <div className="vf-card vf-gameover__chart-card">
+          <div className="vf-section-title">
+            <span>📊</span>
+            <span>How your money grew</span>
+          </div>
+          <NetWorthChart players={players} />
+          {insights.length > 0 && (
+            <div className="vf-gameover__insights">
+              {insights.map((insight) => (
+                <p key={insight.text} className="vf-gameover__insight">
+                  {insight.icon} {insight.text}
+                </p>
+              ))}
+            </div>
+          )}
         </div>
 
         {closingChat.length > 0 && (
@@ -168,12 +269,18 @@ export default function GameOverScreen({ state, onPlayAgain }) {
           )}
         </div>
 
-        <button type="button" className="vf-btn vf-btn--go vf-btn--lg" onClick={handlePlayAgain}>
-          Play Again 🔁
-        </button>
+        <div className="vf-gameover__actions">
+          <button type="button" className="vf-btn vf-btn--ghost" onClick={openRecap}>
+            📋 Family Recap
+          </button>
+          <button type="button" className="vf-btn vf-btn--go vf-btn--lg" onClick={handlePlayAgain}>
+            Play Again 🔁
+          </button>
+        </div>
       </div>
 
       <LeaderboardModal open={showLeaderboard} onClose={() => setShowLeaderboard(false)} highlightId={savedEntryId} />
+      <FamilyRecapModal open={showRecap} onClose={() => setShowRecap(false)} state={state} prices={assetPrices} />
     </div>
   );
 }

@@ -54,6 +54,125 @@ export function getDifficulty(id) {
 }
 
 // ---------------------------------------------------------------------------
+// Scenarios — the GOAL of the game, chosen at setup alongside difficulty
+// ---------------------------------------------------------------------------
+// Every scenario still runs the same 24-month game with the same rules —
+// this just changes what you're aiming for (and, for Survive the Crash,
+// what weather you start in), so replaying with a new goal feels different
+// without needing a whole new game mode. `tagline` is the one-liner shown
+// on the setup screen's scenario card; `details` is the longer explanation
+// shown in the info popup next to it (see components/SetupScreen.jsx +
+// components/InfoModal.jsx) — this is the "may be confusing, so explain it"
+// text. `objective` (null for Classic) is read by game/scenarios.js to
+// track/announce progress; see that file for exactly how each type works.
+export const SCENARIOS = [
+  {
+    id: 'classic',
+    icon: '🏆',
+    name: 'Classic Growth',
+    tagline: 'Highest net worth after 24 months wins.',
+    details:
+      "The original VentureFlow challenge — no twists. Buy, sell, start businesses, and learn skills over 24 months. Whoever has the highest total net worth (cash + assets + businesses) at the end wins. A great default if you just want to play.",
+    startingWeatherStageId: null,
+    objective: null,
+  },
+  {
+    id: 'passiveIncomeRace',
+    icon: '🏁',
+    name: 'Passive Income Race',
+    tagline: 'Be first to hit the monthly passive-income goal.',
+    details:
+      "Passive income is money that comes in every month without you doing anything — rent from a Tree House, income from a business, bonuses from fortune cards. Watch the goal shown at the top of the board: the first player to reach it gets a special shout-out on the game-over screen. The game still runs the full 24 months and net worth still decides the final ranking — this scenario is really about practicing how to build income that works for you, not just piling up cash.",
+    startingWeatherStageId: null,
+    objective: {
+      type: 'passiveIncomeTarget',
+      targetsByDifficulty: { easy: 150, medium: 200, hard: 250 },
+    },
+  },
+  {
+    id: 'survivalCrash',
+    icon: '⛈️',
+    name: 'Survive the Crash',
+    tagline: 'You start mid-storm — can you recover?',
+    details:
+      "Every other scenario starts the game on a sunny Boom. This one drops you straight into a Stormy Bust instead — prices are already falling and fortune cards lean unlucky. It's a good test of what to do when the market turns against you right away: hold steady and protect your cash rather than panic-selling everything. The weather cycles normally after that rough start, and net worth after 24 months still decides the winner — the game-over screen will call out how well you recovered.",
+    startingWeatherStageId: 'stormyBust',
+    objective: null,
+  },
+  {
+    id: 'businessSprint',
+    icon: '🚀',
+    name: 'Business Sprint',
+    tagline: 'Get 3 businesses running by month 12.',
+    details:
+      "Businesses are one of the best ways to build steady passive income, but they cost cash AND a skill token to start, so timing matters. Try to have 3 businesses running by the halfway point (month 12) — hit that and you'll get a special shout-out on the game-over screen. It's good practice for planning a few moves ahead instead of only reacting turn to turn. The game still runs the full 24 months and net worth still decides the final ranking.",
+    startingWeatherStageId: null,
+    objective: {
+      type: 'businessCountByMonth',
+      count: 3,
+      month: 12,
+    },
+  },
+];
+
+export const DEFAULT_SCENARIO_ID = 'classic';
+
+export function getScenario(id) {
+  return SCENARIOS.find((s) => s.id === id) || SCENARIOS.find((s) => s.id === DEFAULT_SCENARIO_ID);
+}
+
+// ---------------------------------------------------------------------------
+// Financial-concept lessons — the "why" behind a moment in the game
+// ---------------------------------------------------------------------------
+// A one-line, kid-friendly explanation of a real financial idea, shown the
+// FIRST time the matching moment happens in a game (see game/lessons.js —
+// keyed here by concept id, which is what state.seenLessons stores).
+export const FINANCIAL_LESSONS = {
+  passiveIncome: {
+    icon: '💡',
+    title: 'Passive income',
+    blurb:
+      "Passive income is money that keeps coming in every month without extra work — like rent from a Tree House or income from a business. It's one of the best ways to grow your money over time.",
+  },
+  riskReward: {
+    icon: '💎',
+    title: 'Risk and reward',
+    blurb:
+      "Treasure Chest bounces around a lot more than Piggy Bank — that's called risk. Riskier things can grow faster, but they can also drop faster. A smart rule: only risk money you can afford to lose.",
+  },
+  marketCycles: {
+    icon: '🌦️',
+    title: 'Markets move in cycles',
+    blurb:
+      "Good times and rough times both come and go — that's normal, not a sign something's wrong. You can't control the weather, only how you react to it.",
+  },
+  emergencyFund: {
+    icon: '🦷',
+    title: 'Emergency savings',
+    blurb:
+      "Bad luck happens to everyone — that's exactly why it's smart to always keep a little extra cash saved for surprises, instead of spending every dollar.",
+  },
+  opportunity: {
+    icon: '🎁',
+    title: 'Good luck is still a choice',
+    blurb:
+      "Sometimes good luck just happens — but you still get to choose what to do with it. Saving some of a windfall instead of spending it all is always a smart move.",
+  },
+  investInYourself: {
+    icon: '📚',
+    title: 'Investing in yourself',
+    blurb:
+      "Learning a new skill is its own kind of investment — it doesn't pay off in cash right away, but it opens up more choices later, just like saving money does.",
+  },
+  goodHabits: {
+    icon: '🏅',
+    title: 'Badges track good habits',
+    blurb:
+      "A badge isn't just a prize — it's proof you built a genuinely good money habit. The more of these habits you practice, the more they add up over time.",
+  },
+};
+
+// ---------------------------------------------------------------------------
 // Core economy
 // ---------------------------------------------------------------------------
 export const GAME_LENGTH_MONTHS = 24;
@@ -800,7 +919,41 @@ export const BUSINESS_NAMES = [
 // ---------------------------------------------------------------------------
 // Player avatars for setup screen
 // ---------------------------------------------------------------------------
-export const PLAYER_AVATARS = ['🦊', '🐼', '🐸', '🦁', '🐨', '🐯'];
+// The first STARTER_AVATAR_COUNT are available immediately; the rest unlock
+// through lifetime progress (see AVATAR_UNLOCKS + game/profile.js) — a
+// small bit of extra replay incentive beyond any single game. Hot-seat mode
+// only ever indexes the first 3 entries (its max player count), so adding
+// more avatars at the end here never changes that path's behavior.
+export const PLAYER_AVATARS = ['🦊', '🐼', '🐸', '🦁', '🐨', '🐯', '🦄', '🐲'];
+export const STARTER_AVATAR_COUNT = 3;
+
+// Each entry's `avatar` must be one of PLAYER_AVATARS above (index >=
+// STARTER_AVATAR_COUNT). `requirement` is read by game/profile.js's
+// meetsRequirement() against the lifetime profile it tracks in
+// localStorage — separate from any single game save, so this persists
+// across "New Game"/"Play Again" and even across devices sharing the same
+// browser profile.
+export const AVATAR_UNLOCKS = [
+  { avatar: '🦁', requirement: { type: 'gamesPlayed', value: 3 }, hint: 'Play 3 games' },
+  { avatar: '🐨', requirement: { type: 'badgesEarned', value: 5 }, hint: 'Earn 5 badges total (across all your games)' },
+  { avatar: '🐯', requirement: { type: 'netWorth', value: 2000 }, hint: 'Finish a game with $2,000+ net worth' },
+  { avatar: '🦄', requirement: { type: 'gamesPlayed', value: 10 }, hint: 'Play 10 games' },
+  { avatar: '🐲', requirement: { type: 'passiveIncome', value: 300 }, hint: 'Reach $300/mo passive income in a game' },
+];
+
+// A cosmetic board theme, unlocked the same way as avatars — see
+// game/profile.js + App.jsx (applies the selected theme as a data
+// attribute the CSS keys off of).
+export const BOARD_THEMES = [
+  { id: 'classic', name: 'Classic', icon: '🎨', requirement: null },
+  {
+    id: 'gold',
+    name: 'Gold Table',
+    icon: '✨',
+    requirement: { type: 'badgesEarned', value: 8 },
+    hint: 'Earn 8 badges total (across all your games)',
+  },
+];
 
 // ---------------------------------------------------------------------------
 // Bot personalities — named robot opponents, each with a fixed play style

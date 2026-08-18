@@ -523,3 +523,160 @@ reply is just one of that robot's existing canned `question`/`tease`/
 events), picked at random and addressed back to the sender. It reads as a
 lighthearted in-character response to *being talked to*, not as an actual
 answer to whatever was said.
+
+## Scenario goals and setup info popups
+
+Setup now asks "Your goal this game" alongside mode/difficulty — a grid of
+scenario cards defined in `gameConfig.js`'s new `SCENARIOS` array (Classic
+Growth, Survive the Crash, Passive Income Race, Business Sprint), each with
+an icon, a one-line tagline shown right on the card, and a longer `details`
+blurb reserved for the popup. Every card has a small "ⓘ" button next to its
+pick button; tapping it (instead of picking the scenario) opens
+`InfoModal.jsx` — a small generic `{icon, title, body}` popup reused for this
+and for the Unlocks screen — so a player can check what "Survive the Crash"
+actually means without accidentally selecting it. The chosen `scenarioId`
+flows from `SetupScreen.jsx` through `useGame.startGame()`'s new `options`
+param → the reducer → `game/newGame.js`, which resolves it via
+`game/scenarios.js`'s `getScenario()` and, for Survive the Crash, starts the
+game already inside a storm (`scenarioStartingWeather()` seeds
+`WEATHER_STAGES.stormyBust` instead of the usual sunny open) rather than
+waiting for the weather to randomly turn bad.
+
+Passive Income Race and Business Sprint each carry an `objective` (a passive
+income target by difficulty, or a business count by a target month).
+`game/scenarios.js`'s `checkScenarioObjective()` runs as a step inside
+`turnEngine.js`'s month-end resolution and, the first time a player crosses
+their target, stamps a one-time `scenarioGoalMonth` on that player and
+appends an `objectiveMet` log entry (celebrated with the badge sound and an
+80% robot-chat reaction chance) — guarded so it only ever fires once per
+player, and deliberately *doesn't* end the game early or change the 24-month
+length, just marks the moment. Classic Growth and Survive the Crash have no
+`objective` and play exactly as before. The game-over screen reads
+`scenarioGoalMonth` back to show who reached the goal (or a "give it another
+shot" nudge if nobody did), plus scenario-specific framing for Survive the
+Crash (did you grow your money starting from a storm, or not).
+
+## Daily Challenge
+
+A "🗓️ Today's Challenge" banner sits above the mode picker on setup — a
+one-tap quick-start (skipping robot/scenario/difficulty pickers entirely)
+into a Solo game against a fixed pair of robots (`game/dailyChallenge.js`'s
+`DAILY_CHALLENGE_BOT_CONFIGS`, BossEmby and MrGrinch, both Sharp), on the
+default difficulty and scenario, seeded so every player who plays today gets
+the *exact same* weather timeline, fortune-card draws, and price drift —
+only their own decisions differ. That fairness rests on `game/rng.js` being
+rewritten from raw `Math.random()` calls to a seedable mulberry32 PRNG (every
+existing helper — `randomInt`, `randomFloat`, `noise`, `chance`,
+`weightedPick`, `pickRandom` — keeps its exact signature, so no other file
+needed to change beyond how it's seeded); `dailyChallenge.js`'s
+`seedForDate()` hashes today's `YYYY-MM-DD` into a seed, and the reducer's
+`START_GAME` case calls `seedRng()` with it right before building state
+whenever `dailyChallengeDate` is present. Leaderboard entries saved from a
+Daily Challenge game carry that date (`game/leaderboard.js`), and
+`LeaderboardModal.jsx` gained an All-Time / Today's Challenge tab toggle that
+filters to just today's date — so a Daily Challenge score is compared
+against other people who played the *same* environment today, not against
+best-ever scores set under arbitrary conditions.
+
+## Unlockable avatars and board theme
+
+Beyond the three starter avatars, `gameConfig.js`'s `PLAYER_AVATARS` now has
+five more, each gated behind a lifetime milestone in the new
+`AVATAR_UNLOCKS` array (three games played, five badges earned across all
+games, a $2,000+ net worth finish, ten games played, $300/mo+ passive
+income in a game) — plus a cosmetic "Gold Table" board theme in
+`BOARD_THEMES`, gated behind eight lifetime badges. `game/profile.js` tracks
+the running totals (`gamesPlayed`, `badgesEarned`, `bestNetWorth`,
+`bestPassiveIncome`, `selectedTheme`) in their own `localStorage` key,
+separate from any single game save, so progress survives "New Game"/"Play
+Again" and persists across sessions. `GameOverScreen.jsx` calls
+`recordGameResult()` exactly once per finished game (guarded with a
+`useRef`, not just an empty effect dependency array — React 18 StrictMode
+intentionally double-invokes a fresh mount effect in development specifically
+to catch a non-idempotent effect like this one, which would otherwise
+double-count `gamesPlayed` and badges every game in a dev build) for
+whichever human did best that game, and shows a "🎉 New unlock!" banner the
+moment a threshold is newly crossed. Setup's avatar picker
+(`useProfile()`'s `avatars`) only offers avatars actually unlocked so far,
+and a new "🏅 Unlocks" button opens `UnlocksModal.jsx`, showing every
+avatar/theme with its requirement and whether it's been met yet — plus a
+one-tap theme selector once Gold Table is unlocked, applied via a
+`data-theme` attribute on the app root that `theme.css` keys off of.
+
+## Financial "why" lessons
+
+The event log now occasionally surfaces a short, plain-language explainer
+right next to the thing that just happened — `game/lessons.js`'s
+`maybeAttachLesson()` maps a log entry's `kind` (starting a business,
+buying a volatile "treasure" asset, a weather shift, a bad or good fortune
+card, learning a skill, earning a badge) to a concept in `gameConfig.js`'s
+new `FINANCIAL_LESSONS` object (passive income, risk and reward, market
+cycles, emergency funds, opportunity cost, investing in yourself, good
+habits — each with an icon, a title, and a one- or two-sentence blurb).
+`game/reducer.js`'s `appendLog()` — already the single choke-point every log
+entry flows through, which is also where bot chat reactions get triggered —
+now checks each concept against a new `state.seenLessons` array and attaches
+the lesson to the log entry (rendered as a small callout in
+`EventLog.jsx`) only the *first* time that concept comes up in a game, so
+the log doesn't repeat the same explainer every time a player buys another
+treasure or another business. `seenLessons` itself is what
+`FamilyRecapModal.jsx` reads to build its "concepts this game touched on"
+list.
+
+## Net worth chart and end-of-game insights
+
+Every player now has a `netWorthHistory` array (`[{month, netWorth}, ...]`)
+snapshotted as a step inside `turnEngine.js`'s month-end resolution, and the
+game-over screen renders it as `NetWorthChart.jsx` — a dependency-free
+inline-SVG line chart, one line per player, ending in that player's avatar
+so the line is identifiable without relying on color alone (a legend row
+underneath reinforces it further). Colors follow a validated-palette
+workflow: three human colors were chosen and confirmed CVD-safe as a set via
+a palette-validation script, while robots keep their existing
+`BOT_PERSONALITIES` color for consistency with the chat feed — a couple of
+those pre-existing bot colors are close enough to fail a strict pairwise
+check on their own, which is exactly why every line here is direct-labeled
+rather than depending on color to carry identity (fixing the wider bot
+palette is out of scope for this round). Underneath the chart,
+`game/insights.js`'s `buildInsights()` reflects a player's *own* numbers
+back at them — their biggest single-month swing (up or down, with a
+diversification nudge if the swing was a big drop) and a note on how spread
+out their holdings ended up — deliberately modest and observational rather
+than prescriptive advice.
+
+## Risk-rating indicator in the asset shop
+
+Each asset card in `AssetShop.jsx` now shows a compact 1-4 dot meter next to
+its existing `riskLabel` text, derived from that asset's `volatility` value
+already defined in `gameConfig.js` (`riskDots()` buckets it into quartiles).
+The label text already existed but wasn't visually reinforced; the dots make
+risk scannable at a glance right where the buy decision happens, instead of
+only showing up implicitly through how bumpy the price line turns out to be
+over time.
+
+## Family/teacher recap screen
+
+A "📋 Family Recap" button on the game-over screen opens
+`FamilyRecapModal.jsx` — a summary meant to be read together after a game
+or printed for a classroom, built entirely from state that already exists
+rather than tracking anything new: the concepts touched on this game (from
+`seenLessons` + `FINANCIAL_LESSONS`), final standings with each player's
+earned badges, and a short list of generic conversation-starter prompts. A
+"🖨️ Print" button calls `window.print()`; `game.css` adds a
+`@media print` block that hides everything else on the page (buttons,
+sidebar, other modals) and shows only the recap content, so what prints is
+a clean one-page summary rather than a screenshot of the whole app chrome.
+
+## Lead-change callouts and bigger milestone celebrations
+
+`turnEngine.js` now snapshots who's in the lead (by net worth) at the very
+start of each month's resolution, before that month's own payday, fortune
+cards, or price drift are applied, then compares against who's in the lead
+once resolution finishes — a genuine mid-resolution swing (not a lead that
+already existed going in) appends a `leadChange` log entry naming whoever
+just took over, which plays the cheering sound and has a 50% chance of
+triggering a robot-chat reaction, on top of the `objectiveMet` sound/chat
+handling scenario goals get. The bigger celebration (fireworks + applause,
+already used for other big moments) now also covers these swing moments,
+making a genuine overtake feel like the game event it is instead of quietly
+scrolling past in the log.

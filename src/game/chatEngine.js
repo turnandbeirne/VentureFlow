@@ -33,6 +33,8 @@ const REACT_CHANCE = {
   fortuneBad: 0.18,
   endTurn: 0.16,
   gameover: 0.7,
+  objectiveMet: 0.8, // a scenario goal reached (Passive Income Race / Business Sprint) — see game/scenarios.js
+  leadChange: 0.5, // the net-worth standings just flipped — see game/turnEngine.js
 };
 
 // After a bot speaks, this is the chance a *different* bot chimes in with a
@@ -204,6 +206,34 @@ function reactionsForEntry(state, entry) {
     const category = kind === 'fortuneGood' ? 'compliment' : 'sympathy';
     const said = say(speaker, category, { player: actorName }, entry.playerId);
     if (said) entries.push(said);
+    return entries;
+  }
+
+  if (kind === 'objectiveMet') {
+    if (Math.random() >= REACT_CHANCE.objectiveMet) return entries;
+    const speaker = pickSpeaker(state, entry.playerId);
+    if (!speaker) return entries;
+    const category = Math.random() < 0.3 ? 'challenge' : 'compliment';
+    const said = say(speaker, category, { player: actorName }, entry.playerId);
+    if (said) entries.push(said);
+    return entries;
+  }
+
+  if (kind === 'leadChange') {
+    if (Math.random() >= REACT_CHANCE.leadChange) return entries;
+    const newLeader = entry.playerId ? state.players.find((p) => p.id === entry.playerId) : null;
+    if (!newLeader) return entries;
+    const speaker = pickSpeaker(state, newLeader.id);
+    if (!speaker) return entries;
+    if (newLeader.type === 'human') {
+      const category = pickRandom(['challenge', 'tease']);
+      const said = say(speaker, category, { player: newLeader.name }, newLeader.id);
+      if (said) entries.push(said);
+    } else {
+      // A robot took the lead — another bot gets a quick word about it.
+      const said = say(speaker, 'botBanter', { bot: newLeader.name }, newLeader.id);
+      if (said) entries.push(said);
+    }
     return entries;
   }
 

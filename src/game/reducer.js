@@ -18,6 +18,9 @@ import {
   reactToHumanChat,
 } from './chatEngine';
 import { isOffensiveName } from './nameFilter';
+import { seedRng } from './rng';
+import { maybeAttachLesson } from './lessons';
+import { seedForDate } from './dailyChallenge';
 
 const CHAT_MAX_LENGTH = 140;
 
@@ -47,7 +50,24 @@ function appendChat(state, entries) {
 function appendLog(state, entries) {
   if (!entries || entries.length === 0) return state;
   const stamped = entries.map((e) => ({ id: nextLogId(), month: state.month, ...e }));
-  const withLog = { ...state, log: [...state.log, ...stamped].slice(-200) };
+
+  // At most one financial-concept lesson per appendLog call (see
+  // game/lessons.js) — attaching one to every qualifying entry in a batch
+  // would turn a nice, occasional touch into clutter. seenLessons tracks
+  // which concepts have already been shown this game so each one only
+  // surfaces once.
+  let seenLessons = state.seenLessons || [];
+  let lessonUsed = false;
+  const withLessons = stamped.map((entry) => {
+    if (lessonUsed) return entry;
+    const found = maybeAttachLesson(seenLessons, entry);
+    if (!found) return entry;
+    lessonUsed = true;
+    seenLessons = [...seenLessons, found.conceptId];
+    return { ...entry, lesson: found.lesson };
+  });
+
+  const withLog = { ...state, log: [...state.log, ...withLessons].slice(-200), seenLessons };
   return appendChat(withLog, reactToLogEntries(withLog, stamped));
 }
 
@@ -63,7 +83,24 @@ function withResult(result) {
 export function gameReducer(state, action) {
   switch (action.type) {
     case 'START_GAME': {
-      const newState = createNewGame(action.mode, action.humanNames, action.difficultyId, action.botConfigs);
+      // A Daily Challenge run reseeds the shared RNG (game/rng.js) from
+      // today's date BEFORE the new game is built, so every random roll
+      // that happens while building it (the starting weather's duration)
+      // and every roll for the rest of the game (fortune cards, price
+      // drift, business names) is identical for every player who plays
+      // today's challenge — see game/dailyChallenge.js.
+      if (action.dailyChallengeDate) {
+        seedRng(seedForDate(action.dailyChallengeDate));
+      }
+      const built = createNewGame(
+        action.mode,
+        action.humanNames,
+        action.difficultyId,
+        action.botConfigs,
+        action.scenarioId,
+        action.humanAvatars
+      );
+      const newState = action.dailyChallengeDate ? { ...built, dailyChallengeDate: action.dailyChallengeDate } : built;
       return appendChat(newState, generateGreeting(newState));
     }
 

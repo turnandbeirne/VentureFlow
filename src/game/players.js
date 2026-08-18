@@ -54,6 +54,8 @@ export function createPlayer({
     badges: [], // [badgeId]
     badgeEvents: [], // [{ badgeId, month }] — feeds future VentureScouts export
     turnComplete: false,
+    scenarioGoalMonth: null, // month this player hit the scenario's objective, if any — see game/scenarios.js
+    netWorthHistory: [], // [{ month, netWorth }] — one snapshot per completed month, see game/turnEngine.js
   };
 }
 
@@ -103,7 +105,8 @@ export function createPlayerRoster(
   mode,
   humanNames = [],
   difficulty = getDifficulty(DEFAULT_DIFFICULTY_ID),
-  botConfigs = []
+  botConfigs = [],
+  humanAvatars = []
 ) {
   const startingCash = difficulty.startingCash;
   const startingSkillTokens = difficulty.startingSkillTokens;
@@ -114,7 +117,7 @@ export function createPlayerRoster(
       createPlayer({
         id: 'p1',
         name: humanNames[0] || 'You',
-        avatar: PLAYER_AVATARS[0],
+        avatar: humanAvatars[0] || PLAYER_AVATARS[0],
         type: 'human',
         startingCash,
         startingSkillTokens,
@@ -143,7 +146,7 @@ export function createPlayerRoster(
         createPlayer({
           id: `p${i + 1}`,
           name: humanNames[i] || `Player ${i + 1}`,
-          avatar: PLAYER_AVATARS[i] || '🙂',
+          avatar: humanAvatars[i] || PLAYER_AVATARS[i] || '🙂',
           type: 'human',
           startingCash,
           startingSkillTokens,

@@ -2,6 +2,17 @@ import { useCallback } from 'react';
 import { ASSETS } from '../data/gameConfig';
 import { useHoldRepeat } from '../hooks/useHoldRepeat';
 
+/** A quick 1-4 dot risk meter from an asset's volatility, paired with its
+ * existing riskLabel text (gameConfig.js) — teaches the risk/reward
+ * vocabulary right where the buy decision actually happens, instead of only
+ * implicitly through how the asset behaves over time. */
+function riskDots(volatility) {
+  if (volatility <= 0.03) return 1;
+  if (volatility <= 0.1) return 2;
+  if (volatility <= 0.2) return 3;
+  return 4;
+}
+
 function AssetCard({ asset, price, previousPrice, owned, cash, onBuy, onSell, disabled }) {
   const trendUp = price >= previousPrice;
   const trendPct = previousPrice ? Math.round(((price - previousPrice) / previousPrice) * 100) : 0;
@@ -23,6 +34,14 @@ function AssetCard({ asset, price, previousPrice, owned, cash, onBuy, onSell, di
       <span className="vf-asset-card__icon">{asset.icon}</span>
       <span className="vf-asset-card__name">{asset.name}</span>
       <span className="vf-asset-card__tagline">{asset.tagline}</span>
+      <span className="vf-asset-card__risk" title={`Volatility: how much the price can swing in one month`}>
+        <span className="vf-asset-card__risk-dots" aria-hidden="true">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <span key={i} className={`vf-risk-dot ${i < riskDots(asset.volatility) ? 'vf-risk-dot--on' : ''}`} />
+          ))}
+        </span>
+        {asset.riskLabel}
+      </span>
       <span className="vf-asset-card__price">${price.toFixed(0)}</span>
       {previousPrice ? (
         <span className={`vf-asset-card__trend ${trendUp ? 'vf-asset-card__trend--up' : 'vf-asset-card__trend--down'}`}>
