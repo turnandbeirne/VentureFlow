@@ -17,7 +17,7 @@ import {
   BUSINESS_UPGRADE_TRACKS,
 } from '../data/gameConfig';
 import { randomInt, pickRandom } from './rng';
-import { upgradeCost, canUpgradeTrack, applyUpgrade } from './businessUpgrades';
+import { upgradeCost, canUpgradeTrack, applyUpgrade, upgradeBlockReason } from './businessUpgrades';
 
 /** A random whimsical name for a new business, preferring one this player
  * hasn't already used this game (500 names is far more than any game will
@@ -123,6 +123,10 @@ export function startBusiness(state, playerId) {
     salesLevel: 0,
     opsLevel: 0,
     rndCount: 0,
+    // Lifetime count of Marketing campaigns launched for this business —
+    // measured against its earned allowance (see businessUpgrades.js's
+    // marketingAllowance). Never decremented.
+    marketingCount: 0,
     tempBoosts: [], // active Marketing boosts — [{ amount, expiresMonth }]
     pendingRnd: [], // in-flight R&D projects — [{ resolveMonth }]
     // Both feed the business-decline decay in game/businessUpgrades.js —
@@ -165,7 +169,11 @@ export function upgradeBusiness(state, playerId, businessId, trackId) {
   const business = player.businesses.find((b) => b.id === businessId);
   if (!business) return { state, ok: false, error: 'Invalid business.' };
   if (!canUpgradeTrack(business, trackId)) {
-    return { state, ok: false, error: `${track.name} is already maxed out for ${business.name}.` };
+    return {
+      state,
+      ok: false,
+      error: upgradeBlockReason(business, trackId) || `${track.name} is already maxed out for ${business.name}.`,
+    };
   }
 
   const cost = upgradeCost(business, trackId);

@@ -15,13 +15,19 @@ import {
   RENT_OVERSUPPLY_FREE_UNITS,
   RENT_OVERSUPPLY_RATE,
   RENT_MIN_YIELD_FACTOR,
+  PIGGY_INTEREST_PCT_MIN,
+  PIGGY_INTEREST_PCT_MAX,
+  PIGGY_BONUS_CHANCE,
+  PIGGY_BONUS_PCT_MIN,
+  PIGGY_BONUS_PCT_MAX,
 } from '../data/gameConfig';
 // pickRandom — the default (player-choice) stream — for picking a robot's
-// personality, exactly like before. envRandomInt — the ENVIRONMENT stream —
-// is used ONLY by rollWeatherIncomeAmounts below, which is driven by the
-// shared weather, not a player's own choices; see game/rng.js's module
-// comment for why that boundary matters (Daily Challenge fairness).
-import { pickRandom, envRandomInt } from './rng';
+// personality, exactly like before. envRandomInt/envRandomFloat/envChance —
+// the ENVIRONMENT stream — are used ONLY by rollMonthlyIncomeAmounts below,
+// which is driven by shared world state (this month's weather, this month's
+// bank interest rate), not any player's own choices; see game/rng.js's
+// module comment for why that boundary matters (Daily Challenge fairness).
+import { pickRandom, envRandomInt, envRandomFloat, envChance } from './rng';
 import { activeMarketingBoostTotal } from './businessUpgrades';
 
 export function createPlayer({
@@ -226,10 +232,10 @@ function baseYield(asset) {
  * first couple of units anyone owns pay the full baseline yield; every unit
  * beyond that crowds the rental market a bit more and pulls the per-unit
  * yield down, floored so it never goes to nothing. Every asset that isn't
- * rent-bearing (including Lemonade Stand, whose income instead comes from
- * perUnitIncome/rollWeatherIncomeAmounts below) always returns 0 here —
- * Treasure Chest and Piggy Bank are genuinely price-only, with no monthly
- * income at all. */
+ * rent-bearing (including Lemonade Stand, whose income comes from
+ * perUnitIncome/rollMonthlyIncomeAmounts below, and Piggy Bank, whose
+ * monthly interest does too) always returns 0 here — only Treasure Chest is
+ * genuinely price-only, with no monthly income at all. */
 export function effectiveRentPerUnit(asset, price, totalOwned) {
   if (!asset || asset.rentPerMonth <= 0) return 0;
   const excess = Math.max(0, (totalOwned || 0) - RENT_OVERSUPPLY_FREE_UNITS);
@@ -238,39 +244,91 @@ export function effectiveRentPerUnit(asset, price, totalOwned) {
 }
 
 /**
- * Roll this "period's" per-unit income for every asset that has a
- * `weatherIncomeRange` (currently just Lemonade Stand — see gameConfig.js),
- * keyed by the CURRENT weather stage. Rolled on the ENVIRONMENT stream (see
- * game/rng.js's module comment) since it's driven by the shared weather,
- * not any player's own choices — every Daily Challenge player must see the
- * identical sequence of amounts regardless of what they buy/sell. Called
- * once per month at month-end (for the upcoming month — see
+ * Roll everything about THIS month's per-unit asset income that has to be
+ * decided once and then stay put:
+ *
+ * - every asset with a `weatherIncomeRange` (currently just Lemonade Stand
+ *   — see gameConfig.js) gets a flat per-unit dollar amount for the current
+ *   weather stage, stored under its own asset id;
+ * - every asset flagged `interestBearing` (currently just Piggy Bank) gets
+ *   an interest RATE rather than a dollar amount — its payout depends on
+ *   the asset's live price, which drifts, so the rate is what's stable —
+ *   stored under `interestRates[assetId]`, with `interestBonus[assetId]`
+ *   flagging the occasional better-than-usual month so the UI/log can call
+ *   it out.
+ *
+ * Both are rolled on the ENVIRONMENT stream (see game/rng.js's module
+ * comment): they're properties of the shared world — the weather, the bank's
+ * rate this month — not of any player's own choices, so every Daily
+ * Challenge player must see the identical sequence regardless of what they
+ * buy or sell.
+ *
+ * Called once per month at month-end (for the month that's ending — see
  * game/turnEngine.js) plus once at game creation for month 1 (see
- * game/newGame.js). The result is stored on state.weatherIncomeAmounts so
+ * game/newGame.js). The result is stored on state.weatherIncomeAmounts —
+ * a name kept from when this only covered weather-driven income, since
+ * renaming it would strand every game already saved in localStorage — so
  * the UI can show a stable, already-rolled figure instead of re-rolling on
  * every render.
  */
-export function rollWeatherIncomeAmounts(weather) {
+export function rollMonthlyIncomeAmounts(weather) {
   const stageId = weather?.stageId;
-  const amounts = {};
+  const amounts = { interestRates: {}, interestBonus: {} };
   for (const asset of ASSETS) {
-    if (!asset.weatherIncomeRange) continue;
-    const range = asset.weatherIncomeRange[stageId] || Object.values(asset.weatherIncomeRange)[0];
-    const [min, max] = range;
-    amounts[asset.id] = envRandomInt(min, max);
+    if (asset.weatherIncomeRange) {
+      const range = asset.weatherIncomeRange[stageId] || Object.values(asset.weatherIncomeRange)[0];
+      const [min, max] = range;
+      amounts[asset.id] = envRandomInt(min, max);
+    }
+    if (asset.interestBearing) {
+      // Draw the bonus coin flip FIRST and unconditionally, then the rate —
+      // a fixed number of draws in a fixed order every month, so the
+      // environment stream's position can never depend on which branch was
+      // taken (same discipline as game/businessExits.js).
+      const bonus = envChance(PIGGY_BONUS_CHANCE);
+      const normalRate = envRandomFloat(PIGGY_INTEREST_PCT_MIN, PIGGY_INTEREST_PCT_MAX);
+      const bonusRate = envRandomFloat(PIGGY_BONUS_PCT_MIN, PIGGY_BONUS_PCT_MAX);
+      amounts.interestRates[asset.id] = bonus ? bonusRate : normalRate;
+      amounts.interestBonus[asset.id] = bonus;
+    }
   }
   return amounts;
+}
+
+/** This month's interest rate for an interest-bearing asset, as a fraction
+ * (0.003 = 0.3%). Falls back to the middle of the normal range when no roll
+ * is available yet (a game saved before interest existed, or a render
+ * before the first roll) rather than reading as 0% — see
+ * rollMonthlyIncomeAmounts above. */
+export function interestRateFor(asset, weatherIncomeAmounts) {
+  if (!asset?.interestBearing) return 0;
+  const rolled = weatherIncomeAmounts?.interestRates?.[asset.id];
+  if (typeof rolled === 'number') return rolled;
+  return (PIGGY_INTEREST_PCT_MIN + PIGGY_INTEREST_PCT_MAX) / 2;
+}
+
+/** Whether this month's roll was one of the occasional better-than-usual
+ * interest months for `asset` (see PIGGY_BONUS_CHANCE in gameConfig.js). */
+export function isInterestBonusMonth(asset, weatherIncomeAmounts) {
+  return !!(asset?.interestBearing && weatherIncomeAmounts?.interestBonus?.[asset.id]);
 }
 
 /** What one unit of ANY asset currently earns per month, dispatching to the
  * right model: a rent-bearing asset (Tree House) uses the live-price cap
  * rate above; a weather-driven asset (Lemonade Stand) uses this period's
  * already-rolled amount from `weatherIncomeAmounts` (see
- * rollWeatherIncomeAmounts); everything else (Piggy Bank, Treasure Chest) is
- * price-only and earns 0. */
+ * rollMonthlyIncomeAmounts); an interest-bearing asset (Piggy Bank) pays
+ * this month's rolled rate against its own live price — deliberately a tiny
+ * number, cents per unit, which is exactly the point: saving is safe and
+ * slow, and only adds up in volume or over time. Everything else (Treasure
+ * Chest) is genuinely price-only and earns 0. Returns a FLOAT — callers sum
+ * across assets/units and round once at the end (see
+ * passiveIncomeBreakdown), so fractional cents per unit are never lost to
+ * premature rounding. */
 export function perUnitIncome(asset, { price, totalOwned, weatherIncomeAmounts } = {}) {
   if (asset.rentPerMonth > 0) return effectiveRentPerUnit(asset, price, totalOwned);
   if (asset.weatherIncomeRange) return weatherIncomeAmounts?.[asset.id] ?? 0;
+  if (asset.interestBearing) return (price ?? asset.basePrice) * interestRateFor(asset, weatherIncomeAmounts);
   return 0;
 }
 

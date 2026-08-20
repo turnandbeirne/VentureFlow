@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { ASSETS, BUSINESS_UPGRADE_TRACKS, WEATHER_STAGES, getAssetIncomeRange, getBotPersonality, getSkillLevel } from '../data/gameConfig';
 import {
   assetValue,
@@ -9,12 +9,56 @@ import {
   perUnitIncome,
   totalUnitsOwned,
   businessMonthlyIncome,
+  interestRateFor,
 } from '../game/players';
-import { upgradeCost, canUpgradeTrack, activeMarketingBoostTotal, businessHealthStatus } from '../game/businessUpgrades';
+import {
+  upgradeCost,
+  canUpgradeTrack,
+  activeMarketingBoostTotal,
+  businessHealthStatus,
+  marketingAllowance,
+  marketingCampaignsUsed,
+  upgradesNeededForNextCampaign,
+} from '../game/businessUpgrades';
+import { useHoldRepeat } from '../hooks/useHoldRepeat';
 import { playSound } from '../audio/soundEngine';
 import LedgerModal from './LedgerModal';
 
 const UPGRADE_TRACK_ORDER = ['marketing', 'sales', 'ops', 'rnd'];
+
+/**
+ * One upgrade button, with the same press-and-hold-to-repeat behaviour the
+ * asset shop's Buy/Sell buttons have (hooks/useHoldRepeat.js) — a tap buys
+ * one, holding past a second keeps buying and accelerates. Growing a
+ * business to Sales Lv3 + Ops Lv3 was six separate round-trips through the
+ * portfolio modal before; now it's one press.
+ *
+ * `canFire` is re-read on every repeat tick, so the repeat stops the instant
+ * the track hits its cap or the cash runs out instead of hammering an action
+ * that would only produce an error toast.
+ *
+ * It has to be its own component (rather than a loop body in
+ * BusinessUpgrades) because useHoldRepeat is a hook — one per button, and
+ * hooks can't be called in a loop inside another component.
+ */
+function UpgradeButton({ track, trackId, business, cost, capped, affordable, onUpgrade }) {
+  const enabled = !capped && affordable;
+  const canFire = useCallback(() => enabled, [enabled]);
+  const fire = useCallback(() => onUpgrade(business.id, trackId), [onUpgrade, business.id, trackId]);
+  const hold = useHoldRepeat(fire, canFire);
+
+  return (
+    <button
+      type="button"
+      className="vf-btn vf-btn--sm vf-btn--ghost vf-biz-upgrades__btn"
+      disabled={!enabled}
+      title={track.blurb}
+      {...hold}
+    >
+      {track.icon} {track.name} {capped ? '(maxed)' : `$${cost}`}
+    </button>
+  );
+}
 
 /** A business's upgrade section: read-only level/status chips always show
  * (so anyone glancing at this business — including from the game-over
@@ -23,6 +67,15 @@ const UPGRADE_TRACK_ORDER = ['marketing', 'sales', 'ops', 'rnd'];
 function BusinessUpgrades({ business, month, cash, canUpgrade, onUpgrade }) {
   const activeBoost = activeMarketingBoostTotal(business, month);
   const pendingRnd = (business.pendingRnd || []).length;
+  // Marketing's cap moves as the business grows (see
+  // game/businessUpgrades.js's marketingAllowance), so it's shown as
+  // used/allowed rather than a fixed "Lv x/3" like the other tracks — and
+  // called out in red once it's exhausted, since the fix is to buy a
+  // DIFFERENT track, which isn't obvious from a greyed-out button alone.
+  const marketingUsed = marketingCampaignsUsed(business);
+  const marketingMax = marketingAllowance(business);
+  const marketingTapped = marketingUsed >= marketingMax;
+  const upgradesNeeded = upgradesNeededForNextCampaign(business);
 
   return (
     <div className="vf-biz-upgrades">
@@ -30,6 +83,12 @@ function BusinessUpgrades({ business, month, cash, canUpgrade, onUpgrade }) {
         {activeBoost > 0 && (
           <span className="vf-biz-upgrades__chip vf-biz-upgrades__chip--active">📣 +${activeBoost}/mo campaign live</span>
         )}
+        <span
+          className={`vf-biz-upgrades__chip ${marketingTapped ? 'vf-biz-upgrades__chip--tapped' : ''}`}
+          title={`Campaigns launched vs. allowed. Every Sales, Operations, or R&D upgrade on this business unlocks 2 more.`}
+        >
+          📣 Campaigns {marketingUsed}/{marketingMax}
+        </span>
         <span className="vf-biz-upgrades__chip">🤝 Sales Lv{business.salesLevel || 0}/3</span>
         <span className="vf-biz-upgrades__chip">⚙️ Ops Lv{business.opsLevel || 0}/3</span>
         <span className="vf-biz-upgrades__chip">
@@ -37,26 +96,28 @@ function BusinessUpgrades({ business, month, cash, canUpgrade, onUpgrade }) {
         </span>
       </div>
       {canUpgrade && (
-        <div className="vf-biz-upgrades__actions">
-          {UPGRADE_TRACK_ORDER.map((trackId) => {
-            const track = BUSINESS_UPGRADE_TRACKS[trackId];
-            const capped = !canUpgradeTrack(business, trackId);
-            const cost = upgradeCost(business, trackId);
-            const affordable = cash >= cost;
-            return (
-              <button
+        <>
+          <div className="vf-biz-upgrades__actions">
+            {UPGRADE_TRACK_ORDER.map((trackId) => (
+              <UpgradeButton
                 key={trackId}
-                type="button"
-                className="vf-btn vf-btn--sm vf-btn--ghost vf-biz-upgrades__btn"
-                disabled={capped || !affordable}
-                title={track.blurb}
-                onClick={() => onUpgrade(business.id, trackId)}
-              >
-                {track.icon} {track.name} {capped ? '(maxed)' : `$${cost}`}
-              </button>
-            );
-          })}
-        </div>
+                trackId={trackId}
+                track={BUSINESS_UPGRADE_TRACKS[trackId]}
+                business={business}
+                cost={upgradeCost(business, trackId)}
+                capped={!canUpgradeTrack(business, trackId)}
+                affordable={cash >= upgradeCost(business, trackId)}
+                onUpgrade={onUpgrade}
+              />
+            ))}
+          </div>
+          {marketingTapped && (
+            <p className="vf-biz-upgrades__note">
+              📣 Out of Marketing campaigns for {business.name}. Buy {upgradesNeeded} more Sales, Operations, or R&amp;D
+              upgrade{upgradesNeeded === 1 ? '' : 's'} to unlock more.
+            </p>
+          )}
+        </>
       )}
     </div>
   );
@@ -78,17 +139,25 @@ export default function PlayerDetailModal({ player, prices, allPlayers, month, w
   // this modal can be mounted (by GameBoard/GameOverScreen) before a
   // player is actually selected, so `player` starts out null.
   const [showLedger, setShowLedger] = useState(false);
+  // No playSound('click') here: an upgrade already gets its own sound from
+  // the log entry it produces (hooks/useGameSounds.js maps
+  // 'businessUpgrade' to the level-up chime), and with press-and-hold
+  // repeat now firing this many times a second, layering a second click on
+  // top of every one turned into noise. Declared above the early return
+  // below with the other hooks — `player` can legitimately be null here.
+  const playerId = player?.id;
+  const handleUpgrade = useCallback(
+    (businessId, trackId) => {
+      if (playerId) onUpgradeBusiness?.(playerId, businessId, trackId);
+    },
+    [onUpgradeBusiness, playerId]
+  );
 
   if (!player) return null;
 
   function handleClose() {
     playSound('click');
     onClose();
-  }
-
-  function handleUpgrade(businessId, trackId) {
-    playSound('click');
-    onUpgradeBusiness?.(player.id, businessId, trackId);
   }
 
   function openLedger() {
@@ -172,7 +241,9 @@ export default function PlayerDetailModal({ player, prices, allPlayers, month, w
                 });
                 const incomeRange = isWeatherIncome ? getAssetIncomeRange(asset) : null;
                 const stageName = weather ? WEATHER_STAGES[weather.stageId]?.name : null;
-                const priceOnly = !isWeatherIncome && asset.rentPerMonth === 0;
+                const isInterest = !!asset.interestBearing;
+                const interestRate = interestRateFor(asset, weatherIncomeAmounts);
+                const priceOnly = !isWeatherIncome && !isInterest && asset.rentPerMonth === 0;
 
                 if (qty === 0 && avgPrice === null) {
                   return (
@@ -183,6 +254,7 @@ export default function PlayerDetailModal({ player, prices, allPlayers, month, w
                         <div className="vf-portfolio__asset-detail">
                           Never bought
                           {priceOnly && ' · price only, no monthly income'}
+                          {isInterest && ` · earns ${(interestRate * 100).toFixed(2)}%/mo interest right now`}
                           {isWeatherIncome && incomeRange && ` · income varies with weather & cards ($${incomeRange[0]}–$${incomeRange[1]}/mo per unit)`}
                         </div>
                       </div>
@@ -211,6 +283,12 @@ export default function PlayerDetailModal({ player, prices, allPlayers, month, w
                             {incomeRange && <> · range ${incomeRange[0]}–${incomeRange[1]}/mo per unit</>}
                           </>
                         )}
+                        {isInterest && qty > 0 && (
+                          <>
+                            {' '}
+                            · +${(qty * perUnit).toFixed(2)}/mo interest ({(interestRate * 100).toFixed(2)}% this month)
+                          </>
+                        )}
                         {priceOnly && <> · price only, no monthly income</>}
                       </div>
                     </div>
@@ -236,6 +314,9 @@ export default function PlayerDetailModal({ player, prices, allPlayers, month, w
             <div className="vf-portfolio__section-title">
               🚀 Businesses ({player.businesses.length}) — ${Math.round(totalBusinessValue).toLocaleString()} value,
               ${totalBusinessIncome}/mo
+              {canUpgrade && player.businesses.length > 0 && (
+                <span className="vf-portfolio__section-hint"> · Hold an invest button to buy several</span>
+              )}
             </div>
             {player.businesses.length === 0 ? (
               <p className="vf-portfolio__empty">No businesses started yet.</p>

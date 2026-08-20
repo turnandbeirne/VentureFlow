@@ -238,7 +238,7 @@ export const BUSINESS_UPGRADE_TRACKS = {
     name: 'Marketing',
     icon: '📣',
     cost: 75,
-    blurb: 'A short ad campaign — a % revenue bump that fades after a few months.',
+    blurb: 'A short ad campaign — a % revenue bump that fades after a few months. Campaigns allowed = 2x this business’s Sales/Ops/R&D upgrades (at least 2).',
   },
   sales: {
     id: 'sales',
@@ -289,6 +289,40 @@ export const RND_SMALL_PAYOFF_PCT_MIN = 0.08;
 export const RND_SMALL_PAYOFF_PCT_MAX = 0.18;
 export const RND_BIG_PAYOFF_PCT_MIN = 0.2;
 export const RND_BIG_PAYOFF_PCT_MAX = 0.3;
+
+// ---------------------------------------------------------------------------
+// Marketing campaign allowance — why Marketing is the one track with a
+// RELATIVE cap instead of an absolute one
+// ---------------------------------------------------------------------------
+// Sales/Ops/R&D each cap at a fixed number of levels, so they can only ever
+// grow a business so far. Marketing used to have NO cap at all — the
+// reasoning being that each campaign costs real cash and fades after a few
+// months, so it would price itself out. It didn't: because a campaign's
+// boost is a % of current income and buyout offers are a multiple of ANNUAL
+// revenue (see BUSINESS_EXIT_MULTIPLIER_WEIGHTS above), a player sitting on
+// a big cash pile could stack campaign after campaign on one business,
+// spike its revenue far past anything the other tracks allow, and then cash
+// out a buyout offer priced off that inflated number. That's a genuine
+// exploit — unbounded, and the single biggest source of runaway wealth in
+// the game.
+//
+// The fix keeps Marketing uncapped in ABSOLUTE terms while tying it to real
+// business-building: every non-Marketing upgrade bought for a business
+// (each Sales level, each Ops level, each R&D project) earns that business
+// MARKETING_CAMPAIGNS_PER_UPGRADE campaigns, and every business starts with
+// MARKETING_FREE_CAMPAIGNS so a brand-new one can still advertise at all.
+// So a business with 2 R&D + 3 Ops + 1 Sales = 6 upgrades can run up to 12
+// campaigns; one with nothing else bought can run 2. Counted PER BUSINESS
+// (not across the portfolio), since that's the level every other cap works
+// at, and enforced in game/businessUpgrades.js's canUpgradeTrack — which
+// game/aiEngine.js already routes through, so robots are bound by the exact
+// same rule as human players.
+//
+// Note the cap counts campaigns LAUNCHED, not campaigns currently active —
+// letting expired ones free up room would just restore the exploit on a
+// slower clock.
+export const MARKETING_CAMPAIGNS_PER_UPGRADE = 2;
+export const MARKETING_FREE_CAMPAIGNS = 2;
 
 // A business is worth reinvesting in — that's the whole point of the four
 // tracks above — but it's also worth PENALIZING for being ignored: a
@@ -357,6 +391,25 @@ export const RENT_MIN_YIELD_FACTOR = 0.35;
 export const MIN_ASSET_PRICE = 5;
 
 // ---------------------------------------------------------------------------
+// Piggy Bank interest
+// ---------------------------------------------------------------------------
+// The Piggy Bank used to be purely a price-only asset: it held its value
+// through a storm and did nothing else. That made "saving" feel like a
+// punishment rather than a real (if unexciting) strategy. It now pays
+// interest every month — a deliberately tiny 0.1%-0.5% of what's parked in
+// it, so it never competes with a business or a rental, plus an occasional
+// better month (PIGGY_BONUS_CHANCE) at PIGGY_BONUS_* rates, standing in for
+// the bank's occasional bonus/promo rate. The rate is rolled once per month
+// on the ENVIRONMENT stream (see game/rng.js) and shared by every player at
+// the table, exactly like the weather — one bank, one rate, and identical
+// for everyone playing the same Daily Challenge.
+export const PIGGY_INTEREST_PCT_MIN = 0.001;
+export const PIGGY_INTEREST_PCT_MAX = 0.005;
+export const PIGGY_BONUS_CHANCE = 0.12;
+export const PIGGY_BONUS_PCT_MIN = 0.012;
+export const PIGGY_BONUS_PCT_MAX = 0.03;
+
+// ---------------------------------------------------------------------------
 // Assets — the four buyable "things that grow"
 // ---------------------------------------------------------------------------
 // kind is used by the AI to reason about risk, and by the UI for badges/labels.
@@ -367,12 +420,19 @@ export const ASSETS = [
     id: 'piggy',
     name: 'Piggy Bank',
     icon: '🐷',
-    tagline: 'Safe & steady',
+    tagline: 'Safe & steady — pays a little interest every month',
     kind: 'safe',
     basePrice: 50,
     volatility: 0.02,
     rentPerMonth: 0,
     riskLabel: 'Very Safe',
+    // Marks this asset as interest-bearing: each month it pays a small
+    // percentage of its CURRENT price per unit owned, rolled fresh on the
+    // environment stream (see players.js's rollMonthlyIncomeAmounts and the
+    // PIGGY_INTEREST_* / PIGGY_BONUS_* constants above). Any future
+    // interest-bearing asset only needs this flag — nothing else in the
+    // income pipeline is piggy-specific.
+    interestBearing: true,
   },
   {
     id: 'lemonade',
@@ -386,7 +446,7 @@ export const ASSETS = [
     riskLabel: 'Medium Risk',
     // Unlike a rent-bearing asset (Tree House), this one's per-unit
     // monthly income isn't derived from its price at all — it's rolled
-    // fresh every month (see players.js's rollWeatherIncomeAmounts) from
+    // fresh every month (see players.js's rollMonthlyIncomeAmounts) from
     // whichever range below matches the CURRENT weather stage, then
     // further nudged by the 3 lemonade-specific fortune cards (a one-time
     // perUnitCash bump — see decks.js/OPPORTUNITY_DECK+SETBACK_DECK below).

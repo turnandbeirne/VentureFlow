@@ -24,6 +24,7 @@ import MusicControl from './MusicControl';
 import Brand from './Brand';
 import VentureMakerLink from './VentureMakerLink';
 import LeaderboardModal from './LeaderboardModal';
+import RulebookModal from './RulebookModal';
 import InfoModal from './InfoModal';
 import UnlocksModal from './UnlocksModal';
 import CareerStatsModal from './CareerStatsModal';
@@ -53,6 +54,7 @@ export default function SetupScreen({ onStart }) {
     { personalityId: 'random', skillLevelId: 'random' },
   ]);
   const [showLeaderboard, setShowLeaderboard] = useState(false);
+  const [showRulebook, setShowRulebook] = useState(false);
   const [showUnlocks, setShowUnlocks] = useState(false);
   const [showCareerStats, setShowCareerStats] = useState(false);
   const [difficultyId, setDifficultyId] = useState(DEFAULT_DIFFICULTY_ID);
@@ -153,6 +155,14 @@ export default function SetupScreen({ onStart }) {
     });
   }
 
+  // Same rulebook the board's 📖 button opens — available before a game
+  // starts too, so a new player can read the rules first rather than only
+  // discovering them mid-game.
+  function openRulebook() {
+    playSound('click');
+    setShowRulebook(true);
+  }
+
   function openLeaderboard() {
     playSound('click');
     setShowLeaderboard(true);
@@ -181,6 +191,9 @@ export default function SetupScreen({ onStart }) {
         </button>
         <button type="button" className="vf-btn vf-btn--sm vf-btn--ghost" onClick={openLeaderboard}>
           🏆 Leaderboard
+        </button>
+        <button type="button" className="vf-btn vf-btn--sm vf-btn--ghost" onClick={openRulebook}>
+          📖 Rulebook
         </button>
       </div>
       <div className="vf-setup__inner">
@@ -427,6 +440,13 @@ export default function SetupScreen({ onStart }) {
       </div>
 
       <LeaderboardModal open={showLeaderboard} onClose={() => setShowLeaderboard(false)} />
+
+      <RulebookModal
+        open={showRulebook}
+        difficultyId={difficultyId}
+        scenarioId={scenarioId}
+        onClose={() => setShowRulebook(false)}
+      />
       <UnlocksModal
         open={showUnlocks}
         onClose={() => setShowUnlocks(false)}

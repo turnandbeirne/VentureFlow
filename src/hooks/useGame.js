@@ -73,6 +73,10 @@ export function useGame() {
     dispatch({ type: 'END_TURN', playerId });
   }, []);
 
+  const ackStartupLaunch = useCallback(() => {
+    dispatch({ type: 'ACK_STARTUP_LAUNCH' });
+  }, []);
+
   const ackFortuneCard = useCallback(() => {
     dispatch({ type: 'ACK_FORTUNE_CARD' });
   }, []);
@@ -100,6 +104,7 @@ export function useGame() {
     learnSkill,
     upgradeBusiness,
     endTurn,
+    ackStartupLaunch,
     ackFortuneCard,
     resolveExitOffer,
     sendChat,

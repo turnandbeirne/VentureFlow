@@ -22,12 +22,13 @@ import {
   GAME_LENGTH_MONTHS,
   MONTHLY_ALLOWANCE,
   BUSINESS_EXIT_RARITY_LABELS,
+  ASSETS,
 } from '../data/gameConfig';
 import { driftPrices } from './market';
 import { tickWeather, getStageInfo } from './weather';
 import { drawFortuneCard, applyCardEffect } from './decks';
 import { evaluateBadges } from './badges';
-import { netWorth, passiveIncomeBreakdown, rollWeatherIncomeAmounts } from './players';
+import { netWorth, passiveIncomeBreakdown, rollMonthlyIncomeAmounts } from './players';
 import { getScenario, checkScenarioObjective } from './scenarios';
 import { resolvePendingRnd, pruneExpiredBoosts, applyBusinessDecline } from './businessUpgrades';
 import { rollBusinessExit } from './businessExits';
@@ -260,12 +261,31 @@ function finishMonthEnd(state, players, logEntries, month, scenario, leaderBefor
   const fortuneRecap = extraFortuneRecap ? [extraFortuneRecap] : [];
 
   // 3) Roll this month's weather-driven per-unit income (Lemonade Stand —
-  // see players.js's rollWeatherIncomeAmounts) using the CURRENT (pre-tick)
+  // see players.js's rollMonthlyIncomeAmounts) using the CURRENT (pre-tick)
   // weather stage, since this is the income for the month that's ending.
   // Stored on nextState below so the UI shows a stable already-rolled
   // figure until the next month-end reroll, instead of re-rolling on every
   // render.
-  const weatherIncomeAmounts = rollWeatherIncomeAmounts(state.weather);
+  const weatherIncomeAmounts = rollMonthlyIncomeAmounts(state.weather);
+
+  // 3b) Call out an occasional better-than-usual interest month on any
+  // interest-bearing asset (currently just the Piggy Bank — see
+  // gameConfig.js's PIGGY_BONUS_CHANCE). Purely a heads-up: the higher rate
+  // is already baked into weatherIncomeAmounts above and gets paid through
+  // the normal passive-income path below, exactly like the ordinary rate.
+  // Only logged when someone at the table actually holds the asset, so it
+  // never reads as noise in a game where nobody's saving.
+  for (const asset of ASSETS) {
+    if (!asset.interestBearing) continue;
+    if (!weatherIncomeAmounts.interestBonus?.[asset.id]) continue;
+    if (!players.some((p) => (p.holdings[asset.id] || 0) > 0)) continue;
+    const ratePct = (weatherIncomeAmounts.interestRates[asset.id] * 100).toFixed(2);
+    logEntries.push({
+      icon: asset.icon,
+      message: `The bank paid a bonus rate this month — ${asset.name} savings earned ${ratePct}% instead of the usual trickle!`,
+      kind: 'interestBonus',
+    });
+  }
 
   // 4) Allowance + rent + business income + weather-driven asset income +
   // card bonuses. Allowance comes from the difficulty preset chosen at

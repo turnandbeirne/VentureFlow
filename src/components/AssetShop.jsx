@@ -1,6 +1,6 @@
 import { useCallback } from 'react';
 import { ASSETS, RENT_OVERSUPPLY_FREE_UNITS, WEATHER_STAGES, getAssetIncomeRange } from '../data/gameConfig';
-import { effectiveRentPerUnit, perUnitIncome, totalUnitsOwned } from '../game/players';
+import { effectiveRentPerUnit, perUnitIncome, totalUnitsOwned, interestRateFor, isInterestBonusMonth } from '../game/players';
 import { useHoldRepeat } from '../hooks/useHoldRepeat';
 
 /** A quick 1-4 dot risk meter from an asset's volatility, paired with its
@@ -38,6 +38,12 @@ function AssetCard({ asset, price, previousPrice, owned, cash, totalOwned, weath
   const canSellRef = useCallback(() => canSell, [canSell]);
   const buyHold = useHoldRepeat(onBuy, canBuyRef);
   const sellHold = useHoldRepeat(onSell, canSellRef);
+
+  // Interest-bearing assets (Piggy Bank) show this month's rate rather than
+  // a dollar figure, since the payout scales with the live price — see
+  // game/players.js's perUnitIncome/interestRateFor.
+  const interestRate = interestRateFor(asset, weatherIncomeAmounts);
+  const bonusMonth = isInterestBonusMonth(asset, weatherIncomeAmounts);
 
   return (
     <div className="vf-card vf-asset-card">
@@ -78,6 +84,15 @@ function AssetCard({ asset, price, previousPrice, owned, cash, totalOwned, weath
               <span className="vf-asset-card__income-range"> · Range: ${range[0]}–${range[1]}/mo each</span>
             ) : null;
           })()}
+        </span>
+      ) : asset.interestBearing ? (
+        <span
+          className={`vf-asset-card__interest ${bonusMonth ? 'vf-asset-card__interest--bonus' : ''}`}
+          title="Savings earn a small amount of interest every month. The rate is set by the bank, not by you — and once in a while it's better than usual."
+        >
+          {bonusMonth ? '🎉 ' : '🏦 '}
+          {(interestRate * 100).toFixed(2)}%/mo interest{bonusMonth && ' — bonus rate!'}
+          <span className="vf-asset-card__income-range"> · +${(price * interestRate).toFixed(2)}/mo each</span>
         </span>
       ) : (
         <span className="vf-asset-card__no-income">💵 Price only — no monthly income</span>

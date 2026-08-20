@@ -29,6 +29,14 @@ function worstBusinessHealth(player, month) {
 
 function PlayerCard({ player, prices, allPlayers, month, weatherIncomeAmounts, isActive, onSelect }) {
   const worstHealth = worstBusinessHealth(player, month);
+  // A robot's card opens the same portfolio modal, but read-only — so its
+  // button says what it actually does ("View businesses") instead of
+  // inviting the human to invest in someone else's company. The health
+  // warnings below are likewise a nudge aimed at the OWNER of the
+  // businesses, so they only appear on a human player's own card; a bot's
+  // neglected business is the bot's problem, and flagging it here would
+  // read as something the player is supposed to fix.
+  const isBot = player.type === 'ai';
   const playerNetWorth = netWorth(player, prices);
   // A <button> can't legally contain another <button> (the invest CTA
   // below), so the whole-card tap target is a div with button semantics
@@ -76,7 +84,9 @@ function PlayerCard({ player, prices, allPlayers, month, weatherIncomeAmounts, i
       <button
         type="button"
         className={`vf-btn vf-btn--sm vf-btn--block vf-player-card__invest-btn ${
-          worstHealth === 'declining'
+          isBot
+            ? 'vf-btn--ghost'
+            : worstHealth === 'declining'
             ? 'vf-btn--danger'
             : worstHealth === 'warning'
             ? 'vf-player-card__invest-btn--warning'
@@ -87,7 +97,9 @@ function PlayerCard({ player, prices, allPlayers, month, weatherIncomeAmounts, i
           onSelect();
         }}
       >
-        {worstHealth === 'declining'
+        {isBot
+          ? '🔍 View businesses'
+          : worstHealth === 'declining'
           ? '📉 A business is losing money — reinvest now!'
           : worstHealth === 'warning'
           ? '⚠️ A business needs attention soon'

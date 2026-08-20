@@ -26,6 +26,9 @@ function resolveSound(kind) {
   // achievement badge chime — see game/turnEngine.js for what triggers each.
   if (kind === 'businessUpgrade') return 'skill';
   if (kind === 'businessRnd') return 'badge';
+  // A bonus Piggy Bank interest month (see game/turnEngine.js) reuses the
+  // Piggy Bank's own cheerful little "boop" rather than getting a new sound.
+  if (kind === 'interestBonus') return 'buy_piggy';
   return null;
 }
 

@@ -133,8 +133,36 @@ export function gameReducer(state, action) {
     case 'SELL_ASSET':
       return withResult(sellAsset(state, action.playerId, action.assetId, action.qty));
 
-    case 'START_BUSINESS':
-      return withResult(startBusiness(state, action.playerId));
+    case 'START_BUSINESS': {
+      const result = startBusiness(state, action.playerId);
+      const next = withResult(result);
+      if (!result.ok) return next;
+      // A HUMAN player's new business gets a launch celebration (see
+      // components/StartupLaunchModal.jsx) — the reducer just records what
+      // to celebrate; the UI decides how. Deliberately human-only: a robot
+      // starting its fourth business shouldn't stop the table with a
+      // fireworks popup. The business is read back out of the RESULT state
+      // (rather than rebuilt here) so the name/income shown are exactly the
+      // ones actions.js rolled, with no second source of truth.
+      const player = next.players.find((p) => p.id === action.playerId);
+      if (player?.type !== 'human') return next;
+      const business = player.businesses[player.businesses.length - 1];
+      if (!business) return next;
+      return {
+        ...next,
+        pendingLaunch: {
+          playerId: player.id,
+          playerName: player.name,
+          avatar: player.avatar,
+          businessId: business.id,
+          businessName: business.name,
+          income: business.income,
+        },
+      };
+    }
+
+    case 'ACK_STARTUP_LAUNCH':
+      return state?.pendingLaunch ? { ...state, pendingLaunch: null } : state;
 
     case 'LEARN_SKILL':
       return withResult(learnSkill(state, action.playerId));

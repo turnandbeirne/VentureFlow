@@ -31,6 +31,8 @@ import {
   BUSINESS_DECLINE_PCT_MIN,
   BUSINESS_DECLINE_PCT_MAX,
   BUSINESS_DECLINE_INCOME_FLOOR,
+  MARKETING_CAMPAIGNS_PER_UPGRADE,
+  MARKETING_FREE_CAMPAIGNS,
 } from '../data/gameConfig';
 import { chance, randomFloat } from './rng';
 
@@ -64,19 +66,98 @@ export function upgradeCost(business, trackId) {
 }
 
 /**
+ * How many non-Marketing upgrades have been bought for this business — one
+ * per Sales level, one per Ops level, one per R&D project. This is what
+ * earns Marketing headroom (see marketingAllowance below).
+ */
+export function otherUpgradeCount(business) {
+  return (business.salesLevel || 0) + (business.opsLevel || 0) + (business.rndCount || 0);
+}
+
+/**
+ * How many Marketing campaigns this business has ever launched. Counts
+ * campaigns BOUGHT, not campaigns still running — an expired campaign does
+ * NOT free up room (see gameConfig.js's MARKETING_CAMPAIGNS_PER_UPGRADE
+ * comment for why that matters). Falls back to the number of recorded
+ * boosts for a business saved before this counter existed, which is the
+ * closest honest reading of its history available.
+ */
+export function marketingCampaignsUsed(business) {
+  return business.marketingCount ?? (business.tempBoosts || []).length;
+}
+
+/**
+ * The total number of Marketing campaigns this business is allowed to
+ * launch, ever: MARKETING_FREE_CAMPAIGNS to start with, then
+ * MARKETING_CAMPAIGNS_PER_UPGRADE for every non-Marketing upgrade bought
+ * for it. 0 other upgrades -> 2 campaigns; 3 -> 6; 6 -> 12.
+ */
+export function marketingAllowance(business) {
+  return Math.max(MARKETING_FREE_CAMPAIGNS, MARKETING_CAMPAIGNS_PER_UPGRADE * otherUpgradeCount(business));
+}
+
+/** How many more Marketing campaigns this business can still launch right
+ * now (never negative — an old save that already overshot the new cap is
+ * simply frozen out of more campaigns rather than being retroactively
+ * punished). */
+export function marketingRemaining(business) {
+  return Math.max(0, marketingAllowance(business) - marketingCampaignsUsed(business));
+}
+
+/**
  * Whether `trackId` has more room to grow for this business. Sales and
  * Operations cap out at a few levels each (steady, bounded climbs, so
  * income can't spiral); R&D caps at a couple of projects (each is a slow,
- * meaningful bet, not something to spam); Marketing has no cap of its own
- * since every purchase costs real cash and only ever helps for a few
- * months at a time.
+ * meaningful bet, not something to spam); Marketing caps RELATIVE to how
+ * much real building has been done on this business — see
+ * marketingAllowance above and gameConfig.js's MARKETING_CAMPAIGNS_PER_UPGRADE
+ * comment for the buyout exploit this closes. game/aiEngine.js builds its
+ * upgrade candidates through this same function, so robots are held to the
+ * identical limit.
  */
 export function canUpgradeTrack(business, trackId) {
   if (trackId === 'sales') return (business.salesLevel || 0) < SALES_MAX_LEVEL;
   if (trackId === 'ops') return (business.opsLevel || 0) < OPS_MAX_LEVEL;
   if (trackId === 'rnd') return (business.rndCount || 0) < RND_MAX_PROJECTS;
-  if (trackId === 'marketing') return true;
+  if (trackId === 'marketing') return marketingRemaining(business) > 0;
   return false;
+}
+
+/**
+ * How many more non-Marketing upgrades this business needs before its
+ * campaign allowance actually rises above what it has already spent.
+ *
+ * Usually 1 — but not always, and the exception is worth being precise
+ * about rather than hand-waving: because the allowance is
+ * `max(FREE, PER_UPGRADE x other)` rather than `FREE + PER_UPGRADE x
+ * other`, the starting campaigns are the same 2 that the first upgrade
+ * would have earned. So a brand-new business that has burned both of its
+ * free campaigns needs TWO other upgrades to unlock the next one, not one.
+ * Telling a player "buy one upgrade" there would be a lie they'd discover
+ * by spending $150.
+ */
+export function upgradesNeededForNextCampaign(business) {
+  if (marketingRemaining(business) > 0) return 0;
+  const used = marketingCampaignsUsed(business);
+  const other = otherUpgradeCount(business);
+  let needed = 1;
+  while (MARKETING_CAMPAIGNS_PER_UPGRADE * (other + needed) <= used) needed += 1;
+  return needed;
+}
+
+/**
+ * A player-facing explanation of why `trackId` can't be bought for this
+ * business right now, or null if it can. Marketing gets its own wording
+ * because "maxed out" is misleading for a cap that buying a different
+ * track will lift.
+ */
+export function upgradeBlockReason(business, trackId) {
+  if (canUpgradeTrack(business, trackId)) return null;
+  if (trackId === 'marketing') {
+    const needed = upgradesNeededForNextCampaign(business);
+    return `${business.name} has used all ${marketingAllowance(business)} of its Marketing campaigns. Buy ${needed} more Sales, Operations, or R&D upgrade${needed === 1 ? '' : 's'} to unlock more.`;
+  }
+  return null;
 }
 
 /**
@@ -122,10 +203,22 @@ export function applyUpgrade(business, trackId, currentMonth) {
     // so stacking campaigns can't inflate each other's roll.
     const { amount, pct } = percentOfIncome(business.income, MARKETING_BOOST_PCT_MIN, MARKETING_BOOST_PCT_MAX);
     const boost = { amount, expiresMonth: currentMonth + MARKETING_BOOST_MONTHS - 1 };
+    // marketingCount is a lifetime counter, deliberately never decremented
+    // when a boost expires — it's what the campaign allowance is measured
+    // against (see marketingAllowance above).
+    const marketingCount = marketingCampaignsUsed(business) + 1;
+    const nextBusiness = {
+      ...business,
+      totalInvested,
+      lastTendedMonth,
+      marketingCount,
+      tempBoosts: [...(business.tempBoosts || []), boost],
+    };
+    const left = marketingRemaining(nextBusiness);
     return {
-      business: { ...business, totalInvested, lastTendedMonth, tempBoosts: [...(business.tempBoosts || []), boost] },
+      business: nextBusiness,
       cost,
-      description: `ran a Marketing campaign for ${business.name} (+$${amount}/mo, ${Math.round(pct * 100)}% of revenue, for ${MARKETING_BOOST_MONTHS} months)`,
+      description: `ran a Marketing campaign for ${business.name} (+$${amount}/mo, ${Math.round(pct * 100)}% of revenue, for ${MARKETING_BOOST_MONTHS} months) — ${left} campaign${left === 1 ? '' : 's'} left`,
     };
   }
   if (trackId === 'sales') {

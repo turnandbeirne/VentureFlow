@@ -17,6 +17,8 @@ import VolumeControl from './VolumeControl';
 import MusicControl from './MusicControl';
 import Brand from './Brand';
 import LeaderboardModal from './LeaderboardModal';
+import RulebookModal from './RulebookModal';
+import StartupLaunchModal from './StartupLaunchModal';
 import PlayerDetailModal from './PlayerDetailModal';
 
 export default function GameBoard({ game }) {
@@ -36,6 +38,7 @@ export default function GameBoard({ game }) {
   } = state;
   const difficulty = getDifficulty(state.difficultyId);
   const [showLeaderboard, setShowLeaderboard] = useState(false);
+  const [showRulebook, setShowRulebook] = useState(false);
   const [selectedPlayerId, setSelectedPlayerId] = useState(null);
   const activePlayer = players[activePlayerIndex];
 
@@ -86,12 +89,27 @@ export default function GameBoard({ game }) {
               <button
                 type="button"
                 className="vf-btn vf-btn--sm vf-btn--ghost"
+                title="Leaderboard"
                 onClick={() => {
                   playSound('click');
                   setShowLeaderboard(true);
                 }}
               >
                 🏆
+              </button>
+              {/* Sits right next to the leaderboard so the rules are always
+                  one tap away, on every screen size, at any point in a game
+                  — see components/RulebookModal.jsx. */}
+              <button
+                type="button"
+                className="vf-btn vf-btn--sm vf-btn--ghost"
+                title="Rulebook — how everything works"
+                onClick={() => {
+                  playSound('click');
+                  setShowRulebook(true);
+                }}
+              >
+                📖
               </button>
               <span className="vf-pill" title={difficulty.tagline}>
                 {difficulty.icon} {difficulty.name}
@@ -182,6 +200,20 @@ export default function GameBoard({ game }) {
       )}
 
       <LeaderboardModal open={showLeaderboard} onClose={() => setShowLeaderboard(false)} />
+
+      <RulebookModal
+        open={showRulebook}
+        difficultyId={state.difficultyId}
+        scenarioId={state.scenarioId}
+        onClose={() => setShowRulebook(false)}
+      />
+
+      {/* Launch celebration for a business a human just started. Rendered
+          last so it sits above the portfolio modal the player almost
+          certainly has open behind it. */}
+      {state.pendingLaunch && (
+        <StartupLaunchModal launch={state.pendingLaunch} onContinue={game.ackStartupLaunch} />
+      )}
 
       {selectedPlayer && (
         <PlayerDetailModal

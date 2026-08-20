@@ -1452,3 +1452,225 @@ to detect the new message wording). The existing
 accept/decline against a directly-injected offer object rather than
 deriving one from the multiplier math, so it stayed valid across the
 switch.
+
+## Marketing campaigns are capped relative to real business-building
+
+**The bug.** Marketing was the one upgrade track with no cap at all. The
+reasoning at the time was that each campaign costs real cash and fades after
+`MARKETING_BOOST_MONTHS`, so it would price itself out. It didn't. Because a
+campaign's boost is a *percentage of current income*, and because a buyout
+offer is a multiple of **annual** revenue (see "Buyout offers are now a
+multiple of annual revenue, not monthly"), a player sitting on a cash pile
+could stack campaign after campaign on one business, spike its revenue far
+past anything the capped tracks allow, and then cash out a buyout priced off
+that inflated number. Unbounded input, multiplied output — the single biggest
+source of runaway wealth in the game, and reported as game-breaking.
+
+**The fix.** Marketing is now capped *relative to* how much real building has
+been done on that business, rather than by an absolute number:
+
+```
+campaigns allowed = max(MARKETING_FREE_CAMPAIGNS,
+                        MARKETING_CAMPAIGNS_PER_UPGRADE × (Sales + Ops + R&D))
+                  = max(2, 2 × other upgrades)
+```
+
+So 2 R&D + 3 Ops + 1 Sales = 6 upgrades → 12 campaigns; 3 upgrades → 6; a
+brand-new business with nothing else bought → 2, so it can still advertise at
+all. Counted **per business**, which is the level every other cap already
+works at, and applied identically to robots — `game/aiEngine.js` builds its
+upgrade candidates through `canUpgradeTrack()`, so no separate AI change was
+needed and no amount of bot cash can push past the limit.
+
+Two details worth knowing:
+
+- **Expired campaigns do not free up room.** The counter
+  (`business.marketingCount`) is a lifetime tally, never decremented when a
+  boost expires. Letting expired campaigns free up headroom would just
+  restore the same exploit on a slower clock.
+- **The starting 2 are the same 2 the first upgrade would have earned** —
+  it's `max(…)`, not `2 + 2 × n`. That means a brand-new business that has
+  burned both free campaigns needs *two* other upgrades before the next
+  campaign unlocks, not one. Rather than paper over that,
+  `upgradesNeededForNextCampaign()` computes the honest number and both the
+  error toast and the in-modal note quote it ("Buy 2 more Sales, Operations,
+  or R&D upgrades to unlock more"), so the advice a player is given is always
+  true.
+
+In the portfolio, Marketing now shows a **"📣 Campaigns 2/6"** chip alongside
+the existing Sales/Ops/R&D level chips — turning red, with an explanatory
+line, once it's exhausted. Each campaign's log entry also reports how many
+are left.
+
+A game saved before this change with, say, nine stacked campaigns isn't
+retroactively punished — `marketingCampaignsUsed()` falls back to the recorded
+boost count, `marketingRemaining()` floors at 0, and that business is simply
+frozen out of further campaigns.
+
+## Hold-to-repeat now works on the business investment buttons too
+
+"Hold Buy/Sell to go faster" already existed in the asset shop
+(`hooks/useHoldRepeat.js`) but had never been wired to the four business
+upgrade buttons inside the player portfolio, so growing a business to Sales
+Lv3 + Ops Lv3 meant six separate round-trips through the modal. Each upgrade
+button is now its own `UpgradeButton` component (a hook can't be called in a
+loop) using the same hook: a tap buys one, a hold auto-repeats and
+accelerates.
+
+The `canFire()` guard is re-read before every repeat tick, so a hold stops
+cleanly the instant the track hits its cap or the cash runs out instead of
+hammering an action that would only produce an error toast — verified in the
+browser: holding Operations bought exactly 3 levels and stopped, and holding
+Marketing afterwards bought exactly the 6 campaigns those 3 upgrades had just
+unlocked, then stopped.
+
+"📚 Learn Skill" got the same treatment. **"🚀 Start Business" deliberately
+did not** — it opens the full-screen launch celebration below, and
+auto-repeating that would stack popups nobody asked for.
+
+One related change: `handleUpgrade` no longer plays its own `click` sound. An
+upgrade already gets a sound from the log entry it produces
+(`hooks/useGameSounds.js` maps `businessUpgrade` → the level-up chime), and
+at repeat speed a second layered click became noise.
+
+## Bot player cards say "View businesses"
+
+A robot's card opens the same portfolio modal, but read-only — so its button
+now reads **"🔍 View businesses"** instead of "⚙️ Invest in your
+businesses!", which is still what a human player's own card says. The
+business-health warnings ("📉 A business is losing money — reinvest now!")
+are likewise a nudge aimed at the *owner*, so they no longer appear on a
+bot's card; a robot's neglected business is the robot's problem, and flagging
+it there read as something the player was supposed to fix.
+
+## The Piggy Bank pays interest
+
+The Piggy Bank used to be purely price-only: it held its value through a
+storm and did nothing else, which made "saving" feel like a punishment rather
+than a real, if unexciting, strategy. It now pays interest every month:
+
+- **0.1%–0.5% of what's parked in it**, monthly — deliberately tiny, so it
+  never competes with a business or a rental. That's the lesson, not a
+  balance oversight: savings are safe and slow.
+- **Roughly a 12% chance of a better month** at 1.2%–3%, standing in for a
+  bank's occasional bonus or promo rate. When it happens *and* somebody at
+  the table actually holds Piggy Banks, it's called out in the event log with
+  the real rate quoted.
+
+Mechanically this generalizes rather than special-cases: an asset opts in with
+an `interestBearing: true` flag in `gameConfig.js`, and `perUnitIncome()`
+gains one branch that pays `price × thisMonth'sRate`. Because it's driven off
+the asset's *live* price rather than a fixed amount, what's stored per month
+is the **rate**, not a dollar figure.
+
+`rollWeatherIncomeAmounts()` is accordingly renamed
+**`rollMonthlyIncomeAmounts()`** — it now rolls both the weather-driven
+per-unit amounts (Lemonade Stand) and the interest rates, under
+`interestRates[assetId]` / `interestBonus[assetId]`. The state field it
+writes to keeps its old name (`weatherIncomeAmounts`) on purpose: renaming it
+would strand every game already saved in `localStorage`.
+
+The rate is drawn on the **environment** stream (`game/rng.js`), like the
+weather — one bank, one rate, shared by everyone at the table and identical
+for everyone playing the same Daily Challenge. The bonus coin-flip and both
+candidate rates are drawn unconditionally in a fixed order, so the stream's
+position can never depend on which branch was taken (the same discipline
+`game/businessExits.js` follows).
+
+The asset shop and portfolio no longer label the Piggy Bank "price only, no
+monthly income" — they show this month's rate and the per-unit cash it works
+out to. Only the Treasure Chest is genuinely price-only now.
+
+## An in-game rulebook
+
+A **📖 Rulebook** button now sits directly beside the 🏆 leaderboard button on
+the board, so the full rules are one tap away at any point in a game — plus
+the same button on the setup screen, for reading before starting.
+`components/RulebookModal.jsx` renders ten tabbed sections: the goal, how a
+turn works, where money comes from, what you can buy, starting a business,
+growing a business, neglect and decline, buyout offers, the weather, badges,
+and five closing strategy tips.
+
+The important design decision is that **every number in it is read live from
+`gameConfig.js`** rather than typed out. `data/rulebook.js` is a *builder*
+(`buildRulebook({ difficultyId, scenarioId })`) that returns the rulebook as
+plain data — paragraphs, lists, and two-column reference rows — computed from
+the actual constants and from the current game's difficulty and scenario. A
+player reading the rulebook mid-game sees the figures actually in play, and
+retuning any constant re-renders the rulebook with the new value on the next
+build. It cannot drift out of sync with the rules it describes, which a
+hand-written rules page inevitably would.
+
+## A startup launch celebration
+
+When a **human** player starts a business, the game now pauses on a
+celebration: "*<Player>*'s startup launches!", an illustrated storefront
+matched to the business's name, the passive cash it will pay every month, a
+one-line explanation of what passive income actually means, and a burst of
+fireworks (reusing `Fireworks.jsx` and the `fireworks` + `cheering` sounds
+from the game-over fanfare).
+
+It's a full-stop modal rather than a toast on purpose: starting a business is
+the single most expensive decision in the game — cash *and* a skill token —
+and it's the moment the "passive income" idea the whole game is teaching
+becomes concrete. Worth a beat of attention rather than a line that scrolls
+past in the event log. Robots don't trigger it; a bot starting its fourth
+business shouldn't stop the table.
+
+**The artwork** comes from `game/businessArt.js`, which reads the *trade* out
+of a business's randomly-generated name ("Auntie Betty's **Bakery**", "The
+Zippy Koala **Rock Collecting Club**") and returns a hero emoji, two
+supporting props, and a gradient. Emoji rather than image files because the
+game ships as a static bundle with no image assets and no network calls, and
+the rest of the UI is already emoji-first — a keyword lookup gives all 500
+names a genuinely relevant picture with zero bytes of art to load.
+
+Matching is longest-keyword-first, in two tiers: specific trades first, then
+generic fallbacks. Two tiers are necessary because "most specific wins" and
+"longest keyword wins" disagree exactly there — "Cookie Company" would match
+the 7-letter generic `company` over the 6-letter specific `cookie`, and
+"Kayak Rental" the 6-letter `rental` over the 5-letter `kayak`. A test asserts
+that **all 500 names** resolve, and that **none** falls through to the generic
+storefront.
+
+State-wise the reducer records `state.pendingLaunch` on a human
+`START_BUSINESS` and clears it on `ACK_STARTUP_LAUNCH` — the engine records
+*what* to celebrate, the UI decides *how*. The business is read back out of
+the result state rather than rebuilt, so the name and income shown are exactly
+the ones `actions.js` rolled.
+
+## Verification for this round
+
+`scripts/test-update.mjs` (run it with
+`node --import ./scripts/register-loader.mjs scripts/test-update.mjs` — the
+loader hook lets plain Node resolve the app's extensionless imports) exercises
+the **actual exported engine functions**, never a re-implementation of the
+rule under test. 20 checks covering:
+
+- the campaign allowance at 0 / 3 / 6 other upgrades, including the user's
+  worked example (2 R&D + 3 Ops + 1 Sales → 12);
+- that expired campaigns don't free up room, and that a pre-cap save is
+  frozen rather than punished;
+- that `upgradesNeededForNextCampaign()`'s advice is *true* — buying that
+  many other upgrades genuinely re-opens Marketing, and buying one fewer
+  doesn't;
+- that a blocked upgrade doesn't charge the player;
+- that a cash-loaded robot, run for 40 turns, never exceeds the cap;
+- the hold-to-repeat guard contract (the repeat loop terminates exactly at
+  each track's cap);
+- interest rates always landing in the normal or bonus band across 3,000
+  rolled months, bonuses occurring at roughly the configured rate, interest
+  scaling with the live price, and interest actually reaching a saver's
+  payday;
+- the bonus-month callout firing for a saver and staying silent when nobody
+  at the table holds any;
+- all 500 business names resolving to art, and specific trades beating
+  generic words;
+- a human launch queuing `pendingLaunch` and a robot launch not.
+
+Also verified in a real browser (Playwright against the production build):
+the rulebook opens and tabs from both screens, the launch modal renders with
+matching art and fireworks, bot cards read "View businesses", the Piggy Bank
+shows its live rate in the shop and portfolio, holding Operations buys exactly
+3 levels and stops, holding Marketing afterwards buys exactly the 6 unlocked
+campaigns and stops, and 12 full months play through with no console errors.
