@@ -395,3 +395,33 @@
 .vf-setup__back {
   margin-bottom: 0.5rem;
 }
+
+/* Turn-timer opt-in ---------------------------------------------------------- */
+.vf-timer-option {
+  padding: 0.85rem 1rem;
+  background: var(--vf-white);
+}
+
+.vf-timer-option__row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+  cursor: pointer;
+}
+
+.vf-timer-option__row input {
+  margin-top: 0.2rem;
+  width: 20px;
+  height: 20px;
+  accent-color: var(--vf-teal);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.vf-timer-option__blurb {
+  display: block;
+  margin-top: 0.2rem;
+  font-size: 0.8rem;
+  line-height: 1.4;
+  color: var(--vf-ink-soft);
+}

@@ -7,6 +7,7 @@ import { isOffensiveName } from '../game/nameFilter';
 import { playSound } from '../audio/soundEngine';
 import { playMusicTrack } from '../audio/musicEngine';
 import { useLeaderboard } from '../hooks/useLeaderboard';
+import { useGlobalLeaderboard } from '../hooks/useGlobalLeaderboard';
 import { buildInsights } from '../game/insights';
 import VolumeControl from './VolumeControl';
 import MusicControl from './MusicControl';
@@ -33,6 +34,10 @@ export default function GameOverScreen({ state, onPlayAgain, onRecordProfileResu
   const closingChat = (state.chat || []).filter((c) => c.category === 'gloat' || c.category === 'applause').slice(-4);
 
   const { addEntry } = useLeaderboard();
+  // `enabled: false` — this hook is only here to SUBMIT. Fetching the board
+  // on the game-over screen would be a network round-trip nobody asked for.
+  const globalBoard = useGlobalLeaderboard({ enabled: false });
+  const [globalStatus, setGlobalStatus] = useState(null); // null | 'saving' | 'saved' | 'failed'
   const [scoreName, setScoreName] = useState(winner.name);
   const [scoreEmail, setScoreEmail] = useState('');
   const [nameError, setNameError] = useState(false);
@@ -118,6 +123,29 @@ export default function GameOverScreen({ state, onPlayAgain, onRecordProfileResu
     });
     setSavedEntryId(entry.id);
     setSavedRank(entry.rank);
+
+    // Also publish to the shared board, so the score survives this browser
+    // and shows up for other players. Deliberately fire-and-report rather
+    // than awaited: the local save has already succeeded and the
+    // celebration should not wait on the network. The email typed above is
+    // NOT sent — it stays local, in localStorage; a public, unauthenticated
+    // table is no place for it.
+    if (globalBoard.available) {
+      setGlobalStatus('saving');
+      globalBoard
+        .submit({
+          name: trimmed,
+          avatar: winner.avatar,
+          netWorth: netWorth(winner, assetPrices),
+          mode: mode?.type,
+          difficultyId,
+          scenarioId,
+          weatherSeverityId: state.weatherSeverityId,
+          dailyChallengeDate: dailyChallengeDate || null,
+          monthsPlayed: state.totalMonths,
+        })
+        .then((saved) => setGlobalStatus(saved ? 'saved' : 'failed'));
+    }
     // A Top 20 finish gets the bigger celebration; everyone else still gets
     // the regular save-confirmation chime.
     if (entry.rank >= 1 && entry.rank <= LEADERBOARD_TOP_HIGHLIGHT) {
@@ -166,6 +194,13 @@ export default function GameOverScreen({ state, onPlayAgain, onRecordProfileResu
       <div className="vf-topbar-corner">
         <VolumeControl />
         <MusicControl />
+        {/* A second Play Again, up here as well as at the very bottom. The
+            game-over screen is long — standings, the net-worth chart, the
+            insights, the save-your-score form — and someone who just wants
+            another game should not have to scroll past all of it first. */}
+        <button type="button" className="vf-btn vf-btn--sm vf-btn--go" onClick={handlePlayAgain}>
+          🔁 Play Again
+        </button>
       </div>
       <div className="vf-card vf-gameover__inner">
         <Brand size="md" align="center" />
@@ -266,6 +301,15 @@ export default function GameOverScreen({ state, onPlayAgain, onRecordProfileResu
             {savedEntryId ? '🎉 Added to the Leaderboard!' : `🏆 ${winner.avatar} Add your win to the Leaderboard!`}
           </div>
 
+          {savedEntryId && globalStatus && (
+            <p className="vf-save-score__global">
+              {globalStatus === 'saving'
+                ? '🌍 Publishing to the global leaderboard…'
+                : globalStatus === 'saved'
+                ? '🌍 Published to the global leaderboard — other players can see it now.'
+                : "🌍 Couldn't reach the global leaderboard, so this one is saved on this device only."}
+            </p>
+          )}
           {savedEntryId ? (
             <>
               <p className="vf-save-score__success">Nice work, {scoreName}! Your score is saved.</p>

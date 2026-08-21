@@ -1865,3 +1865,329 @@ in a burst, the speed slider produces a measured 3-vs-20 entry difference over
 the same 5 seconds, Customize → Back works, and the upkeep campaign goes
 through once and is then correctly refused with the "already run this month's
 upkeep campaign" wording.
+
+## The fortune cards grew up
+
+Three problems with the old decks, all reported from real play.
+
+**1. Asset cards paid people who owned nothing.** "Tree House Tourists, +$50"
+paid a player who had never bought a Tree House; "Piggy Bank Interest, +$25"
+paid someone with no savings. That is backwards for a game whose entire
+lesson is that money comes from what you own. Every card themed around an
+asset now expresses itself through `perUnitCash` or `assetUnits`, which scale
+with holdings and cleanly no-op for everyone else — with an honest log line
+("no Tree Houses owned — no effect") rather than a blank one. `assetPrice` is
+the deliberate exception: it's market news, it moves the shared price table,
+so it only ever matters to holders anyway. There's a test that walks every
+card in both decks and fails if any card mixes flat cash with an
+asset-specific effect.
+
+**2. Treasure cards did nothing you could feel.** They only moved a price, so
+drawing one produced no visible personal outcome. They now pair the market
+move with a per-unit cash effect, so a collectors' rush actually pays the
+people holding chests.
+
+**3. Setbacks were trivial.** "Lost library book, -$15" is a rounding error,
+not a financial lesson. The setback deck now contains the kinds of thing that
+genuinely derail a small operation, which needed four new effect types in the
+engine:
+
+| Effect | What it does |
+| --- | --- |
+| `assetUnits` | Lose (or gain) a % of the UNITS held. A bank failure takes 12% of your Piggy Banks — permanently, not a dip you can wait out. |
+| `businessIncomePercent` | A permanent % change to your most valuable business. A partnership splitting really does halve it. |
+| `businessPause` | Your businesses earn nothing for N months — broken equipment, nobody to do the work. |
+| `allowanceModifier` | Your allowance changes for N months, then reverts on its own. Stacks if two land at once. |
+
+Sixteen cards in each deck, each with a real-world concept attached (a single
+point of failure, concentration risk, margin squeeze, deposit protection).
+Setbacks are survivable by construction: `businessIncomePercent` floors at
+`BUSINESS_DECLINE_INCOME_FLOOR`, allowance modifiers floor at $0, and nothing
+already bought is ever confiscated.
+
+The temporary shocks are shown on the player's own card — "🛑 No business
+income · 1 mo", "📉 Allowance -50%" — because the card that caused them has
+long since scrolled out of the event log, and a player whose income silently
+halves needs to be able to find out why.
+
+## The weather now moves businesses, and how hard is a setup choice
+
+Businesses previously ignored the weather **entirely**. A recession that
+leaves your companies untouched isn't a recession, and it made "start
+businesses, ignore the sky" the only strategy worth playing.
+
+Each weather stage gained a `businessIncomeFactor` (Sunny Boom +12%, Stormy
+Bust -22%, and so on), and **Weather severity** is now picked at setup —
+🌤️ Gentle / 🌦️ Normal / 🌧️ Rough / ⛈️ Severe. The multiplier scales the
+distance from neutral, so Gentle pulls every effect toward zero and Severe
+pushes it out, and neither can flip a boom into a bust. At Severe, a Stormy
+Bust costs a business 55% of its revenue; at Gentle it costs 11%.
+
+The same multiplier scales price moves — **both** the directional drift and
+each asset's own random swing, since scaling only the drift would make a
+"severe" economy relentlessly one-directional rather than genuinely volatile.
+
+Implementation note: the business factor is folded into the per-month
+`weatherIncomeAmounts` object that every screen already receives, exactly like
+the Piggy Bank's interest rate. That meant no new plumbing through the dozen
+call sites that build an income context. Severity lives in game state, not a
+device preference — every seat has to share one economy.
+
+The sidebar weather card now states the figure outright ("🚀 Business revenue
+-30% this month"), because an invisible 30% cut reads as a bug.
+
+## Lemonade stands, rebalanced
+
+At the old ranges a Sunny Boom stand averaged ~$26/mo on a $75 asset — a 35%
+**monthly** yield, which made lemonade strictly better than everything else
+and turned good weather into a formality.
+
+The ceiling is deliberately unchanged (a heat wave should still feel like a
+windfall); what changed is the typical month. The ranges came down, and the
+roll is now the **lower of two draws** — a triangular distribution whose mode
+sits at the bottom of the range while the top stays reachable when both draws
+come in high. A Sunny Boom stand now typically pays ~$18 and can still spike
+to $34.
+
+Both draws happen unconditionally, every time, so the environment stream's
+position never depends on the weather or on anything a player did.
+
+## The event log stops drowning in "bought a Piggy Bank"
+
+Press-and-hold could produce eighty consecutive identical log lines, burying
+everything worth reading. Repeated trades of the same asset now fold into one
+line that grows in place — "bought 14 Piggy Banks" — merged across the whole
+turn rather than only consecutively, so alternating between two assets still
+collapses to two lines.
+
+Deliberately scoped to trades only: a robot's stepped turn is supposed to show
+one readable line per decision, and merging distinct actions would undo that.
+Scoped to one turn and one player, so nobody's spree merges into anybody
+else's. A penalised sale (below) opts out of merging — the fee is the
+interesting part and folding it away would hide it.
+
+## A same-turn resale fee
+
+Selling something you bought **this turn** returns 10% less. Prices only move
+at month-end, so buying and instantly selling was previously a free option —
+the shop worked as a scratchpad at zero cost. It also mirrors something real:
+a spread, a restocking fee, a dealer's margin. You never get back quite what
+you just paid.
+
+Only the units bought this turn are penalised; anything held since an earlier
+month sells at full price in the same transaction. The tally is stamped with
+the turn it belongs to (`game/turnClock.js`) rather than reset at each
+hand-off — a counter that clears itself can't be left stale by a code path
+that forgot to reset it. Sold units are removed from the tally so the same
+ones can't be penalised twice.
+
+The shop warns before the fact ("↩️ 2 bought this turn · sells back 10%
+lower") rather than letting the player discover it from the receipt.
+
+## Sound: a pool per asset, and a button that feels like a button
+
+Every asset now draws from a **weighted pool** of character sounds rather than
+repeating one blip:
+
+- **Piggy Bank** — oink, slurp, bubble pop, a tiny cheer, a contented "ahh",
+  munching, a belch, and a genuinely rare fart (~2%).
+- **Lemonade Stands & More** — service bell, cash register cha-ching, delivery
+  horn, blender, "order up!" dings, coins in the tin, ice into a cup.
+- **Tree House** — hammering, handsaw, paint roller, doorbell, a distant
+  mower, birdsong, an unimpressed cat, and a rare Tarzan yodel (~3%).
+- **Treasure Chest** — sparkle cascade, creaking lid, tumbling gems, one deep
+  expensive chime.
+
+Selling reuses the same pool at lower gain, so an asset still sounds like
+itself on the way out without a sale feeling like a celebration. The weights
+are what make the joke sounds land — they're rare enough to be a surprise.
+
+Randomness here is plain `Math.random`, unlike everything in `src/game/`:
+sound is pure presentation, never stored in state, and nothing downstream
+depends on which variant played.
+
+Separately, every press of Buy or Sell now gets a very short punchy "thock"
+and a ring that flashes out from the button's border, with the button
+depressing into its own shadow for as long as it's held. The ring is keyed on
+a press counter so React remounts it each time — a CSS animation only replays
+if the node is new, which is what makes a rapid repeat flash on every press
+instead of only the first.
+
+This also fills a gap the log-coalescing change opened: since repeats no
+longer append a log entry, only the first buy in a burst plays the asset's
+character sound. Now the burst is one "cha-ching" topped with tight clicky
+feedback on every press, rather than either silence or twenty cha-chings.
+
+## Bots repeat themselves far less
+
+A personality with eight `compliment` lines was noticeably recycling them
+within a single game. A line (or a sound effect) is now off the table for six
+turns after it's used, measured in real turns rather than months so it works
+the same at a four-player table. The transcript in `state.chat` IS the memory
+— no new field. If every line in a category is on cooldown it falls back to
+the full bank: repeating beats a bot falling silent for no visible reason.
+
+While in there, every probability gate in `chatEngine.js` moved from
+`Math.random()` to the seeded stream. Chat is stored in game state, so raw
+entropy meant two clients replaying the same actions would end up with
+different state — and it had already made Daily Challenge chat
+non-reproducible.
+
+## Up to four players, and an optional turn clock
+
+Both modes now seat **4**: you against up to 3 robots, or up to 4 humans
+passing one device. Seven bot personalities already existed, so three distinct
+opponents was never a constraint.
+
+**The turn timer** is off by default and switched on at setup: 30 seconds a
+turn, with a `+30s` button each player can use 4 times across the whole game.
+When time runs out the turn simply **ends** — no penalty, nothing already
+bought is undone. It exists to keep a four-player game moving, not to punish
+someone who was thinking.
+
+Extensions are tracked per player rather than per table, so one slow player
+can't spend everybody else's. Some deliberate details:
+
+- The timer lives in **game state**, not a device preference (unlike play
+  speed) — every seat has to play by the same rule, and it must survive a
+  reload.
+- The deadline is a wall-clock timestamp **computed by the UI and passed into
+  the reducer**, never read from `Date.now()` inside it. That keeps the
+  reducer a pure function of `(state, action)` — the property the whole online
+  multiplayer plan rests on — and means a broadcast action would carry the
+  same deadline to every client instead of each inventing its own.
+- A resumed save clears the deadline. It's wall-clock, so a game reopened an
+  hour later would otherwise start with the clock already expired.
+- Restarting a running clock is a no-op, so a stray re-render can't quietly
+  hand out extra time; and only the seat actually on the clock can spend its
+  own extension.
+
+## A shared leaderboard that survives a new browser
+
+The local leaderboard is `localStorage` — per browser **and** per origin,
+which is why a friend who played saw nobody but themselves, and why moving the
+game to a new domain looks like the board was wiped. There are now two extra
+tabs, **🌍 Global** and **🌍 Today**, backed by one Supabase table.
+
+This needed no part of the VentureMaker Arena work: a shared score list and
+playing together are unrelated problems.
+
+`game/globalLeaderboard.js` talks to PostgREST over plain `fetch` rather than
+pulling in `@supabase/supabase-js` — the whole interaction is a GET and a
+POST, and the game's promise is that it works offline once loaded, so a ~40kB
+client and its dependencies isn't a trade worth making. **Every call fails
+soft**: no network error, blocked request, or missing configuration is allowed
+to break a game that just ended. The tab says so honestly ("Couldn't reach the
+global leaderboard — your own scores are safe on the other tabs") and the
+local board keeps working.
+
+The publishable key in that file is meant to be public; what guards the table
+is its row-level security policy. Verified against the live database as the
+`anon` role: it can insert a score and read the board, and it **cannot** update
+or delete anything (0 rows affected — there is deliberately no such policy).
+The CHECK constraints — name length, plausible net worth, known mode — reject
+garbage at the database rather than trusting the client. They can't stop a
+determined person from posting a fake score and aren't meant to; they stop
+accidental garbage and the obviously impossible.
+
+The email field on the local save is **not** sent. A public, unauthenticated,
+readable table is no place for an address somebody typed in.
+
+## Fixes carried in with this round
+
+- **Old saves crashed at the first month-end, unrecoverably.** A save made
+  before `netWorthHistory` existed threw "not iterable" and, since the game
+  auto-resumes with no error boundary, gave a white screen on every load until
+  storage was cleared by hand. Migration now happens once, in one place
+  (`persistence.js`'s `normalizeState`), backfilling every field added since
+  the first release — plus defensive fallbacks at the engine's spread sites,
+  since a state can now also arrive from an Arena replay.
+- **The marketing cap silently reset on legacy saves.** The fallback read
+  `tempBoosts.length`, but month-end pruning deletes exactly that history, so
+  an old business got its campaigns back at the first month boundary.
+  `marketingCount` is now recovered at load, before any pruning can destroy
+  it — the only moment that number is still knowable.
+- **`END_TURN` was not idempotent.** It resolved the seat by id rather than
+  checking it was the active one, so a repeated dispatch — a double-click, or
+  the ordinary duplicate-delivery case once actions are broadcast — ran
+  month-end twice: two paydays, two card rounds, the calendar jumping two
+  months. An unknown id was worse: `findIndex` returned -1 and the turn
+  silently snapped back to the first seat.
+- **`RUN_AI_TURN` left stale stepped-turn bookkeeping**, which would make the
+  next `RUN_AI_STEP` think the robot was out of moves and skip its whole turn.
+- **Buyouts counted temporary Marketing boosts.** Three live campaigns could
+  value a business ~90% above its real revenue, and since the payout is
+  `12 × multiplier × income`, that inflation arrived multiplied. Offers are now
+  priced off permanent revenue — which is what a buyer would do anyway; nobody
+  values a company on the month it happened to be running an ad.
+- **RNG state now survives a reload.** The streams live outside game state, so
+  a refresh silently jumped to a fresh entropy-seeded sequence. That quietly
+  broke the Daily Challenge's whole promise: anyone who reloaded mid-run
+  continued on a different weather/card timeline and still saved into that
+  day's leaderboard segment. Both cursors are saved and restored, which is
+  also the first step toward the reducer being genuinely pure.
+- **A `GameBoard` effect depended on a `game` object App rebuilt every
+  render**, which cleared and restarted the fortune-recap timer each time.
+  Harmless only by luck; at the fastest speed any future ticking state in App
+  would have restarted the timer faster than it could fire and hung the game
+  on the recap screen.
+- **The setup screen's corner toolbar was swallowing clicks** beneath it.
+- **A `Play Again` button now sits in the game-over header** as well as at the
+  bottom. That screen is long — standings, chart, insights, save form — and
+  someone who just wants another game shouldn't scroll past all of it.
+
+One bug in this round's own work is worth recording because only the browser
+caught it: `sameTurnBuys` was initially declared above `activePlayer`, which it
+reads. Vite builds a temporal-dead-zone reference like that without complaint;
+it only surfaced as a blank board under Playwright.
+
+## Verification for this round
+
+`npm run test` is now **59 checks**. New coverage:
+
+- every card in both decks audited for the flat-cash-with-asset-flavour bug;
+  an asset card paying a holder and explaining itself to a non-holder; a bank
+  failure taking real units, rounding away from zero, never below zero, never
+  from a non-saver; a partnership split hitting only the most valuable
+  business and respecting the floor; equipment failure zeroing income for
+  exactly one payday; allowance modifiers stacking and expiring; and a full
+  month-end proving both shocks reach real cash and the ledger explains them;
+- weather moving business revenue, scaled by severity, reaching actual income,
+  and defaulting to no effect for a save with no weather rolled; severity
+  never flipping a drift's direction; severe storms measurably dragging prices
+  further than gentle ones;
+- lemonade's distribution: every roll in range, the mean below the midpoint,
+  the surge still reachable, and a guard against drifting back toward the old
+  ~$26 average;
+- buyouts valued on permanent income with a large live boost present;
+- 26 purchases collapsing to 2 log lines while every purchase still happens,
+  and a different seat's identical purchase refusing to merge;
+- the resale fee: a same-turn round trip always costing money, older holdings
+  selling at full price, a mixed sale penalising only the right units, and the
+  same units never penalised twice;
+- the turn timer: only the active seat can start or extend it, restarting is a
+  no-op, extensions run out per player and leave other players' pools alone,
+  and a hand-off clears the clock;
+- 4-seat tables in both modes with no duplicate bot personalities;
+- `END_TURN` idempotency and stale-seat rejection;
+- a genuine pre-`netWorthHistory` save loading and surviving a month-end, and a
+  legacy business not getting free campaigns back after pruning;
+- 30 turns of bot chat with zero repeats inside the 6-turn cooldown, and a
+  source check that `chatEngine.js` contains no `Math.random`;
+- every asset's sound pool producing valid, varied recipes across 300 draws
+  per pool, and the button press being short enough to repeat.
+
+In a browser against the production build: a 4-seat game with the timer
+running (30s → 59s after an extension, 3 left), 8 buys reading as one log
+line, the weather card reporting "+30% this month" on Severe, the rulebook's
+new Fortune cards and weather sections rendering, the global tab degrading
+honestly when the network is blocked, 9 months played with ownership-gated
+cards both paying out and reporting "no effect", the press ring rendering, a
+buy-then-sell round trip costing money, and Play Again from the game-over
+header returning to the landing page. No console errors.
+
+One limitation worth stating plainly: this sandbox's egress rules block
+`supabase.co`, so the leaderboard's **HTTP** round-trip could not be exercised
+from here. The table, its policies and its constraints were verified directly
+against the live database instead; the client code is a plain PostgREST GET
+and POST. Worth a single confirming try from a deployed build.

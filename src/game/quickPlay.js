@@ -13,14 +13,14 @@
 // Challenge's fairness depends on. (Quick Play never starts a Daily
 // Challenge run anyway — that has its own fixed configuration.)
 // ============================================================================
-import { SCENARIOS, DIFFICULTIES, PLAYER_AVATARS } from '../data/gameConfig';
+import { SCENARIOS, DIFFICULTIES, PLAYER_AVATARS, MAX_AI_PLAYERS, WEATHER_SEVERITIES } from '../data/gameConfig';
 import { pickRandom, randomInt } from './rng';
 
-// 1 or 2 robots. Not 3+: the roster supports more, but a first-time player
-// clicking "Quick Play" wants a table they can read at a glance, and a 4-way
-// game is a slower first experience.
+// Anywhere from one opponent to a full table. Part of the point of Quick
+// Play is that the shape of the game varies run to run, and a 4-seat table
+// is now supported everywhere else too (gameConfig.js's MAX_PLAYERS).
 const QUICK_PLAY_MIN_BOTS = 1;
-const QUICK_PLAY_MAX_BOTS = 2;
+const QUICK_PLAY_MAX_BOTS = MAX_AI_PLAYERS;
 
 /**
  * A randomized game setup. `playerName`/`avatar` are passed in (from the
@@ -43,6 +43,12 @@ export function rollQuickPlaySetup({ playerName, avatar } = {}) {
     options: {
       scenarioId: pickRandom(SCENARIOS).id,
       humanAvatars: [avatar || PLAYER_AVATARS[0]],
+      // Rolled like everything else — how wild the economy gets is part of
+      // what makes one Quick Play run feel different from the last.
+      weatherSeverityId: pickRandom(WEATHER_SEVERITIES).id,
+      // Never rolled on: a one-click "just start" game should not surprise
+      // anyone with a clock. The timer is an explicit setup choice.
+      turnTimer: false,
     },
   };
 }
