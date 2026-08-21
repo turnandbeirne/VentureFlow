@@ -19,6 +19,7 @@ import {
   marketingAllowance,
   marketingCampaignsUsed,
   upgradesNeededForNextCampaign,
+  marketingUpkeepAvailable,
 } from '../game/businessUpgrades';
 import { useHoldRepeat } from '../hooks/useHoldRepeat';
 import { playSound } from '../audio/soundEngine';
@@ -41,7 +42,7 @@ const UPGRADE_TRACK_ORDER = ['marketing', 'sales', 'ops', 'rnd'];
  * BusinessUpgrades) because useHoldRepeat is a hook — one per button, and
  * hooks can't be called in a loop inside another component.
  */
-function UpgradeButton({ track, trackId, business, cost, capped, affordable, onUpgrade }) {
+function UpgradeButton({ track, trackId, business, cost, capped, affordable, upkeep, onUpgrade }) {
   const enabled = !capped && affordable;
   const canFire = useCallback(() => enabled, [enabled]);
   const fire = useCallback(() => onUpgrade(business.id, trackId), [onUpgrade, business.id, trackId]);
@@ -56,6 +57,7 @@ function UpgradeButton({ track, trackId, business, cost, capped, affordable, onU
       {...hold}
     >
       {track.icon} {track.name} {capped ? '(maxed)' : `$${cost}`}
+      {!capped && upkeep && <span className="vf-biz-upgrades__btn-tag"> upkeep</span>}
     </button>
   );
 }
@@ -76,6 +78,10 @@ function BusinessUpgrades({ business, month, cash, canUpgrade, onUpgrade }) {
   const marketingMax = marketingAllowance(business);
   const marketingTapped = marketingUsed >= marketingMax;
   const upgradesNeeded = upgradesNeededForNextCampaign(business);
+  // With the allowance gone, this month's upkeep campaign is what keeps the
+  // business tended — worth saying out loud, since a "Campaigns 6/6" chip
+  // otherwise reads as "no campaigns at all, ever".
+  const upkeepOpen = marketingUpkeepAvailable(business, month);
 
   return (
     <div className="vf-biz-upgrades">
@@ -85,9 +91,10 @@ function BusinessUpgrades({ business, month, cash, canUpgrade, onUpgrade }) {
         )}
         <span
           className={`vf-biz-upgrades__chip ${marketingTapped ? 'vf-biz-upgrades__chip--tapped' : ''}`}
-          title={`Campaigns launched vs. allowed. Every Sales, Operations, or R&D upgrade on this business unlocks 2 more.`}
+          title={`Campaigns launched vs. allowed. Every Sales, Operations, or R&D upgrade on this business unlocks 2 more — and one upkeep campaign a month is always available on top, so a business can never become impossible to tend.`}
         >
           📣 Campaigns {marketingUsed}/{marketingMax}
+          {upkeepOpen && ' +1 upkeep'}
         </span>
         <span className="vf-biz-upgrades__chip">🤝 Sales Lv{business.salesLevel || 0}/3</span>
         <span className="vf-biz-upgrades__chip">⚙️ Ops Lv{business.opsLevel || 0}/3</span>
@@ -105,16 +112,28 @@ function BusinessUpgrades({ business, month, cash, canUpgrade, onUpgrade }) {
                 track={BUSINESS_UPGRADE_TRACKS[trackId]}
                 business={business}
                 cost={upgradeCost(business, trackId)}
-                capped={!canUpgradeTrack(business, trackId)}
+                capped={!canUpgradeTrack(business, trackId, month)}
                 affordable={cash >= upgradeCost(business, trackId)}
+                upkeep={trackId === 'marketing' && upkeepOpen}
                 onUpgrade={onUpgrade}
               />
             ))}
           </div>
           {marketingTapped && (
-            <p className="vf-biz-upgrades__note">
-              📣 Out of Marketing campaigns for {business.name}. Buy {upgradesNeeded} more Sales, Operations, or R&amp;D
-              upgrade{upgradesNeeded === 1 ? '' : 's'} to unlock more.
+            <p className={`vf-biz-upgrades__note ${upkeepOpen ? 'vf-biz-upgrades__note--upkeep' : ''}`}>
+              {upkeepOpen ? (
+                <>
+                  📣 Campaigns for {business.name} are used up, but you can always run one upkeep campaign a month to
+                  keep it tended. Buy {upgradesNeeded} more Sales, Operations, or R&amp;D upgrade
+                  {upgradesNeeded === 1 ? '' : 's'} to unlock more.
+                </>
+              ) : (
+                <>
+                  📣 {business.name} has already run this month's upkeep campaign. Buy {upgradesNeeded} more Sales,
+                  Operations, or R&amp;D upgrade{upgradesNeeded === 1 ? '' : 's'} to unlock more, or run another next
+                  month.
+                </>
+              )}
             </p>
           )}
         </>

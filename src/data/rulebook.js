@@ -38,6 +38,7 @@ import {
   MARKETING_BOOST_MONTHS,
   MARKETING_CAMPAIGNS_PER_UPGRADE,
   MARKETING_FREE_CAMPAIGNS,
+  MARKETING_UPKEEP_CAMPAIGNS_PER_MONTH,
   SALES_BOOST_PCT_MIN,
   SALES_BOOST_PCT_MAX,
   SALES_MAX_LEVEL,
@@ -117,6 +118,7 @@ export function buildRulebook({ difficultyId, scenarioId } = {}) {
             'Press "Done!" to pass. Once every player has gone, the month wraps up.',
             'Month-end, in order: R&D projects that are due pay off, neglected businesses lose a little income, a buyout offer may appear, everyone gets paid, everyone draws a fortune card, prices drift, badges are awarded, and the weather may change.',
             'Tap any player card at any time to see their full portfolio — yours has the investment buttons on it, everyone else’s is read-only.',
+            'A spotlight follows whoever’s turn it is. Robots take one move at a time, at whatever pace the speed slider is set to — drag it left to watch every move land, right to speed through. You can change it mid-game.',
           ],
         },
       ],
@@ -206,7 +208,7 @@ export function buildRulebook({ difficultyId, scenarioId } = {}) {
               label: `${BUSINESS_UPGRADE_TRACKS.marketing.icon} Marketing — ${money(BUSINESS_UPGRADE_TRACKS.marketing.cost)}`,
               detail: `A ${pct(MARKETING_BOOST_PCT_MIN)}–${pct(
                 MARKETING_BOOST_PCT_MAX
-              )} revenue bump that lasts ${MARKETING_BOOST_MONTHS} months and then fades. LIMITED: a business can run ${MARKETING_CAMPAIGNS_PER_UPGRADE} campaigns for every Sales, Operations, or R&D upgrade it has (minimum ${MARKETING_FREE_CAMPAIGNS}, so a brand-new business can still advertise). 6 other upgrades = 12 campaigns. Ads alone don't build a company.`,
+              )} revenue bump that lasts ${MARKETING_BOOST_MONTHS} months and then fades. LIMITED: a business can run ${MARKETING_CAMPAIGNS_PER_UPGRADE} campaigns for every Sales, Operations, or R&D upgrade it has (minimum ${MARKETING_FREE_CAMPAIGNS}, so a brand-new business can still advertise) — 6 other upgrades = 12 campaigns. Ads alone don't build a company. On top of that, every business can always run ${MARKETING_UPKEEP_CAMPAIGNS_PER_MONTH} upkeep campaign a month, so it can never become impossible to look after.`,
             },
             {
               label: `${BUSINESS_UPGRADE_TRACKS.sales.icon} Sales — ${money(BUSINESS_UPGRADE_TRACKS.sales.cost)}`,
@@ -248,6 +250,10 @@ export function buildRulebook({ difficultyId, scenarioId } = {}) {
         {
           type: 'p',
           text: 'Its name turns yellow as a warning and red once it is actually declining. Buying ANY upgrade — even the cheapest one — resets the clock completely.',
+        },
+        {
+          type: 'p',
+          text: `And you are never locked out of doing so: even with every other track maxed and every earned campaign spent, each business can still run ${MARKETING_UPKEEP_CAMPAIGNS_PER_MONTH} upkeep Marketing campaign a month, which counts as tending it.`,
         },
       ],
     },

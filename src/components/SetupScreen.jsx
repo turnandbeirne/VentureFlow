@@ -25,6 +25,7 @@ import Brand from './Brand';
 import VentureMakerLink from './VentureMakerLink';
 import LeaderboardModal from './LeaderboardModal';
 import RulebookModal from './RulebookModal';
+import SpeedControl from './SpeedControl';
 import InfoModal from './InfoModal';
 import UnlocksModal from './UnlocksModal';
 import CareerStatsModal from './CareerStatsModal';
@@ -44,7 +45,7 @@ const MODES = [
   },
 ];
 
-export default function SetupScreen({ onStart }) {
+export default function SetupScreen({ onStart, onBack }) {
   const [modeId, setModeId] = useState('solo');
   const [aiCount, setAiCount] = useState(1);
   const [humanCount, setHumanCount] = useState(2);
@@ -67,9 +68,10 @@ export default function SetupScreen({ onStart }) {
   const { profile, avatars, avatarProgress, themeProgress, selectTheme } = useProfile();
   const [avatarChoices, setAvatarChoices] = useState([avatars[0], avatars[1], avatars[2]]);
 
-  // The opening theme plays here at normal volume — same track picks back
-  // up (no restart) if you land back here via "Play Again" from the
-  // game-over screen, since that screen plays the same track.
+  // The opening theme plays here at normal volume. playMusicTrack is a
+  // no-op when the same track is already playing, so arriving from the
+  // landing screen (which starts it) or from "Play Again" on the game-over
+  // screen picks the song up where it was rather than restarting it.
   useEffect(() => {
     playMusicTrack('theme');
   }, []);
@@ -195,8 +197,24 @@ export default function SetupScreen({ onStart }) {
         <button type="button" className="vf-btn vf-btn--sm vf-btn--ghost" onClick={openRulebook}>
           📖 Rulebook
         </button>
+        {/* Play speed is a device preference, not a per-game one, but it's
+            offered here too so it can be set before the first robot ever
+            moves rather than only once the board is up. */}
+        <SpeedControl />
       </div>
       <div className="vf-setup__inner">
+        {onBack && (
+          <button
+            type="button"
+            className="vf-btn vf-btn--sm vf-btn--ghost vf-setup__back"
+            onClick={() => {
+              playSound('click');
+              onBack();
+            }}
+          >
+            ← Back
+          </button>
+        )}
         <div className="vf-setup__logo">
           <Brand size="lg" align="center" />
         </div>

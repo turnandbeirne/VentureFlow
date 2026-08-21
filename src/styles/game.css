@@ -2010,3 +2010,118 @@
     gap: 0.15rem;
   }
 }
+
+/* Play-speed slider ------------------------------------------------------- */
+.vf-speed {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.25rem 0.6rem;
+  background: var(--vf-white);
+  border: var(--vf-border-width) solid var(--vf-border);
+  border-radius: var(--vf-radius-pill);
+  box-shadow: var(--vf-shadow-sm);
+  cursor: pointer;
+  user-select: none;
+}
+
+.vf-speed__icon {
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.vf-speed__range {
+  width: 92px;
+  accent-color: var(--vf-teal);
+  cursor: pointer;
+}
+
+.vf-speed__name {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--vf-ink-soft);
+  min-width: 4.6rem;
+}
+
+/* On a narrow screen the header is already crowded — the icon and the slider
+   still say everything the label does. */
+@media (max-width: 720px) {
+  .vf-speed--compact .vf-speed__name {
+    display: none;
+  }
+  .vf-speed--compact .vf-speed__range {
+    width: 66px;
+  }
+}
+
+/* Travelling turn spotlight ----------------------------------------------- */
+.vf-players {
+  position: relative; /* the spotlight below is positioned against this */
+}
+
+.vf-spotlight {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+  z-index: 0; /* under the cards' own content, over the board background */
+  border-radius: var(--vf-radius-lg);
+  background: radial-gradient(circle at 50% 40%, rgba(31, 169, 142, 0.22), rgba(31, 169, 142, 0) 72%);
+  /* Kept fairly tight: a wide outer glow spills past the board's own border
+     on narrow layouts, where the players grid sits close to the card edge. */
+  box-shadow: 0 0 0 4px rgba(31, 169, 142, 0.55), 0 0 16px 3px rgba(31, 169, 142, 0.28);
+  animation: vf-spotlight-pulse 2.2s ease-in-out infinite;
+}
+
+/* Only travel once it has been placed — see PlayerPanel's placedRef. */
+.vf-spotlight--travelling {
+  transition:
+    transform var(--vf-spotlight-ms, 550ms) cubic-bezier(0.34, 1.15, 0.5, 1),
+    width var(--vf-spotlight-ms, 550ms) ease,
+    height var(--vf-spotlight-ms, 550ms) ease;
+}
+
+@keyframes vf-spotlight-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 4px rgba(31, 169, 142, 0.55), 0 0 14px 2px rgba(31, 169, 142, 0.24);
+  }
+  50% {
+    box-shadow: 0 0 0 5px rgba(31, 169, 142, 0.72), 0 0 22px 6px rgba(31, 169, 142, 0.36);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vf-spotlight {
+    animation: none;
+  }
+  .vf-spotlight--travelling {
+    transition: none;
+  }
+}
+
+/* The active card already had its own teal ring; with the spotlight doing
+   that job now, the card keeps only the warm background so the two don't
+   fight each other visually. */
+.vf-player-card--active {
+  box-shadow: var(--vf-shadow);
+}
+
+/* Cards sit above the spotlight glow so their text stays crisp. */
+.vf-player-card {
+  position: relative;
+  z-index: 1;
+}
+
+/* Marketing upkeep campaign ------------------------------------------------ */
+.vf-biz-upgrades__btn-tag {
+  font-size: 0.62rem;
+  font-weight: 700;
+  color: var(--vf-teal-dark);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.vf-biz-upgrades__note--upkeep {
+  color: var(--vf-ink-soft);
+}

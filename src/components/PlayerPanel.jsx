@@ -1,3 +1,4 @@
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { netWorth, passiveIncome } from '../game/players';
 import { getBadgeInfo } from '../game/badges';
 import { getSkillLevel } from '../data/gameConfig';
@@ -27,7 +28,7 @@ function worstBusinessHealth(player, month) {
   return worst;
 }
 
-function PlayerCard({ player, prices, allPlayers, month, weatherIncomeAmounts, isActive, onSelect }) {
+function PlayerCard({ player, prices, allPlayers, month, weatherIncomeAmounts, isActive, onSelect, cardRef }) {
   const worstHealth = worstBusinessHealth(player, month);
   // A robot's card opens the same portfolio modal, but read-only — so its
   // button says what it actually does ("View businesses") instead of
@@ -45,6 +46,7 @@ function PlayerCard({ player, prices, allPlayers, month, weatherIncomeAmounts, i
   // enough (appearance: none, cursor: pointer) not to depend on the tag.
   return (
     <div
+      ref={cardRef}
       role="button"
       tabIndex={0}
       className={`vf-card vf-player-card ${isActive ? 'vf-player-card--active' : ''}`}
@@ -109,9 +111,102 @@ function PlayerCard({ player, prices, allPlayers, month, weatherIncomeAmounts, i
   );
 }
 
-export default function PlayerPanel({ players, prices, month, weatherIncomeAmounts, activePlayerIndex, onSelectPlayer }) {
+const SPOTLIGHT_EPSILON = 0.5;
+function sameRect(a, b) {
   return (
-    <div className="vf-players">
+    Math.abs(a.x - b.x) < SPOTLIGHT_EPSILON &&
+    Math.abs(a.y - b.y) < SPOTLIGHT_EPSILON &&
+    Math.abs(a.width - b.width) < SPOTLIGHT_EPSILON &&
+    Math.abs(a.height - b.height) < SPOTLIGHT_EPSILON
+  );
+}
+
+/**
+ * The players strip, with a travelling turn spotlight.
+ *
+ * The spotlight is a single absolutely-positioned element inside the grid,
+ * moved onto whichever card is active and CSS-transitioned there — so as the
+ * turn passes around the table you SEE the light slide from one player to the
+ * next, rather than one card simply lighting up while another goes dark. With
+ * the speed slider turned down (game/playSpeed.js) that travel is slow enough
+ * to follow deliberately; `spotlightMs` comes straight from the current speed,
+ * so the light is always settling in just as the new turn begins.
+ *
+ * Its position is MEASURED from the live DOM rather than computed, because
+ * the grid is `auto-fit`/`minmax` and reflows to 1, 2, or 3 columns depending
+ * on viewport width — there's no layout formula to copy here that wouldn't
+ * silently drift from the CSS. A ResizeObserver on the container and on every
+ * card keeps it correct through window resizes and through a card growing on
+ * its own (a new badge chip, a longer net-worth number).
+ *
+ * `setRect` is guarded by a same-rect check: measuring on every render and
+ * storing a fresh object unconditionally would re-trigger the measure effect
+ * and spin forever.
+ */
+export default function PlayerPanel({
+  players,
+  prices,
+  month,
+  weatherIncomeAmounts,
+  activePlayerIndex,
+  onSelectPlayer,
+  spotlightMs = 550,
+}) {
+  const containerRef = useRef(null);
+  const cardRefs = useRef([]);
+  const [rect, setRect] = useState(null);
+  // Skip the travel animation on the very first placement (and after a
+  // remount) so the spotlight doesn't fly in from the board's top-left
+  // corner when a game loads or resumes.
+  const placedRef = useRef(false);
+
+  const measure = useCallback(() => {
+    const container = containerRef.current;
+    const target = cardRefs.current[activePlayerIndex];
+    if (!container || !target) {
+      setRect(null);
+      return;
+    }
+    const c = container.getBoundingClientRect();
+    const t = target.getBoundingClientRect();
+    const next = { x: t.left - c.left, y: t.top - c.top, width: t.width, height: t.height };
+    setRect((prev) => (prev && sameRect(prev, next) ? prev : next));
+  }, [activePlayerIndex]);
+
+  useLayoutEffect(() => {
+    measure();
+  }, [measure, players.length]);
+
+  useEffect(() => {
+    if (typeof ResizeObserver === 'undefined') {
+      // Very old browser: window resize still covers the common case.
+      window.addEventListener('resize', measure);
+      return () => window.removeEventListener('resize', measure);
+    }
+    const observer = new ResizeObserver(measure);
+    if (containerRef.current) observer.observe(containerRef.current);
+    for (const el of cardRefs.current) if (el) observer.observe(el);
+    return () => observer.disconnect();
+  }, [measure, players.length]);
+
+  useEffect(() => {
+    if (rect) placedRef.current = true;
+  }, [rect]);
+
+  return (
+    <div className="vf-players" ref={containerRef}>
+      {rect && (
+        <div
+          className={`vf-spotlight ${placedRef.current ? 'vf-spotlight--travelling' : ''}`}
+          aria-hidden="true"
+          style={{
+            transform: `translate(${rect.x}px, ${rect.y}px)`,
+            width: `${rect.width}px`,
+            height: `${rect.height}px`,
+            '--vf-spotlight-ms': `${spotlightMs}ms`,
+          }}
+        />
+      )}
       {players.map((player, i) => (
         <PlayerCard
           key={player.id}
@@ -122,6 +217,9 @@ export default function PlayerPanel({ players, prices, month, weatherIncomeAmoun
           weatherIncomeAmounts={weatherIncomeAmounts}
           isActive={i === activePlayerIndex}
           onSelect={() => onSelectPlayer(player.id)}
+          cardRef={(el) => {
+            cardRefs.current[i] = el;
+          }}
         />
       ))}
     </div>

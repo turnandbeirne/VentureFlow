@@ -9,7 +9,7 @@
 import { createNewGame } from './newGame';
 import { buyAsset, sellAsset, startBusiness, learnSkill, upgradeBusiness } from './actions';
 import { endTurn, acknowledgeFortuneCard, resolveExitOfferDecision } from './turnEngine';
-import { runAiTurn } from './aiEngine';
+import { runAiTurn, runAiStep, aiMaxSteps } from './aiEngine';
 import {
   reactToLogEntries,
   generateGreeting,
@@ -172,9 +172,45 @@ export function gameReducer(state, action) {
 
     case 'END_TURN': {
       const { state: nextState, logEntries } = endTurn(state, action.playerId);
-      return appendLog(nextState, logEntries);
+      // Clear the stepped-robot-turn bookkeeping on every hand-off, so the
+      // next robot starts from a clean step count no matter how its
+      // predecessor's turn ended (ran out of moves, hit its cap, or was a
+      // human turn that never used these fields at all).
+      return appendLog({ ...nextState, aiTurnSteps: 0, aiTurnDone: false }, logEntries);
     }
 
+    // One robot decision, then stop — the watchable path. hooks/useGame.js
+    // dispatches this repeatedly, waiting the player's chosen beat between
+    // each (see game/playSpeed.js), and ends the turn once `aiTurnDone`
+    // comes back true. Everything the old all-at-once RUN_AI_TURN did still
+    // happens, just spread across several dispatches instead of one:
+    // per-action log entries (and so per-action sounds and bot chat
+    // reactions, via appendLog) land one at a time, and the once-per-turn
+    // goof-off flavor fires on the final step.
+    case 'RUN_AI_STEP': {
+      const player = state.players.find((p) => p.id === action.playerId);
+      if (!player || player.type !== 'ai') return state;
+
+      const stepsTaken = state.aiTurnSteps || 0;
+      const outOfSteps = stepsTaken >= aiMaxSteps(player);
+      const { state: afterStep, logEntry, acted } = outOfSteps
+        ? { state, logEntry: null, acted: false }
+        : runAiStep(state, action.playerId);
+
+      if (!acted) {
+        // Nothing left worth doing. Mark the turn finished and give the bot
+        // its one shot at a goof-off sound / hype quote, exactly as
+        // RUN_AI_TURN does at the same point in the turn.
+        const done = { ...afterStep, aiTurnDone: true };
+        return appendChat(done, generateBotTurnFlavor(done, action.playerId));
+      }
+
+      return appendLog({ ...afterStep, aiTurnSteps: stepsTaken + 1, aiTurnDone: false }, logEntry ? [logEntry] : []);
+    }
+
+    // The whole robot turn in one dispatch. Interactive play uses
+    // RUN_AI_STEP above instead; this remains for the VentureMaker Arena's
+    // server-side replay (no UI to pace) and for tests.
     case 'RUN_AI_TURN': {
       const { state: afterAi, logEntries } = runAiTurn(state, action.playerId);
       let logged = appendLog(afterAi, logEntries);

@@ -33,6 +33,7 @@ import {
   BUSINESS_DECLINE_INCOME_FLOOR,
   MARKETING_CAMPAIGNS_PER_UPGRADE,
   MARKETING_FREE_CAMPAIGNS,
+  MARKETING_UPKEEP_CAMPAIGNS_PER_MONTH,
 } from '../data/gameConfig';
 import { chance, randomFloat } from './rng';
 
@@ -105,21 +106,56 @@ export function marketingRemaining(business) {
 }
 
 /**
+ * How many upkeep campaigns this business has already run in `month` — the
+ * always-available maintenance purchase that exists so a fully-built
+ * business can never become impossible to tend (see gameConfig.js's
+ * MARKETING_UPKEEP_CAMPAIGNS_PER_MONTH comment). Tracked separately from
+ * `marketingCount` precisely so it never eats earned allowance.
+ */
+export function marketingUpkeepUsedThisMonth(business, month) {
+  if (month == null) return 0;
+  return business.lastMarketingUpkeepMonth === month ? MARKETING_UPKEEP_CAMPAIGNS_PER_MONTH : 0;
+}
+
+/**
+ * Whether an upkeep campaign is available for this business right now: only
+ * once the earned allowance is spent (while there's allowance left, a
+ * campaign is just a normal campaign and spends it), and only if this
+ * month's upkeep hasn't been used yet.
+ *
+ * `month == null` — a caller with no month context, e.g. the read-only
+ * portfolio view opened from the game-over screen — always reads as
+ * unavailable rather than guessing, so nothing can be bought off a stale
+ * assumption about what month it is.
+ */
+export function marketingUpkeepAvailable(business, month) {
+  if (month == null) return false;
+  if (marketingRemaining(business) > 0) return false;
+  return marketingUpkeepUsedThisMonth(business, month) < MARKETING_UPKEEP_CAMPAIGNS_PER_MONTH;
+}
+
+/**
  * Whether `trackId` has more room to grow for this business. Sales and
  * Operations cap out at a few levels each (steady, bounded climbs, so
  * income can't spiral); R&D caps at a couple of projects (each is a slow,
  * meaningful bet, not something to spam); Marketing caps RELATIVE to how
  * much real building has been done on this business — see
  * marketingAllowance above and gameConfig.js's MARKETING_CAMPAIGNS_PER_UPGRADE
- * comment for the buyout exploit this closes. game/aiEngine.js builds its
- * upgrade candidates through this same function, so robots are held to the
- * identical limit.
+ * comment for the buyout exploit this closes — with the one deliberate
+ * exception of the monthly upkeep campaign above.
+ *
+ * `month` is optional and only matters for Marketing (it's what decides
+ * whether this month's upkeep is still available). Omitting it enforces the
+ * strict allowance, which is the safe reading for any caller that doesn't
+ * know what month it is. game/aiEngine.js builds its upgrade candidates
+ * through this same function, so robots are held to identical limits,
+ * upkeep included.
  */
-export function canUpgradeTrack(business, trackId) {
+export function canUpgradeTrack(business, trackId, month = null) {
   if (trackId === 'sales') return (business.salesLevel || 0) < SALES_MAX_LEVEL;
   if (trackId === 'ops') return (business.opsLevel || 0) < OPS_MAX_LEVEL;
   if (trackId === 'rnd') return (business.rndCount || 0) < RND_MAX_PROJECTS;
-  if (trackId === 'marketing') return marketingRemaining(business) > 0;
+  if (trackId === 'marketing') return marketingRemaining(business) > 0 || marketingUpkeepAvailable(business, month);
   return false;
 }
 
@@ -151,11 +187,18 @@ export function upgradesNeededForNextCampaign(business) {
  * because "maxed out" is misleading for a cap that buying a different
  * track will lift.
  */
-export function upgradeBlockReason(business, trackId) {
-  if (canUpgradeTrack(business, trackId)) return null;
+export function upgradeBlockReason(business, trackId, month = null) {
+  if (canUpgradeTrack(business, trackId, month)) return null;
   if (trackId === 'marketing') {
     const needed = upgradesNeededForNextCampaign(business);
-    return `${business.name} has used all ${marketingAllowance(business)} of its Marketing campaigns. Buy ${needed} more Sales, Operations, or R&D upgrade${needed === 1 ? '' : 's'} to unlock more.`;
+    const unlock = `Buy ${needed} more Sales, Operations, or R&D upgrade${needed === 1 ? '' : 's'} to unlock more`;
+    // If the only reason it's blocked is that this month's upkeep campaign
+    // is already spent, say THAT — "all your campaigns are gone" would read
+    // as permanent when another one arrives next month.
+    if (month != null && marketingUpkeepUsedThisMonth(business, month) > 0) {
+      return `${business.name} has already run its upkeep campaign this month. ${unlock}, or run another next month.`;
+    }
+    return `${business.name} has used all ${marketingAllowance(business)} of its Marketing campaigns. ${unlock}.`;
   }
   return null;
 }
@@ -203,22 +246,31 @@ export function applyUpgrade(business, trackId, currentMonth) {
     // so stacking campaigns can't inflate each other's roll.
     const { amount, pct } = percentOfIncome(business.income, MARKETING_BOOST_PCT_MIN, MARKETING_BOOST_PCT_MAX);
     const boost = { amount, expiresMonth: currentMonth + MARKETING_BOOST_MONTHS - 1 };
-    // marketingCount is a lifetime counter, deliberately never decremented
-    // when a boost expires — it's what the campaign allowance is measured
-    // against (see marketingAllowance above).
-    const marketingCount = marketingCampaignsUsed(business) + 1;
+    // Which kind of campaign this is decides what gets stamped. A normal
+    // campaign spends earned allowance and bumps `marketingCount` (a
+    // lifetime counter, deliberately never decremented when a boost expires
+    // — it's what marketingAllowance is measured against). An upkeep
+    // campaign — only reachable once the allowance is gone, once a month —
+    // stamps `lastMarketingUpkeepMonth` instead and leaves the allowance
+    // untouched, so it can never eat headroom the player earned.
+    const isUpkeep = marketingRemaining(business) <= 0;
     const nextBusiness = {
       ...business,
       totalInvested,
       lastTendedMonth,
-      marketingCount,
       tempBoosts: [...(business.tempBoosts || []), boost],
+      ...(isUpkeep
+        ? { lastMarketingUpkeepMonth: currentMonth }
+        : { marketingCount: marketingCampaignsUsed(business) + 1 }),
     };
     const left = marketingRemaining(nextBusiness);
+    const tail = isUpkeep
+      ? 'an upkeep campaign — keeps it tended'
+      : `${left} campaign${left === 1 ? '' : 's'} left`;
     return {
       business: nextBusiness,
       cost,
-      description: `ran a Marketing campaign for ${business.name} (+$${amount}/mo, ${Math.round(pct * 100)}% of revenue, for ${MARKETING_BOOST_MONTHS} months) — ${left} campaign${left === 1 ? '' : 's'} left`,
+      description: `ran a Marketing campaign for ${business.name} (+$${amount}/mo, ${Math.round(pct * 100)}% of revenue, for ${MARKETING_BOOST_MONTHS} months) — ${tail}`,
     };
   }
   if (trackId === 'sales') {

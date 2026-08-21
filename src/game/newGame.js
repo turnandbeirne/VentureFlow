@@ -49,6 +49,11 @@ export function createNewGame(
     // when they dismiss the celebration — see reducer.js's START_BUSINESS /
     // ACK_STARTUP_LAUNCH and components/StartupLaunchModal.jsx.
     pendingLaunch: null,
+    // Bookkeeping for the stepped robot turn (reducer.js's RUN_AI_STEP):
+    // how many moves the current robot has taken and whether it's finished.
+    // Reset on every hand-off; never read for a human's turn.
+    aiTurnSteps: 0,
+    aiTurnDone: false,
     seenLessons: [], // concept ids already shown this game — see game/lessons.js
   };
 }

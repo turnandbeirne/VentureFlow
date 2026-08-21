@@ -1674,3 +1674,194 @@ matching art and fireworks, bot cards read "View businesses", the Piggy Bank
 shows its live rate in the shop and portfolio, holding Operations buys exactly
 3 levels and stops, holding Marketing afterwards buys exactly the 6 unlocked
 campaigns and stops, and 12 full months play through with no console errors.
+
+## An always-available upkeep campaign (the decline deadlock)
+
+The campaign cap above created a problem the cap itself couldn't solve.
+Buying *any* upgrade resets a business's decline clock — but Sales, Ops and
+R&D all cap permanently, so a fully-built business (3/3 Sales, 3/3 Ops, 2/2
+R&D) that had also spent its 16 earned campaigns would have **no legal
+purchase left that counts as tending it**. The player's best business would
+then decline forever with no remedy: strictly worse than the exploit the cap
+was closing.
+
+So regardless of the allowance, every business can always run
+`MARKETING_UPKEEP_CAMPAIGNS_PER_MONTH` (currently 1) campaign per month, at
+full price. Two details make this safe rather than a loophole:
+
+- **It's per month, not per purchase.** The exploit was stacking an unbounded
+  number of campaigns inside a *single turn* to spike revenue right before a
+  buyout. One per month can't do that: since a campaign lasts
+  `MARKETING_BOOST_MONTHS`, upkeep alone can never have more than three boosts
+  live at once, no matter how much cash is on the table. There's a test that
+  hammers 50 purchase attempts in one month and asserts exactly one lands,
+  and another that walks 24 months and asserts the live-boost count never
+  exceeds `MARKETING_BOOST_MONTHS`.
+- **It doesn't spend earned allowance.** Upkeep stamps its own
+  `lastMarketingUpkeepMonth` rather than incrementing `marketingCount`, so it
+  never eats headroom the player worked for by buying Sales/Ops/R&D.
+
+Robots get it too — `aiEngine.js` builds its candidates through
+`canUpgradeTrack()`, which now takes `month` — so a bot's fully-built business
+isn't the one thing at the table that can't be kept healthy.
+
+In the UI the Marketing button gains a small "UPKEEP" tag when that's what the
+next purchase would be, the campaigns chip reads "📣 Campaigns 2/2 +1 upkeep",
+and the explanatory note distinguishes "you've used this month's upkeep" (temporary,
+comes back next month) from "you're out of campaigns" (needs another upgrade)
+— the earlier wording would have read as permanent in both cases.
+
+Note this does mean upkeep boosts can slightly inflate a buyout offer, since
+`rollBusinessExit()` values a business on `businessMonthlyIncome()` including
+active boosts. That's bounded at three concurrent campaigns' worth and can't
+be spiked on demand, which is the whole difference from the original bug.
+
+## Play speed: a slider, and robots that move one step at a time
+
+Two changes that only make sense together.
+
+**The problem.** A robot turn resolved as a single burst — the whole turn ran
+in one `RUN_AI_TURN` dispatch, so four decisions and their four log lines all
+appeared in the same frame, 700ms after the previous player finished. Fast,
+but impossible to read: you couldn't see that the bot bought a Tree House
+*because* the weather turned sunny, or that its income jumped *because* it ran
+a campaign. Cause and effect were simultaneous.
+
+**Stepping.** `aiEngine.js` gained `runAiStep()` — identical decision logic to
+`runAiTurn()` (same candidate builder, same strategy weights, same
+mistake-chance roll); the only difference is where the loop lives. The reducer
+drives it through a new `RUN_AI_STEP` action, tracking `aiTurnSteps` /
+`aiTurnDone` on state (both reset on every hand-off), and `useGame.js` waits a
+beat between dispatches. Each decision now lands on its own beat with its own
+log line and its own sound. `RUN_AI_TURN` is unchanged and still exported —
+the VentureMaker Arena's server-side replay has no UI to pace and wants a
+whole turn in one call.
+
+Because a shark-level bot can legitimately take up to 32 moves in one turn,
+each successive move in the *same* turn comes a little faster than the last
+(`STEP_ACCELERATION`, floored) — a typical 4-6 move turn barely notices, and a
+20-move late-game turn stays watchable without becoming a wait.
+
+**The slider.** `game/playSpeed.js` is a framework-free settings store (same
+shape as the audio/music ones) with five notches — 🐢 Storyteller, 🐌 Relaxed,
+🚶 Steady, 🏃 Brisk, ⚡ Zippy — each specifying four real millisecond values
+rather than a multiplier over one base number, because the delays don't scale
+together evenly: a slow setting wants a *lot* of room between a robot's
+individual actions but only a little extra between turns, or the handoff
+starts to feel broken rather than deliberate.
+
+`SpeedControl.jsx` sits in the board header (not just on setup — the whole
+point is slowing the table down the moment it outruns you, mid-turn if need
+be), on the setup screen, and on the landing page. It's a real
+`<input type="range">` so "slow it down a couple of notches" is one drag and
+it's keyboard/screen-reader accessible for free. Nothing about speed lives in
+game state, so it never touches the save file and applies to whatever game is
+running; `useGame`'s effect re-reads the current speed on every state change,
+so a mid-turn change takes effect on the very next beat.
+
+The default is **Steady**, one notch slower than the old pace ("Brisk" is
+documented as closest to how the game used to play) — a new player is the one
+who most needs to see cause and effect, and anyone who finds it slow moves the
+slider in one click.
+
+Measured in a real browser: in an identical 5-second window after handing off
+to the robots, Storyteller produced 3 log entries and Zippy produced 20.
+
+## A spotlight that follows the turn
+
+The active player's card used to get a static teal ring; now a single
+absolutely-positioned spotlight element sits inside the players grid and is
+CSS-transitioned onto whichever card is active, so as the turn passes you
+*see* the light travel from one player to the next. Its travel time comes from
+the current play speed, so it's always settling in just as the new turn
+begins, never still sliding.
+
+Its position is **measured** from the live DOM rather than computed: the grid
+is `auto-fit`/`minmax` and reflows between 1, 2 and 3 columns, so there's no
+layout formula to copy that wouldn't silently drift from the CSS. A
+`ResizeObserver` watches the container and every card, so it stays correct
+through window resizes and through a card growing on its own (a new badge
+chip, a longer net-worth number). `setRect` is guarded by a same-rect check —
+measuring on every render and storing a fresh object unconditionally would
+re-trigger the measure effect and spin forever. The first placement skips the
+animation so the light doesn't fly in from the board's corner on load.
+
+The active card's own ring was removed so the two don't fight each other; the
+card keeps only its warm background.
+
+## A landing page
+
+`LandingScreen.jsx` is now the first thing anyone sees, ahead of the setup
+screen (`App.jsx` holds a small `preGameScreen` state — deliberately local UI
+state, since no game exists yet). It carries:
+
+- **An animated hero illustration** (`HeroGraphic.jsx`) — one inline SVG,
+  hand-drawn rather than a bundled image, because the game ships no raster art
+  and makes no network requests (classroom wifi, offline after first load), an
+  SVG stays crisp from a phone to a projector, and every colour is a theme
+  token so the hero reskins with the unlockable board themes. What it shows is
+  the game's actual loop rather than generic business clip-art: weather
+  overhead driving the market, a rising net-worth line, three storefronts, and
+  coins stacking up.
+- **The three-beat pitch** — buy things that grow, start real businesses, ride
+  the weather — with figures read from `gameConfig.js` so the page can't
+  advertise rules the game no longer has.
+- **The top 5 leaderboard**, with a link to the full one.
+- **A self-scrolling rulebook window** (`RulebookTicker.jsx`) so a newcomer
+  who hasn't clicked anything yet still sees real rules drifting past. It's
+  flattened from the same `buildRulebook()` data the rulebook modal renders,
+  so its numbers are equally live. Auto-scroll pauses on hover, focus or
+  pointer-down so it never fights someone who has started reading, and stops
+  entirely under `prefers-reduced-motion`.
+- **Two ways in.** ⚡ **Quick Play** starts immediately with everything rolled
+  (`game/quickPlay.js`: scenario, difficulty, 1-2 opponents, each robot's
+  personality and skill), and 🎛️ **Customize a game** opens the existing setup
+  screen, which gained a ← Back button. Both call the same `onStart`, so
+  there's one code path into a game and the two can't drift apart.
+- **A "▶️ Watch how to play" link**, driven by `HOW_TO_PLAY_VIDEO_URL` in
+  `gameConfig.js`. That constant is deliberately **empty** — the button hides
+  itself entirely while it's blank, so nothing ever ships as a dead link. Drop
+  a URL in and the button appears on the next build; no other code changes.
+
+The opening theme now starts on the landing page rather than on setup.
+`playMusicTrack` is a no-op when the same track is already playing, so moving
+Landing → Customize → Back doesn't restart the song mid-phrase, and ending a
+game returns to the landing page rather than dropping the player into a form.
+
+One layout bug surfaced and was fixed here: the setup screen's absolutely-
+positioned corner toolbar grew wide enough (with the speed slider added) to
+overlap and swallow clicks meant for the content beneath it — caught by
+Playwright, which reported the mute button intercepting pointer events for the
+Back button. `.vf-setup__inner` now has top padding that clears it, with more
+on narrow screens where the toolbar wraps.
+
+## Verification for this round
+
+`npm run test` now runs **33 checks**. New ones cover:
+
+- the upkeep campaign: that a fully-maxed business is still tendable, that
+  upkeep resets the decline clock without spending allowance, that 50 attempts
+  in one month yield exactly one campaign, that 24 months of upkeep never
+  exceed `MARKETING_BOOST_MONTHS` live boosts, and that a robot uses upkeep
+  across 12 months without ever exceeding its earned allowance;
+- the speed table: every delay strictly decreasing across the notches, none of
+  them zero (a zero would restore the burst), the default sitting mid-slider
+  and slower than "Brisk", and an unknown/corrupt saved id falling back;
+- `runAiStep` taking exactly one action per call with exactly one log entry
+  each, the stepped path terminating on its own and spending like the
+  whole-turn path, `END_TURN` clearing the step bookkeeping, and `RUN_AI_STEP`
+  being a no-op on a human seat;
+- Quick Play across 400 rolls: always a valid setup, opponent count in range,
+  one config per robot, and — since "randomized" has to mean it actually
+  varies — every scenario and every difficulty reachable; plus one roll
+  actually starting a game, with the name trimmed and no two robots sharing a
+  personality.
+
+In a real browser against the production build: the landing page renders with
+no console errors (empty and populated leaderboard), Quick Play reaches the
+board in ~250ms, the spotlight is pixel-aligned to the active card and
+realigns after a hand-off, robot log entries arrive one at a time rather than
+in a burst, the speed slider produces a measured 3-vs-20 entry difference over
+the same 5 seconds, Customize → Back works, and the upkeep campaign goes
+through once and is then correctly refused with the "already run this month's
+upkeep campaign" wording.

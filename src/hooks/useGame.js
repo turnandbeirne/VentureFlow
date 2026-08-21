@@ -1,35 +1,64 @@
 import { useEffect, useReducer, useRef, useCallback } from 'react';
 import { gameReducer } from '../game/reducer';
 import { saveGame, loadGame, clearSavedGame, hasSavedGame } from '../game/persistence';
+import { usePlaySpeed } from './usePlaySpeed';
 
-const AI_TURN_DELAY_MS = 700;
+// A robot with a big cash pile can legitimately take a lot of moves in one
+// turn (a shark's cap is 32). Pacing every one of them at the full step
+// delay would make a rich late-game turn interminable, so each successive
+// move in the SAME turn comes a little faster than the last, floored so it
+// never becomes the instant burst this replaced. A typical 4-6 move turn
+// barely notices; a 20-move turn stays watchable without being a wait.
+const STEP_ACCELERATION = 0.82;
+const STEP_FLOOR_FACTOR = 0.3;
+const ABSOLUTE_STEP_FLOOR_MS = 110;
+
+function stepDelayFor(baseMs, stepsTaken) {
+  const floor = Math.max(ABSOLUTE_STEP_FLOOR_MS, baseMs * STEP_FLOOR_FACTOR);
+  return Math.max(floor, Math.round(baseMs * STEP_ACCELERATION ** stepsTaken));
+}
 
 /**
  * React glue around the pure gameReducer: persists to localStorage on every
- * change, and auto-plays AI turns after a short delay so robot moves are
- * readable instead of instant.
+ * change, and plays robot turns out one decision at a time so their moves
+ * are readable instead of instant.
+ *
+ * The pacing comes from the player's chosen play speed (game/playSpeed.js),
+ * read live — change the slider mid-turn and the very next beat uses the new
+ * timing, because this effect re-runs on every state change and reads the
+ * current speed each time. Nothing about speed is stored in game state, so
+ * it's never baked into a save.
  */
 export function useGame() {
   const [state, dispatch] = useReducer(gameReducer, null, () => loadGame());
   const aiTimeoutRef = useRef(null);
+  const { speed } = usePlaySpeed();
 
   // Persist whenever state changes (and there's an active game).
   useEffect(() => {
     if (state) saveGame(state);
   }, [state]);
 
-  // Auto-play the active player's turn if it's a robot.
+  // Drive the active robot's turn: one decision per beat, then hand off.
   useEffect(() => {
     if (!state || state.status !== 'playing') return;
     const activePlayer = state.players[state.activePlayerIndex];
     if (!activePlayer || activePlayer.type !== 'ai') return;
 
+    const stepsTaken = state.aiTurnSteps || 0;
+    const finished = !!state.aiTurnDone;
+    const delay = finished ? speed.turnHandoffMs : stepDelayFor(speed.aiStepMs, stepsTaken);
+
     aiTimeoutRef.current = setTimeout(() => {
-      dispatch({ type: 'RUN_AI_TURN', playerId: activePlayer.id });
-    }, AI_TURN_DELAY_MS);
+      dispatch(
+        finished
+          ? { type: 'END_TURN', playerId: activePlayer.id }
+          : { type: 'RUN_AI_STEP', playerId: activePlayer.id }
+      );
+    }, delay);
 
     return () => clearTimeout(aiTimeoutRef.current);
-  }, [state]);
+  }, [state, speed]);
 
   const startGame = useCallback((mode, humanNames, difficultyId, botConfigs, options = {}) => {
     dispatch({

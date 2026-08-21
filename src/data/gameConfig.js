@@ -324,6 +324,29 @@ export const RND_BIG_PAYOFF_PCT_MAX = 0.3;
 export const MARKETING_CAMPAIGNS_PER_UPGRADE = 2;
 export const MARKETING_FREE_CAMPAIGNS = 2;
 
+// The one deliberate hole in that cap, and it exists to stop the cap from
+// creating a worse problem than the exploit it closed.
+//
+// Buying ANY upgrade resets a business's decline clock (see
+// BUSINESS_DECLINE_* below). But Sales, Operations and R&D all cap out
+// permanently — a fully-built business is 3/3 Sales, 3/3 Ops, 2/2 R&D — so
+// once its 16 campaigns were also gone, there would be literally no purchase
+// left that counts as tending it. The player's best-built business would
+// then decline forever with no legal remedy. That's a strictly worse outcome
+// than the buyout exploit.
+//
+// So: regardless of the allowance, a business can always run
+// MARKETING_UPKEEP_CAMPAIGNS_PER_MONTH campaign(s) per month at full price.
+// Crucially this is per MONTH, not per purchase — the exploit was stacking
+// an unbounded number of campaigns inside a single turn to spike revenue
+// right before a buyout, and one-per-month can't do that: since a campaign
+// lasts MARKETING_BOOST_MONTHS, upkeep alone can never have more than
+// MARKETING_BOOST_MONTHS boosts live at once, no matter how much cash is on
+// the table. An upkeep campaign does NOT count against the earned allowance
+// (it's stamped separately as `lastMarketingUpkeepMonth`), so it never eats
+// headroom a player worked for.
+export const MARKETING_UPKEEP_CAMPAIGNS_PER_MONTH = 1;
+
 // A business is worth reinvesting in — that's the whole point of the four
 // tracks above — but it's also worth PENALIZING for being ignored: a
 // business nobody has touched in a long while starts to atrophy, the same
@@ -1544,6 +1567,17 @@ export const BRAND_CREDIT = 'by Michael P Beirne';
 // Where the VentureMaker brand mark and the "learn more / connect with
 // entrepreneurs" callouts link out to (see components/Brand.jsx and
 // components/VentureMakerLink.jsx) — one place to update if it ever moves.
+// ---------------------------------------------------------------------------
+// "How to play" video
+// ---------------------------------------------------------------------------
+// Shown as a "▶️ Watch how to play" button on the landing screen. Left EMPTY
+// on purpose until there's a real video to point at — the landing page hides
+// the button entirely when this is blank, so nothing ever ships as a dead
+// link. Drop any watchable URL in here (YouTube, Vimeo, a file on
+// venturemaker.org) and the button appears on the next build; no other code
+// needs to change.
+export const HOW_TO_PLAY_VIDEO_URL = '';
+
 export const VENTUREMAKER_URL = 'https://venturemaker.org/';
 export const VENTUREMAKER_BLURB =
   'Learn more about winning entrepreneurship and connect with future and proven entrepreneurs at VentureMaker.';

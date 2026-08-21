@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import '../styles/game.css';
 import { getDifficulty } from '../data/gameConfig';
+import { usePlaySpeed } from '../hooks/usePlaySpeed';
 import { playSound } from '../audio/soundEngine';
 import { playMusicTrack } from '../audio/musicEngine';
 import WeatherBadge from './WeatherBadge';
@@ -18,6 +19,7 @@ import MusicControl from './MusicControl';
 import Brand from './Brand';
 import LeaderboardModal from './LeaderboardModal';
 import RulebookModal from './RulebookModal';
+import SpeedControl from './SpeedControl';
 import StartupLaunchModal from './StartupLaunchModal';
 import PlayerDetailModal from './PlayerDetailModal';
 
@@ -37,6 +39,9 @@ export default function GameBoard({ game }) {
     weatherIncomeAmounts,
   } = state;
   const difficulty = getDifficulty(state.difficultyId);
+  // Read live so a mid-game change to the slider takes effect on the very
+  // next beat — including the robot-recap auto-advance below.
+  const { speed } = usePlaySpeed();
   const [showLeaderboard, setShowLeaderboard] = useState(false);
   const [showRulebook, setShowRulebook] = useState(false);
   const [selectedPlayerId, setSelectedPlayerId] = useState(null);
@@ -65,10 +70,10 @@ export default function GameBoard({ game }) {
     if (status !== 'monthRecap') return;
     if (!currentFortuneEntry) return;
     if (currentFortunePlayer?.type === 'ai') {
-      const t = setTimeout(() => game.ackFortuneCard(), 400);
+      const t = setTimeout(() => game.ackFortuneCard(), speed.recapAdvanceMs);
       return () => clearTimeout(t);
     }
-  }, [status, currentFortuneEntry, currentFortunePlayer, game]);
+  }, [status, currentFortuneEntry, currentFortunePlayer, game, speed]);
 
   // Auto-dismiss error toasts.
   useEffect(() => {
@@ -86,6 +91,11 @@ export default function GameBoard({ game }) {
             <div className="vf-header__right">
               <VolumeControl />
               <MusicControl />
+              {/* Play speed lives in the board header, not just on setup,
+                  because the whole point is being able to slow the table
+                  down the moment it starts moving faster than you can
+                  follow — mid-turn if need be. */}
+              <SpeedControl />
               <button
                 type="button"
                 className="vf-btn vf-btn--sm vf-btn--ghost"
@@ -136,6 +146,7 @@ export default function GameBoard({ game }) {
             month={month}
             weatherIncomeAmounts={weatherIncomeAmounts}
             activePlayerIndex={activePlayerIndex}
+            spotlightMs={speed.spotlightMs}
             onSelectPlayer={(playerId) => {
               playSound('click');
               setSelectedPlayerId(playerId);

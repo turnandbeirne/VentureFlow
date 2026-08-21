@@ -215,11 +215,14 @@ const UPGRADE_KIND_BY_TRACK = { marketing: 'upgradeMarketing', sales: 'upgradeSa
  * upgrade a human couldn't also buy. Reuses actions.js's upgradeBusiness()
  * the same way every other candidate here reuses a human action function.
  */
-function buildUpgradeCandidates(player, strategy, cashBuffer, baseScores) {
+function buildUpgradeCandidates(player, strategy, cashBuffer, baseScores, month) {
   const candidates = [];
   for (const business of player.businesses) {
     for (const trackId of UPGRADE_TRACK_IDS) {
-      if (!canUpgradeTrack(business, trackId)) continue;
+      // `month` is passed through so a robot gets the same monthly upkeep
+      // campaign a human does — otherwise a bot's fully-built business
+      // would be the only thing at the table that can't be kept tended.
+      if (!canUpgradeTrack(business, trackId, month)) continue;
       const cost = upgradeCost(business, trackId);
       if (player.cash - cashBuffer < cost) continue;
       candidates.push({
@@ -257,7 +260,7 @@ function buildCandidates(state, playerId, strategy, cashBuffer) {
     if (player.cash - cashBuffer >= prices.piggy) {
       candidates.push({ ...weighted(strategy, 'piggy', 20), run: (s) => buyAsset(s, playerId, 'piggy', 1) });
     }
-    candidates.push(...buildUpgradeCandidates(player, strategy, cashBuffer, UPGRADE_BASE_SCORES_GOOD));
+    candidates.push(...buildUpgradeCandidates(player, strategy, cashBuffer, UPGRADE_BASE_SCORES_GOOD, state.month));
   } else {
     // Storms / dips: retreat to safety first.
     if ((player.holdings.treasure || 0) > 0) {
@@ -275,7 +278,7 @@ function buildCandidates(state, playerId, strategy, cashBuffer) {
     if (player.cash >= SKILL_COST && player.skillTokens < 2) {
       candidates.push({ ...weighted(strategy, 'skill', 10), run: (s) => learnSkill(s, playerId) });
     }
-    candidates.push(...buildUpgradeCandidates(player, strategy, cashBuffer, UPGRADE_BASE_SCORES_STORM));
+    candidates.push(...buildUpgradeCandidates(player, strategy, cashBuffer, UPGRADE_BASE_SCORES_STORM, state.month));
   }
 
   return candidates;
@@ -300,10 +303,59 @@ function chooseMove(candidates, skill) {
 }
 
 /**
+ * How many moves this robot is still willing to make this turn — its skill
+ * profile's cap, which the stepped path below has to know about too (see
+ * runAiStep). Exported so game/reducer.js can ask without reaching into
+ * SKILL_PROFILES itself.
+ */
+export function aiMaxSteps(player) {
+  return getSkillProfile(player?.skillLevelId).maxSteps;
+}
+
+/**
+ * Take exactly ONE robot action and return, rather than playing the whole
+ * turn out in a single call the way runAiTurn does below.
+ *
+ * This is what lets the game be *watchable*: driven one step at a time from
+ * game/reducer.js's RUN_AI_STEP (paced by hooks/useGame.js against the
+ * player's chosen speed — see game/playSpeed.js), each decision lands on its
+ * own beat, with its own log line and its own sound, instead of four moves
+ * and four log lines appearing in the same frame. A player can actually see
+ * that the bot bought a Tree House *because* the weather turned sunny.
+ *
+ * Returns `{ state, logEntry, acted }` — `acted: false` means the robot has
+ * nothing left worth doing (no affordable candidate, or the action it chose
+ * unexpectedly failed) and its turn should end. Identical decision logic to
+ * runAiTurn: same candidate builder, same strategy weighting, same
+ * mistake-chance roll. The ONLY difference is where the loop lives.
+ */
+export function runAiStep(state, playerId) {
+  const player = findPlayer(state, playerId);
+  const strategy = getStrategy(player?.strategyId);
+  const skill = getSkillProfile(player?.skillLevelId);
+
+  const candidates = buildCandidates(state, playerId, strategy, skill.cashBuffer);
+  if (candidates.length === 0) return { state, logEntry: null, acted: false };
+
+  const chosen = chooseMove(candidates, skill);
+  const result = chosen.run(state);
+  // Shouldn't happen given the affordability checks in buildCandidates, but
+  // a failed action must end the turn rather than spin: the same state would
+  // produce the same choice again next step, forever.
+  if (!result.ok) return { state, logEntry: null, acted: false };
+
+  return { state: result.state, logEntry: result.logEntry || null, acted: true };
+}
+
+/**
  * Run a full AI turn: greedily apply the best-scoring (strategy-weighted)
  * action, over and over, until nothing affordable/beneficial remains or the
  * bot's skill-level step cap is hit. Returns the updated game state plus a
  * list of log entries describing what happened.
+ *
+ * Still used verbatim by the server-side replay in the VentureMaker Arena
+ * (which has no UI to pace and wants a whole turn resolved in one call), and
+ * by tests. Interactive play goes through runAiStep above instead.
  */
 export function runAiTurn(state, playerId) {
   const player = findPlayer(state, playerId);

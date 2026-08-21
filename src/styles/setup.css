@@ -10,6 +10,18 @@
 .vf-setup__inner {
   width: 100%;
   max-width: 640px;
+  /* Clears the absolutely-positioned corner toolbar (volume, music, speed,
+     unlocks, career stats, leaderboard, rulebook). That row got wide enough
+     with the speed slider added that it was overlapping — and swallowing
+     clicks meant for — the content beneath it, the Back button especially. */
+  padding-top: 3.5rem;
+}
+
+@media (max-width: 720px) {
+  /* The toolbar wraps to two or three rows on a narrow screen. */
+  .vf-setup__inner {
+    padding-top: 7rem;
+  }
 }
 
 .vf-setup__logo {
@@ -377,4 +389,9 @@
   margin-top: 1.75rem;
   padding-top: 1.25rem;
   border-top: 2px dashed var(--vf-border);
+}
+
+/* Back to the landing screen ------------------------------------------------ */
+.vf-setup__back {
+  margin-bottom: 0.5rem;
 }

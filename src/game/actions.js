@@ -168,11 +168,14 @@ export function upgradeBusiness(state, playerId, businessId, trackId) {
 
   const business = player.businesses.find((b) => b.id === businessId);
   if (!business) return { state, ok: false, error: 'Invalid business.' };
-  if (!canUpgradeTrack(business, trackId)) {
+  // `state.month` matters for Marketing: it's what decides whether this
+  // business's always-available monthly upkeep campaign is still on the
+  // table (see businessUpgrades.js's marketingUpkeepAvailable).
+  if (!canUpgradeTrack(business, trackId, state.month)) {
     return {
       state,
       ok: false,
-      error: upgradeBlockReason(business, trackId) || `${track.name} is already maxed out for ${business.name}.`,
+      error: upgradeBlockReason(business, trackId, state.month) || `${track.name} is already maxed out for ${business.name}.`,
     };
   }
 
