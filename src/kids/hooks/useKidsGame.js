@@ -1,14 +1,71 @@
 import { useEffect, useReducer, useRef, useCallback } from 'react';
-import { gameReducer } from '../game/reducer';
-import { saveGame, loadGame, clearSavedGame, hasSavedGame } from '../game/persistence';
-import { usePlaySpeed } from './usePlaySpeed';
+import { gameReducer } from '../../game/reducer';
+import { usePlaySpeed } from '../../hooks/usePlaySpeed';
 
-// A robot with a big cash pile can legitimately take a lot of moves in one
-// turn (a shark's cap is 32). Pacing every one of them at the full step
-// delay would make a rich late-game turn interminable, so each successive
-// move in the SAME turn comes a little faster than the last, floored so it
-// never becomes the instant burst this replaced. A typical 4-6 move turn
-// barely notices; a 20-move turn stays watchable without being a wait.
+// ============================================================================
+// The Kids Version's own game hook
+// ----------------------------------------------------------------------------
+// This is a DELIBERATE near-duplicate of hooks/useGame.js rather than a
+// shared/refactored one, for one reason: the "Just for Kids" build is not
+// allowed to touch anything under src/game/ or the main app's own hooks in
+// any way that could change the main game's behavior (see the project brief
+// this shipped under). gameReducer itself — the actual rules engine — is
+// imported completely unmodified, so "same game logic" is literally true:
+// every action type, every rule, every bit of randomness works exactly like
+// the grown-up version. Only two things differ from useGame.js:
+//
+//   1. Persistence uses its OWN localStorage key (see KIDS_STORAGE_KEY
+//      below) instead of game/persistence.js's LOCAL_STORAGE_KEY, so a kid
+//      picking up "Just for Kids" never overwrites (or gets overwritten by)
+//      a parent's in-progress main-game save, and vice versa. Implemented
+//      inline here rather than parameterizing game/persistence.js, again to
+//      avoid touching any shared game/ file.
+//   2. The play-speed preference (hooks/usePlaySpeed.js) IS shared with the
+//      main game on purpose — it's a device-wide preference already stored
+//      outside game state, and there's no reason a family should have to
+//      set "how fast do robots move" twice.
+// ============================================================================
+
+const KIDS_STORAGE_KEY = 'ventureflow-kids-save-v1';
+
+function saveKidsGame(state) {
+  try {
+    localStorage.setItem(KIDS_STORAGE_KEY, JSON.stringify({ savedAt: Date.now(), state }));
+  } catch (err) {
+    console.warn('VentureFlow Kids: could not save game.', err);
+  }
+}
+
+function loadKidsGame() {
+  try {
+    const raw = localStorage.getItem(KIDS_STORAGE_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw)?.state || null;
+  } catch (err) {
+    console.warn('VentureFlow Kids: could not load saved game.', err);
+    return null;
+  }
+}
+
+function clearKidsGame() {
+  try {
+    localStorage.removeItem(KIDS_STORAGE_KEY);
+  } catch (err) {
+    console.warn('VentureFlow Kids: could not clear saved game.', err);
+  }
+}
+
+export function hasSavedKidsGame() {
+  try {
+    return !!localStorage.getItem(KIDS_STORAGE_KEY);
+  } catch {
+    return false;
+  }
+}
+
+// Same acceleration curve as useGame.js, so a robot's turn in the Kids
+// Version paces identically to the main game rather than surprising a kid
+// who's played both.
 const STEP_ACCELERATION = 0.82;
 const STEP_FLOOR_FACTOR = 0.3;
 const ABSOLUTE_STEP_FLOOR_MS = 110;
@@ -18,28 +75,18 @@ function stepDelayFor(baseMs, stepsTaken) {
   return Math.max(floor, Math.round(baseMs * STEP_ACCELERATION ** stepsTaken));
 }
 
-/**
- * React glue around the pure gameReducer: persists to localStorage on every
- * change, and plays robot turns out one decision at a time so their moves
- * are readable instead of instant.
- *
- * The pacing comes from the player's chosen play speed (game/playSpeed.js),
- * read live — change the slider mid-turn and the very next beat uses the new
- * timing, because this effect re-runs on every state change and reads the
- * current speed each time. Nothing about speed is stored in game state, so
- * it's never baked into a save.
- */
-export function useGame() {
-  const [state, dispatch] = useReducer(gameReducer, null, () => loadGame());
+/** Same shape as hooks/useGame.js's return value (state + one callback per
+ * action), so the kids UI layer dispatches through the identical action
+ * vocabulary as the main game. */
+export function useKidsGame() {
+  const [state, dispatch] = useReducer(gameReducer, null, () => loadKidsGame());
   const aiTimeoutRef = useRef(null);
   const { speed } = usePlaySpeed();
 
-  // Persist whenever state changes (and there's an active game).
   useEffect(() => {
-    if (state) saveGame(state);
+    if (state) saveKidsGame(state);
   }, [state]);
 
-  // Drive the active robot's turn: one decision per beat, then hand off.
   useEffect(() => {
     if (!state || state.status !== 'playing') return;
     const activePlayer = state.players[state.activePlayerIndex];
@@ -69,12 +116,11 @@ export function useGame() {
       botConfigs,
       scenarioId: options.scenarioId,
       humanAvatars: options.humanAvatars,
-      dailyChallengeDate: options.dailyChallengeDate,
     });
   }, []);
 
   const newGame = useCallback(() => {
-    clearSavedGame();
+    clearKidsGame();
     dispatch({ type: 'NEW_GAME' });
   }, []);
 
@@ -124,7 +170,7 @@ export function useGame() {
 
   return {
     state,
-    hasSavedGame: hasSavedGame(),
+    hasSavedGame: hasSavedKidsGame(),
     startGame,
     newGame,
     buyAsset,

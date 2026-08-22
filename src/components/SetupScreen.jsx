@@ -8,13 +8,6 @@ import {
   SKILL_LEVELS,
   SCENARIOS,
   DEFAULT_SCENARIO_ID,
-  MAX_PLAYERS,
-  MAX_AI_PLAYERS,
-  TURN_TIME_SECONDS,
-  TURN_EXTENSION_SECONDS,
-  TURN_EXTENSIONS_PER_PLAYER,
-  WEATHER_SEVERITIES,
-  DEFAULT_WEATHER_SEVERITY_ID,
 } from '../data/gameConfig';
 import { playSound } from '../audio/soundEngine';
 import { playMusicTrack } from '../audio/musicEngine';
@@ -42,13 +35,13 @@ const MODES = [
     id: 'solo',
     icon: '🤖',
     title: 'Solo vs Robots',
-    description: `You against up to ${MAX_AI_PLAYERS} AI robot players.`,
+    description: 'You against 1 or 2 AI robot players.',
   },
   {
     id: 'hotseat',
     icon: '🪑',
     title: 'Hot-Seat Party',
-    description: `Up to ${MAX_PLAYERS} humans pass the device and take turns.`,
+    description: '2-3 humans pass the device and take turns.',
   },
 ];
 
@@ -56,30 +49,24 @@ export default function SetupScreen({ onStart, onBack }) {
   const [modeId, setModeId] = useState('solo');
   const [aiCount, setAiCount] = useState(1);
   const [humanCount, setHumanCount] = useState(2);
-  const [names, setNames] = useState(() => Array.from({ length: MAX_PLAYERS }, () => ''));
-  const [botConfigs, setBotConfigs] = useState(() =>
-    Array.from({ length: MAX_AI_PLAYERS }, () => ({ personalityId: 'random', skillLevelId: 'random' }))
-  );
-  // Off by default — a relaxed family or solo game shouldn't suddenly be on
-  // a clock. See gameConfig.js's TURN_TIME_SECONDS comment.
-  const [turnTimer, setTurnTimer] = useState(false);
+  const [names, setNames] = useState(['', '', '']);
+  const [botConfigs, setBotConfigs] = useState([
+    { personalityId: 'random', skillLevelId: 'random' },
+    { personalityId: 'random', skillLevelId: 'random' },
+  ]);
   const [showLeaderboard, setShowLeaderboard] = useState(false);
   const [showRulebook, setShowRulebook] = useState(false);
   const [showUnlocks, setShowUnlocks] = useState(false);
   const [showCareerStats, setShowCareerStats] = useState(false);
   const [difficultyId, setDifficultyId] = useState(DEFAULT_DIFFICULTY_ID);
   const [scenarioId, setScenarioId] = useState(DEFAULT_SCENARIO_ID);
-  const [weatherSeverityId, setWeatherSeverityId] = useState(DEFAULT_WEATHER_SEVERITY_ID);
   const [infoScenarioId, setInfoScenarioId] = useState(null);
   const difficulty = DIFFICULTIES.find((d) => d.id === difficultyId) || DIFFICULTIES[0];
   const scenario = SCENARIOS.find((s) => s.id === scenarioId) || SCENARIOS[0];
-  const severity = WEATHER_SEVERITIES.find((w) => w.id === weatherSeverityId) || WEATHER_SEVERITIES[1];
   const infoScenario = infoScenarioId ? SCENARIOS.find((s) => s.id === infoScenarioId) : null;
 
   const { profile, avatars, avatarProgress, themeProgress, selectTheme } = useProfile();
-  const [avatarChoices, setAvatarChoices] = useState(() =>
-    Array.from({ length: MAX_PLAYERS }, (_, i) => avatars[i % avatars.length])
-  );
+  const [avatarChoices, setAvatarChoices] = useState([avatars[0], avatars[1], avatars[2]]);
 
   // The opening theme plays here at normal volume. playMusicTrack is a
   // no-op when the same track is already playing, so arriving from the
@@ -150,15 +137,11 @@ export default function SetupScreen({ onStart, onBack }) {
     playSound('business');
     if (modeId === 'solo') {
       onStart({ type: 'solo', aiCount }, [names[0] || 'You'], difficultyId, botConfigs.slice(0, aiCount), {
-        turnTimer,
-        weatherSeverityId,
         scenarioId,
         humanAvatars: [avatarChoices[0]],
       });
     } else {
       onStart({ type: 'hotseat', humanCount }, names.slice(0, humanCount), difficultyId, [], {
-        turnTimer,
-        weatherSeverityId,
         scenarioId,
         humanAvatars: avatarChoices.slice(0, humanCount),
       });
@@ -269,7 +252,7 @@ export default function SetupScreen({ onStart, onBack }) {
               <div>
                 <span className="vf-field-label">How many robot players?</span>
                 <div className="vf-count-toggle">
-                  {Array.from({ length: MAX_AI_PLAYERS }, (_, i) => i + 1).map((n) => (
+                  {[1, 2].map((n) => (
                     <button
                       key={n}
                       type="button"
@@ -357,7 +340,7 @@ export default function SetupScreen({ onStart, onBack }) {
               <div>
                 <span className="vf-field-label">How many players?</span>
                 <div className="vf-count-toggle">
-                  {Array.from({ length: MAX_PLAYERS - 1 }, (_, i) => i + 2).map((n) => (
+                  {[2, 3].map((n) => (
                     <button
                       key={n}
                       type="button"
@@ -407,27 +390,6 @@ export default function SetupScreen({ onStart, onBack }) {
           )}
         </div>
 
-        <div className="vf-card vf-timer-option">
-          <label className="vf-timer-option__row">
-            <input
-              type="checkbox"
-              checked={turnTimer}
-              onChange={(e) => {
-                playSound('click');
-                setTurnTimer(e.target.checked);
-              }}
-            />
-            <span>
-              <strong>⏱️ Play on a clock</strong>
-              <span className="vf-timer-option__blurb">
-                {TURN_TIME_SECONDS} seconds per turn. Each player can add {TURN_EXTENSION_SECONDS} more seconds up to{' '}
-                {TURN_EXTENSIONS_PER_PLAYER} times a game. When time runs out the turn just passes — nothing you
-                already bought is lost.
-              </span>
-            </span>
-          </label>
-        </div>
-
         <div>
           <span className="vf-field-label">Your goal this game</span>
           <div className="vf-scenario-grid">
@@ -456,31 +418,6 @@ export default function SetupScreen({ onStart, onBack }) {
         </div>
 
         <div>
-          <span className="vf-field-label">How wild is the economy?</span>
-          <div className="vf-difficulty-grid">
-            {WEATHER_SEVERITIES.map((w) => (
-              <button
-                key={w.id}
-                type="button"
-                className={`vf-card vf-difficulty-card ${weatherSeverityId === w.id ? 'vf-difficulty-card--active' : ''}`}
-                onClick={() => {
-                  playSound('click');
-                  setWeatherSeverityId(w.id);
-                }}
-              >
-                <span className="vf-difficulty-card__icon">{w.icon}</span>
-                <h3>{w.name}</h3>
-                <p>{w.tagline}</p>
-              </button>
-            ))}
-          </div>
-          <p className="vf-setup__hint">
-            Weather moves asset prices <em>and</em> what your businesses earn each month — turn this up and a storm
-            genuinely hurts.
-          </p>
-        </div>
-
-        <div>
           <span className="vf-field-label">Challenge level</span>
           <div className="vf-difficulty-grid">
             {DIFFICULTIES.map((d) => (
@@ -505,9 +442,6 @@ export default function SetupScreen({ onStart, onBack }) {
             💡 {difficulty.startingSkillTokens} skill token{difficulty.startingSkillTokens === 1 ? '' : 's'}
           </span>
           <span className="vf-pill">
-            {severity.icon} {severity.name} weather
-          </span>
-          <span className="vf-pill">
             {scenario.icon} {scenario.name}
           </span>
         </div>
@@ -529,8 +463,6 @@ export default function SetupScreen({ onStart, onBack }) {
         open={showRulebook}
         difficultyId={difficultyId}
         scenarioId={scenarioId}
-        weatherSeverityId={weatherSeverityId}
-        turnTimer={turnTimer}
         onClose={() => setShowRulebook(false)}
       />
       <UnlocksModal

@@ -12,7 +12,6 @@ import {
   BUSINESS_COST,
   getDifficulty,
   DEFAULT_DIFFICULTY_ID,
-  TURN_EXTENSIONS_PER_PLAYER,
   RENT_OVERSUPPLY_FREE_UNITS,
   RENT_OVERSUPPLY_RATE,
   RENT_MIN_YIELD_FACTOR,
@@ -21,8 +20,6 @@ import {
   PIGGY_BONUS_CHANCE,
   PIGGY_BONUS_PCT_MIN,
   PIGGY_BONUS_PCT_MAX,
-  WEATHER_STAGES,
-  severityScaled,
 } from '../data/gameConfig';
 // pickRandom — the default (player-choice) stream — for picking a robot's
 // personality, exactly like before. envRandomInt/envRandomFloat/envChance —
@@ -83,18 +80,6 @@ export function createPlayer({
     soldBusinesses: [],
     skillTokens: startingSkillTokens,
     passiveBonus: 0, // permanent $/mo from fortune cards
-    // Temporary shocks from fortune cards (see game/decks.js's
-    // applyCardEffect and turnEngine.js's payday step):
-    //   allowanceMods — [{ percent, expiresMonth }], stacking, pruned once
-    //     expired. A lost side job, a new shared cost.
-    //   businessPauseUntilMonth — the LAST month in which this player's
-    //     businesses earn nothing. 0 means "not paused".
-    allowanceMods: [],
-    businessPauseUntilMonth: 0,
-    // Turn-timer extensions this player has left for the whole game (see
-    // gameConfig.js's TURN_EXTENSIONS_PER_PLAYER). Per player rather than
-    // per table, so one slow player can't spend everybody else's.
-    turnExtensionsLeft: TURN_EXTENSIONS_PER_PLAYER,
     badges: [], // [badgeId]
     badgeEvents: [], // [{ badgeId, month }] — feeds future VentureScouts export
     turnComplete: false,
@@ -122,7 +107,7 @@ export function createPlayer({
  * randomly — a human-picked duplicate is left alone, since that's a
  * deliberate choice.
  */
-function resolveBotConfig(config, usedPersonalityIds) {
+export function resolveBotConfig(config, usedPersonalityIds) {
   const requestedPersonalityId = config?.personalityId;
   let personality;
   if (requestedPersonalityId && requestedPersonalityId !== 'random') {
@@ -207,6 +192,55 @@ export function createPlayerRoster(
         })
       );
     }
+  } else if (mode.type === 'online') {
+    // Arbitrary human/AI mix, up to ONLINE_ROOM_MAX_PLAYERS (gameConfig.js) —
+    // e.g. the VentureMaker Arena, where a room can be all-human, all-bot
+    // stand-ins, or anything in between. `mode.seats` is the seat list in
+    // order — [{ type: 'human', name, avatar } | { type: 'ai', personalityId,
+    // skillLevelId }, ...] — and `players[i]` below always corresponds to
+    // `mode.seats[i]`, which is what lets a caller (e.g. the Arena's
+    // resolve-move edge function) map a room seat index straight onto a
+    // player id with no extra bookkeeping. Human and AI seats keep their own
+    // independent id counters (p1, p2, ... / ai1, ai2, ...), same naming
+    // convention as 'solo' and 'hotseat' above — only the ARRAY POSITION
+    // encodes seat order, not the id text.
+    const usedPersonalityIds = new Set();
+    let humanSeq = 0;
+    let aiSeq = 0;
+    for (const seat of mode.seats || []) {
+      if (seat.type === 'ai') {
+        aiSeq += 1;
+        const { personality, skillLevelId } = resolveBotConfig(
+          { personalityId: seat.personalityId, skillLevelId: seat.skillLevelId },
+          usedPersonalityIds
+        );
+        players.push(
+          createPlayer({
+            id: `ai${aiSeq}`,
+            name: personality.name,
+            avatar: personality.avatar,
+            type: 'ai',
+            startingCash,
+            startingSkillTokens,
+            personalityId: personality.id,
+            strategyId: personality.strategyId,
+            skillLevelId,
+          })
+        );
+      } else {
+        humanSeq += 1;
+        players.push(
+          createPlayer({
+            id: `p${humanSeq}`,
+            name: seat.name || `Player ${humanSeq}`,
+            avatar: seat.avatar || PLAYER_AVATARS[(humanSeq - 1) % PLAYER_AVATARS.length] || '🙂',
+            type: 'human',
+            startingCash,
+            startingSkillTokens,
+          })
+        );
+      }
+    }
   }
   return players;
 }
@@ -286,34 +320,14 @@ export function effectiveRentPerUnit(asset, price, totalOwned) {
  * the UI can show a stable, already-rolled figure instead of re-rolling on
  * every render.
  */
-export function rollMonthlyIncomeAmounts(weather, weatherSeverityId) {
+export function rollMonthlyIncomeAmounts(weather) {
   const stageId = weather?.stageId;
-  // The weather's effect on BUSINESS revenue for this month, folded into the
-  // same per-month object everything already receives — so every screen that
-  // shows business income picks it up with no new plumbing, exactly like the
-  // interest rate above. Businesses used to ignore the weather completely,
-  // which made a recession something that happened only to other people.
-  const stageFactor = WEATHER_STAGES[stageId]?.businessIncomeFactor ?? 1;
-  const amounts = {
-    interestRates: {},
-    interestBonus: {},
-    businessFactor: severityScaled(stageFactor, weatherSeverityId, 1),
-  };
+  const amounts = { interestRates: {}, interestBonus: {} };
   for (const asset of ASSETS) {
     if (asset.weatherIncomeRange) {
       const range = asset.weatherIncomeRange[stageId] || Object.values(asset.weatherIncomeRange)[0];
       const [min, max] = range;
-      // TWO draws, always, and take the lower — a triangular distribution
-      // whose mode sits at the bottom of the range while the top stays
-      // reachable (both draws have to come in high). That's the shape the
-      // asset wants: a stand usually earns modestly and occasionally has a
-      // brilliant month, rather than reliably earning near the middle.
-      // Exactly two draws every time, unconditionally, so the environment
-      // stream's position never depends on the weather or on anything a
-      // player did — see game/rng.js's module comment.
-      const first = envRandomInt(min, max);
-      const second = envRandomInt(min, max);
-      amounts[asset.id] = Math.min(first, second);
+      amounts[asset.id] = envRandomInt(min, max);
     }
     if (asset.interestBearing) {
       // Draw the bonus coin flip FIRST and unconditionally, then the rate —
@@ -404,19 +418,7 @@ export function passiveIncomeBreakdown(player, context = {}) {
     const price = prices[a.id] ?? a.basePrice;
     return sum + qty * perUnitIncome(a, { price, totalOwned: total, weatherIncomeAmounts });
   }, 0);
-  // A fortune card can suspend this player's business income for a month or
-  // two (equipment failure, being short-handed — see game/decks.js's
-  // `businessPause`). `month == null` means the caller doesn't know what
-  // month it is, in which case the pause can't be evaluated and the honest
-  // answer is the un-paused figure rather than a guess.
-  const paused = month != null && month <= (player.businessPauseUntilMonth || 0);
-  // The weather scales business revenue for the month (see
-  // rollMonthlyIncomeAmounts). Defaults to 1 for any caller without a
-  // rolled month — an old save, or a context that genuinely has no weather.
-  const weatherFactor = weatherIncomeAmounts?.businessFactor ?? 1;
-  const businessIncome = paused
-    ? 0
-    : player.businesses.reduce((sum, b) => sum + businessMonthlyIncome(b, month), 0) * weatherFactor;
+  const businessIncome = player.businesses.reduce((sum, b) => sum + businessMonthlyIncome(b, month), 0);
   const passiveBonus = player.passiveBonus || 0;
   return {
     assetIncome: Math.round(assetIncome),
@@ -438,31 +440,6 @@ export function passiveIncomeBreakdown(player, context = {}) {
  * defaults to "unknown," which safely excludes any temporary Marketing
  * boosts rather than guessing they're active.
  */
-/** Whether this player's businesses are currently earning nothing because
- * of a fortune-card shock, and until when. Used by the UI to explain a
- * sudden drop rather than leaving the player to work it out. */
-export function businessPauseStatus(player, month) {
-  const until = player.businessPauseUntilMonth || 0;
-  if (month == null || month > until) return null;
-  return { until, monthsLeft: until - month + 1 };
-}
-
-/** How much the current weather is helping or hurting business revenue this
- * month, as a percentage delta (+12, -22). Returns 0 when there's nothing
- * rolled yet. Used by the UI to explain why business income moved. */
-export function businessWeatherPercent(weatherIncomeAmounts) {
-  const factor = weatherIncomeAmounts?.businessFactor;
-  if (typeof factor !== 'number') return 0;
-  return Math.round((factor - 1) * 100);
-}
-
-/** This player's active allowance modifiers for `month`, as a combined
- * percentage (two overlapping cards stack). Returns 0 when nothing applies. */
-export function allowanceModifierPercent(player, month) {
-  if (month == null) return 0;
-  return (player.allowanceMods || []).reduce((sum, m) => (month <= m.expiresMonth ? sum + m.percent : sum), 0);
-}
-
 export function passiveIncome(player, context = {}) {
   return passiveIncomeBreakdown(player, context).total;
 }

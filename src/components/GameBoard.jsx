@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import '../styles/game.css';
 import { getDifficulty } from '../data/gameConfig';
 import { usePlaySpeed } from '../hooks/usePlaySpeed';
-import { turnOrdinal, currentTurnTally } from '../game/turnClock';
 import { playSound } from '../audio/soundEngine';
 import { playMusicTrack } from '../audio/musicEngine';
 import WeatherBadge from './WeatherBadge';
@@ -21,7 +20,6 @@ import Brand from './Brand';
 import LeaderboardModal from './LeaderboardModal';
 import RulebookModal from './RulebookModal';
 import SpeedControl from './SpeedControl';
-import TurnTimer from './TurnTimer';
 import StartupLaunchModal from './StartupLaunchModal';
 import PlayerDetailModal from './PlayerDetailModal';
 
@@ -48,11 +46,6 @@ export default function GameBoard({ game }) {
   const [showRulebook, setShowRulebook] = useState(false);
   const [selectedPlayerId, setSelectedPlayerId] = useState(null);
   const activePlayer = players[activePlayerIndex];
-  // What the active player has bought during THIS turn — the shop uses it to
-  // warn that selling those units back carries the same-turn resale fee,
-  // rather than letting the player discover it from the receipt. Declared
-  // after `activePlayer`, which it reads.
-  const sameTurnBuys = currentTurnTally(activePlayer?.turnBuys, turnOrdinal(state));
 
   // The soft instrumental plays for the whole time the board is up —
   // through every month, every turn, fortune-card recaps included — since
@@ -80,20 +73,14 @@ export default function GameBoard({ game }) {
       const t = setTimeout(() => game.ackFortuneCard(), speed.recapAdvanceMs);
       return () => clearTimeout(t);
     }
-    // Depends on the STABLE useCallback, not the whole `game` object: App
-    // rebuilds that object on every one of its renders, so listing it here
-    // cleared and restarted this timer each time. Harmless only because
-    // nothing currently re-renders App during a recap — but at the fastest
-    // speed (200ms) any future ticking state in App would restart the timer
-    // faster than it could fire and hang the game on the recap screen.
-  }, [status, currentFortuneEntry, currentFortunePlayer, game.ackFortuneCard, speed]);
+  }, [status, currentFortuneEntry, currentFortunePlayer, game, speed]);
 
   // Auto-dismiss error toasts.
   useEffect(() => {
     if (!state.lastError) return;
     const t = setTimeout(() => game.clearError(), 2400);
     return () => clearTimeout(t);
-  }, [state.lastError, game.clearError]);
+  }, [state.lastError, game]);
 
   return (
     <div className="vf-page">
@@ -109,16 +96,6 @@ export default function GameBoard({ game }) {
                   down the moment it starts moving faster than you can
                   follow — mid-turn if need be. */}
               <SpeedControl />
-              {/* Only renders when this game was started with the timer on
-                  and it's a human's live turn — see TurnTimer.jsx. */}
-              <TurnTimer
-                enabled={!!state.turnTimer && isHumanTurn}
-                deadlineAt={state.turnDeadlineAt}
-                player={activePlayer}
-                onStart={game.startTurnTimer}
-                onExtend={() => game.extendTurn(activePlayer.id)}
-                onExpire={() => game.endTurn(activePlayer.id)}
-              />
               <button
                 type="button"
                 className="vf-btn vf-btn--sm vf-btn--ghost"
@@ -195,7 +172,6 @@ export default function GameBoard({ game }) {
             allPlayers={players}
             weather={weather}
             weatherIncomeAmounts={weatherIncomeAmounts}
-            sameTurnBuys={sameTurnBuys}
             disabled={!isHumanTurn}
             onBuy={(assetId) => game.buyAsset(activePlayer.id, assetId, 1)}
             onSell={(assetId) => game.sellAsset(activePlayer.id, assetId, 1)}
@@ -215,11 +191,7 @@ export default function GameBoard({ game }) {
             past the board below them — falls back to stacking under the
             board on narrow screens, see game.css's .vf-board-layout. */}
         <div className="vf-board-sidebar">
-          <WeatherCard
-            weather={weather}
-            weatherIncomeAmounts={weatherIncomeAmounts}
-            weatherSeverityId={state.weatherSeverityId}
-          />
+          <WeatherCard weather={weather} />
           <ChatPanel chat={chat} players={players} onSendChat={game.sendChat} />
           <EventLog log={log} />
         </div>
@@ -244,8 +216,6 @@ export default function GameBoard({ game }) {
         open={showRulebook}
         difficultyId={state.difficultyId}
         scenarioId={state.scenarioId}
-        weatherSeverityId={state.weatherSeverityId}
-        turnTimer={!!state.turnTimer}
         onClose={() => setShowRulebook(false)}
       />
 

@@ -61,14 +61,6 @@ import {
   PIGGY_BONUS_PCT_MAX,
   PIGGY_BONUS_CHANCE,
   getAssetIncomeRange,
-  MAX_PLAYERS,
-  SAME_TURN_SELL_PENALTY,
-  WEATHER_SEVERITIES,
-  TURN_TIME_SECONDS,
-  TURN_EXTENSION_SECONDS,
-  TURN_EXTENSIONS_PER_PLAYER,
-  getWeatherSeverity,
-  severityScaled,
 } from './gameConfig';
 
 const pct = (n) => `${+(n * 100).toFixed(2)}%`;
@@ -82,10 +74,9 @@ const money = (n) => `$${Math.round(n).toLocaleString()}`;
  * modal can render it, search it, and print it without any of that logic
  * knowing what the rules actually say.
  */
-export function buildRulebook({ difficultyId, scenarioId, weatherSeverityId, turnTimer } = {}) {
+export function buildRulebook({ difficultyId, scenarioId } = {}) {
   const difficulty = getDifficulty(difficultyId || DEFAULT_DIFFICULTY_ID);
   const scenario = getScenario(scenarioId || DEFAULT_SCENARIO_ID);
-  const severity = getWeatherSeverity(weatherSeverityId);
 
   return [
     {
@@ -128,10 +119,6 @@ export function buildRulebook({ difficultyId, scenarioId, weatherSeverityId, tur
             'Month-end, in order: R&D projects that are due pay off, neglected businesses lose a little income, a buyout offer may appear, everyone gets paid, everyone draws a fortune card, prices drift, badges are awarded, and the weather may change.',
             'Tap any player card at any time to see their full portfolio — yours has the investment buttons on it, everyone else’s is read-only.',
             'A spotlight follows whoever’s turn it is. Robots take one move at a time, at whatever pace the speed slider is set to — drag it left to watch every move land, right to speed through. You can change it mid-game.',
-            `A table seats up to ${MAX_PLAYERS} players — you against up to ${MAX_PLAYERS - 1} robots, or up to ${MAX_PLAYERS} humans passing one device.`,
-            turnTimer
-              ? `This game is on a clock: ${TURN_TIME_SECONDS} seconds a turn. You can add ${TURN_EXTENSION_SECONDS} more seconds up to ${TURN_EXTENSIONS_PER_PLAYER} times across the whole game. If time runs out your turn simply passes — nothing you already bought is taken away.`
-              : `Games can optionally be played on a clock (${TURN_TIME_SECONDS} seconds a turn, with ${TURN_EXTENSIONS_PER_PLAYER} extensions each). This one isn't — turn it on at setup if you want it.`,
           ],
         },
       ],
@@ -161,12 +148,6 @@ export function buildRulebook({ difficultyId, scenarioId, weatherSeverityId, tur
         {
           type: 'p',
           text: 'Prices move every month with the weather plus a random wobble of their own. Riskier things swing harder — both up and down. Hold the Buy or Sell button to buy or sell a whole stack quickly.',
-        },
-        {
-          type: 'p',
-          text: `One catch: anything you sell in the SAME turn you bought it returns ${Math.round(
-            SAME_TURN_SELL_PENALTY * 100
-          )}% less. Prices only move at month-end, so buying and instantly selling would otherwise cost nothing — and in the real world you never get back quite what you just paid. Units you have held since an earlier month always sell at full price.`,
         },
         {
           type: 'rows',
@@ -329,50 +310,7 @@ export function buildRulebook({ difficultyId, scenarioId, weatherSeverityId, tur
         },
         {
           type: 'p',
-          text: `The weather moves your BUSINESS revenue too, not just prices. Right now you are playing on ${severity.icon} ${severity.name} weather, so a Stormy Bust cuts business income by about ${Math.abs(
-            Math.round((severityScaled(WEATHER_STAGES.stormyBust.businessIncomeFactor, severity.id, 1) - 1) * 100)
-          )}% and a Sunny Boom lifts it by about ${Math.round(
-            (severityScaled(WEATHER_STAGES.sunnyBoom.businessIncomeFactor, severity.id, 1) - 1) * 100
-          )}%.`,
-        },
-        {
-          type: 'rows',
-          rows: WEATHER_SEVERITIES.map((w) => ({ label: `${w.icon} ${w.name}`, detail: w.tagline })),
-        },
-        {
-          type: 'p',
           text: 'Storms are not only bad news: everything is cheaper to buy, and the cycle always turns. Buying when things look grim is how a lot of real money gets made.',
-        },
-      ],
-    },
-    {
-      id: 'cards',
-      icon: '🎴',
-      title: 'Fortune cards',
-      blocks: [
-        {
-          type: 'p',
-          text: 'At the end of every month each player draws one card. Some are opportunities, some are setbacks, and which deck is more likely depends on the weather.',
-        },
-        {
-          type: 'p',
-          text: 'A card about a thing only affects players who own that thing. A card about tree houses pays (or costs) you per tree house you own, and does nothing at all if you own none — it will say so. Money in this game comes from what you own, and the cards follow that rule.',
-        },
-        {
-          type: 'rows',
-          rows: [
-            { label: '💵 Cash', detail: 'A one-off gain or cost from ordinary life — a grant, a repair, an insurance bill.' },
-            { label: '📦 Per item owned', detail: 'Scales with how many you hold. Nothing to hold, nothing happens.' },
-            { label: '🏦 A share of your holdings', detail: 'You actually lose (or gain) units of something — a bank failure takes part of your savings for good.' },
-            { label: '🚀 Your business revenue', detail: 'A permanent change to your best business, up or down. A lost partner really is a lost partner.' },
-            { label: '🛑 Business paused', detail: 'Your businesses earn nothing for a month or two — broken equipment, no one to do the work.' },
-            { label: '📅 Your allowance', detail: 'Temporarily higher or lower for a few months, then back to normal on its own.' },
-            { label: '📈 Market news', detail: 'Moves a price for everyone at the table, which only matters if you hold it.' },
-          ],
-        },
-        {
-          type: 'p',
-          text: 'Setbacks are meant to be survivable, not fatal: a business can never be driven to zero income, and nothing you already bought is confiscated. The point is that a bad month is normal, and being spread out is what makes it survivable.',
         },
       ],
     },

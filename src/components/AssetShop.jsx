@@ -1,14 +1,7 @@
-import { useCallback, useState } from 'react';
-import {
-  ASSETS,
-  RENT_OVERSUPPLY_FREE_UNITS,
-  WEATHER_STAGES,
-  getAssetIncomeRange,
-  SAME_TURN_SELL_PENALTY,
-} from '../data/gameConfig';
+import { useCallback } from 'react';
+import { ASSETS, RENT_OVERSUPPLY_FREE_UNITS, WEATHER_STAGES, getAssetIncomeRange } from '../data/gameConfig';
 import { effectiveRentPerUnit, perUnitIncome, totalUnitsOwned, interestRateFor, isInterestBonusMonth } from '../game/players';
 import { useHoldRepeat } from '../hooks/useHoldRepeat';
-import { playSound } from '../audio/soundEngine';
 
 /** A quick 1-4 dot risk meter from an asset's volatility, paired with its
  * existing riskLabel text (gameConfig.js) — teaches the risk/reward
@@ -30,7 +23,7 @@ function crowdingLabel(totalOwned) {
   return 'Market: very crowded';
 }
 
-function AssetCard({ asset, price, previousPrice, owned, cash, totalOwned, weather, weatherIncomeAmounts, boughtThisTurn = 0, onBuy, onSell, disabled }) {
+function AssetCard({ asset, price, previousPrice, owned, cash, totalOwned, weather, weatherIncomeAmounts, onBuy, onSell, disabled }) {
   const trendUp = price >= previousPrice;
   const trendPct = previousPrice ? Math.round(((price - previousPrice) / previousPrice) * 100) : 0;
   const canBuy = !disabled && cash >= price;
@@ -43,37 +36,8 @@ function AssetCard({ asset, price, previousPrice, owned, cash, totalOwned, weath
   // instant cash or holdings run out, rather than hammering a no-op.
   const canBuyRef = useCallback(() => canBuy, [canBuy]);
   const canSellRef = useCallback(() => canSell, [canSell]);
-
-  // Every press — including each repeat of a press-and-hold — gets a short
-  // punchy "thock" and a ring that flashes around the button's border.
-  //
-  // The ring is keyed on a counter so React remounts the element on each
-  // press: a CSS animation only replays if the node is new, which is what
-  // makes rapid repeats each flash rather than the first one animating and
-  // the rest doing nothing.
-  //
-  // This also fills a gap the event-log change opened. Repeated purchases of
-  // the same thing now merge into one log line, so only the FIRST buy in a
-  // burst produces the asset's character sound; without this the twentieth
-  // press would give no feedback at all. Now every press feels like a press,
-  // and the asset's own sound tops the burst.
-  const [buyPress, setBuyPress] = useState(0);
-  const [sellPress, setSellPress] = useState(0);
-
-  const fireBuy = useCallback(() => {
-    playSound('buttonPress');
-    setBuyPress((n) => n + 1);
-    onBuy();
-  }, [onBuy]);
-
-  const fireSell = useCallback(() => {
-    playSound('buttonPress');
-    setSellPress((n) => n + 1);
-    onSell();
-  }, [onSell]);
-
-  const buyHold = useHoldRepeat(fireBuy, canBuyRef);
-  const sellHold = useHoldRepeat(fireSell, canSellRef);
+  const buyHold = useHoldRepeat(onBuy, canBuyRef);
+  const sellHold = useHoldRepeat(onSell, canSellRef);
 
   // Interest-bearing assets (Piggy Bank) show this month's rate rather than
   // a dollar figure, since the payout scales with the live price — see
@@ -134,42 +98,19 @@ function AssetCard({ asset, price, previousPrice, owned, cash, totalOwned, weath
         <span className="vf-asset-card__no-income">💵 Price only — no monthly income</span>
       )}
       <span className="vf-asset-card__owned">You have: {owned}</span>
-      {boughtThisTurn > 0 && (
-        <span
-          className="vf-asset-card__resale"
-          title={`Anything bought this turn sells back for ${Math.round(
-            SAME_TURN_SELL_PENALTY * 100
-          )}% less. Units you have held since an earlier month sell at full price.`}
-        >
-          ↩️ {boughtThisTurn} bought this turn · sells back {Math.round(SAME_TURN_SELL_PENALTY * 100)}% lower
-        </span>
-      )}
       <div className="vf-asset-card__actions">
-        <button type="button" className="vf-btn vf-btn--go vf-btn--press" disabled={!canBuy} {...buyHold}>
+        <button type="button" className="vf-btn vf-btn--go" disabled={!canBuy} {...buyHold}>
           Buy
-          {buyPress > 0 && <span key={buyPress} className="vf-btn__ring" aria-hidden="true" />}
         </button>
-        <button type="button" className="vf-btn vf-btn--danger vf-btn--press" disabled={!canSell} {...sellHold}>
+        <button type="button" className="vf-btn vf-btn--danger" disabled={!canSell} {...sellHold}>
           Sell
-          {sellPress > 0 && <span key={sellPress} className="vf-btn__ring" aria-hidden="true" />}
         </button>
       </div>
     </div>
   );
 }
 
-export default function AssetShop({
-  prices,
-  previousPrices,
-  player,
-  allPlayers,
-  weather,
-  weatherIncomeAmounts,
-  sameTurnBuys = {},
-  disabled,
-  onBuy,
-  onSell,
-}) {
+export default function AssetShop({ prices, previousPrices, player, allPlayers, weather, weatherIncomeAmounts, disabled, onBuy, onSell }) {
   return (
     <div>
       <div className="vf-section-title">
@@ -189,7 +130,6 @@ export default function AssetShop({
             totalOwned={totalUnitsOwned(allPlayers, asset.id)}
             weather={weather}
             weatherIncomeAmounts={weatherIncomeAmounts}
-            boughtThisTurn={sameTurnBuys[asset.id] || 0}
             disabled={disabled}
             onBuy={() => onBuy(asset.id)}
             onSell={() => onSell(asset.id)}

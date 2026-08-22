@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { netWorth, passiveIncome, businessPauseStatus, allowanceModifierPercent } from '../game/players';
+import { netWorth, passiveIncome } from '../game/players';
 import { getBadgeInfo } from '../game/badges';
 import { getSkillLevel } from '../data/gameConfig';
 import { businessHealthStatus } from '../game/businessUpgrades';
@@ -38,11 +38,6 @@ function PlayerCard({ player, prices, allPlayers, month, weatherIncomeAmounts, i
   // neglected business is the bot's problem, and flagging it here would
   // read as something the player is supposed to fix.
   const isBot = player.type === 'ai';
-  // Temporary fortune-card shocks, surfaced on the card itself. A player
-  // whose income silently halves has no way to find out why otherwise —
-  // the card that did it has long since scrolled out of the event log.
-  const pause = businessPauseStatus(player, month);
-  const allowancePct = allowanceModifierPercent(player, month);
   const playerNetWorth = netWorth(player, prices);
   // A <button> can't legally contain another <button> (the invest CTA
   // below), so the whole-card tap target is a div with button semantics
@@ -74,27 +69,6 @@ function PlayerCard({ player, prices, allPlayers, month, weatherIncomeAmounts, i
       <div className="vf-player-card__stat">
         🌱 Passive: ${passiveIncome(player, { allPlayers, prices, month, weatherIncomeAmounts })}/mo · 💡 {player.skillTokens}
       </div>
-      {(pause || allowancePct !== 0) && (
-        <div className="vf-player-card__shocks">
-          {pause && (
-            <span
-              className="vf-shock-chip vf-shock-chip--bad"
-              title="A fortune card stopped this player's businesses earning. It comes back on its own."
-            >
-              🛑 No business income · {pause.monthsLeft} mo
-            </span>
-          )}
-          {allowancePct !== 0 && (
-            <span
-              className={`vf-shock-chip ${allowancePct > 0 ? 'vf-shock-chip--good' : 'vf-shock-chip--bad'}`}
-              title="A fortune card temporarily changed this player's monthly allowance."
-            >
-              {allowancePct > 0 ? '📈' : '📉'} Allowance {allowancePct > 0 ? '+' : ''}
-              {allowancePct}%
-            </span>
-          )}
-        </div>
-      )}
       {player.badges.length > 0 && (
         <div className="vf-player-card__badges">
           {player.badges.map((badgeId) => {

@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { getDifficulty } from '../data/gameConfig';
 import { useLeaderboard } from '../hooks/useLeaderboard';
-import { useGlobalLeaderboard } from '../hooks/useGlobalLeaderboard';
 import { playSound } from '../audio/soundEngine';
 import { todayChallengeDate } from '../game/dailyChallenge';
 
@@ -96,23 +95,14 @@ export default function LeaderboardModal({ open, onClose, highlightId }) {
   }, [open]);
 
   const today = todayChallengeDate();
-  // The shared board is only fetched once its tab is actually opened —
-  // there's no reason to hit the network every time somebody glances at
-  // their own local scores.
-  const global = useGlobalLeaderboard({
-    enabled: open && (tab === 'global' || tab === 'globalDaily'),
-    dailyChallengeDate: tab === 'globalDaily' ? today : null,
-  });
-  const isGlobalTab = tab === 'global' || tab === 'globalDaily';
   // "Today's Challenge" is its own segment — every entry there played the
   // identical weather timeline/fortune-card draws (see
   // game/dailyChallenge.js), so those scores are a fair apples-to-apples
   // comparison in a way mixing them with regular runs wouldn't be.
-  const visibleEntries = useMemo(() => {
-    if (tab === 'global' || tab === 'globalDaily') return global.entries;
-    if (tab === 'daily') return entries.filter((e) => e.dailyChallengeDate === today);
-    return entries;
-  }, [entries, global.entries, tab, today]);
+  const visibleEntries = useMemo(
+    () => (tab === 'daily' ? entries.filter((e) => e.dailyChallengeDate === today) : entries),
+    [entries, tab, today]
+  );
 
   if (!open) return null;
 
@@ -156,49 +146,11 @@ export default function LeaderboardModal({ open, onClose, highlightId }) {
           >
             🗓️ Today's Challenge
           </button>
-          {global.available && (
-            <>
-              <button
-                type="button"
-                className={`vf-btn vf-btn--sm ${tab === 'global' ? 'vf-btn--primary' : 'vf-btn--ghost'}`}
-                onClick={() => selectTab('global')}
-                title="Scores from everyone playing VentureFlow, on any device"
-              >
-                🌍 Global
-              </button>
-              <button
-                type="button"
-                className={`vf-btn vf-btn--sm ${tab === 'globalDaily' ? 'vf-btn--primary' : 'vf-btn--ghost'}`}
-                onClick={() => selectTab('globalDaily')}
-                title="Everyone who played today's challenge, anywhere"
-              >
-                🌍 Today
-              </button>
-            </>
-          )}
         </div>
-
-        {isGlobalTab && (
-          <p className="vf-leaderboard__note">
-            {global.loading
-              ? 'Loading scores from everyone…'
-              : global.error
-              ? "Couldn't reach the global leaderboard — your own scores are safe on the other tabs."
-              : 'Everyone who plays VentureFlow, on any device. Your local tabs keep working offline.'}
-          </p>
-        )}
 
         {visibleEntries.length === 0 ? (
           <p className="vf-log__empty">
-            {global.loading && isGlobalTab
-              ? ''
-              : global.error && isGlobalTab
-              ? 'Nothing to show while the global board is unreachable.'
-              : tab === 'globalDaily'
-              ? "No one anywhere has finished today's challenge yet — be the first!"
-              : tab === 'global'
-              ? 'No global scores yet — finish a game and add yours!'
-              : tab === 'daily'
+            {tab === 'daily'
               ? "No one's played today's challenge yet — be the first!"
               : 'No scores saved yet — finish a game and add yours!'}
           </p>
@@ -209,8 +161,8 @@ export default function LeaderboardModal({ open, onClose, highlightId }) {
                 <button
                   type="button"
                   className={`vf-leaderboard__row ${entry.id === highlightId ? 'vf-leaderboard__row--highlight' : ''}`}
-                  onClick={() => !entry.global && toggleExpanded(entry.id)}
-                  title={entry.global ? 'A score from another player' : 'Tap to see their portfolio'}
+                  onClick={() => toggleExpanded(entry.id)}
+                  title="Tap to see their portfolio"
                 >
                   <span className="vf-leaderboard__rank">{i + 1}</span>
                   <span className="vf-leaderboard__avatar">{entry.avatar}</span>
@@ -222,7 +174,7 @@ export default function LeaderboardModal({ open, onClose, highlightId }) {
                   <span className="vf-leaderboard__date">{formatDate(entry.playedAt)}</span>
                   <span className="vf-leaderboard__score">${entry.netWorth.toLocaleString()}</span>
                 </button>
-                {!entry.global && expandedId === entry.id && <PortfolioSnapshot portfolio={entry.portfolio} />}
+                {expandedId === entry.id && <PortfolioSnapshot portfolio={entry.portfolio} />}
               </div>
             ))}
           </div>

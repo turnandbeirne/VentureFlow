@@ -275,6 +275,16 @@
   align-self: center;
 }
 
+/* The one link to the "Just for Kids" build (src/kids/) — see
+   components/LandingScreen.jsx for why this is the ONLY place that build is
+   allowed to touch the main game. Reuses .vf-btn's shape but needs its own
+   text-decoration reset, same as .vf-venturemaker-link above, since .vf-btn
+   alone doesn't cover anchor elements. */
+.vf-landing__kids-link {
+  align-self: center;
+  text-decoration: none;
+}
+
 /* Motion -------------------------------------------------------------------- */
 .vf-hero-sun {
   transform-origin: 86px 70px;
