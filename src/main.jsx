@@ -9,19 +9,9 @@ import '@fontsource/fredoka/700.css'
 import '@fontsource/dancing-script/600.css'
 import './index.css'
 import App from './App.jsx'
-import KidsApp from './kids/KidsApp.jsx'
-
-// A one-line, no-dependency "route": `/kids` mounts the standalone Kids
-// Version instead of the main app. Deliberately not pulling in a routing
-// library for a single static entry point — see src/kids/KidsApp.jsx's
-// header comment for why the two apps are kept as separate files rather
-// than one branching component. Every other path (including any the main
-// app's own client-side state might produce) renders <App /> exactly as
-// before.
-const isKidsRoute = window.location.pathname.replace(/\/+$/, '') === '/kids';
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
-    {isKidsRoute ? <KidsApp /> : <App />}
+    <App />
   </StrictMode>,
 )

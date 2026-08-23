@@ -206,15 +206,6 @@ export default function LandingScreen({ onStart, onCustomize }) {
           </div>
         </section>
 
-        {/* The one and only change the "VentureFlow: Just for Kids" build
-            (src/kids/) is allowed to make to the main game — everything
-            else about that version lives in its own files and its own
-            /kids route (see src/main.jsx). A plain anchor rather than any
-            client-side nav, since /kids is its own separate mounted app. */}
-        <a className="vf-btn vf-btn--warm vf-btn--lg vf-landing__kids-link" href="/kids">
-          🧒 VentureFlow: Just for Kids Version!
-        </a>
-
         <VentureMakerLink className="vf-landing__vm" />
       </div>
 
