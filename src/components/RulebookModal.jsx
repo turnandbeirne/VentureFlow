@@ -41,8 +41,11 @@ function Block({ block }) {
  * when there is one, so a player reading the rulebook mid-game sees the
  * figures actually in play rather than the defaults.
  */
-export default function RulebookModal({ open, difficultyId, scenarioId, onClose }) {
-  const sections = useMemo(() => buildRulebook({ difficultyId, scenarioId }), [difficultyId, scenarioId]);
+export default function RulebookModal({ open, difficultyId, scenarioId, weatherSeverityId, turnTimer, onClose }) {
+  const sections = useMemo(
+    () => buildRulebook({ difficultyId, scenarioId, weatherSeverityId, turnTimer }),
+    [difficultyId, scenarioId, weatherSeverityId, turnTimer]
+  );
   const [activeId, setActiveId] = useState(sections[0].id);
 
   if (!open) return null;

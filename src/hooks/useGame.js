@@ -70,6 +70,8 @@ export function useGame() {
       scenarioId: options.scenarioId,
       humanAvatars: options.humanAvatars,
       dailyChallengeDate: options.dailyChallengeDate,
+      turnTimer: !!options.turnTimer,
+      weatherSeverityId: options.weatherSeverityId,
     });
   }, []);
 
@@ -100,6 +102,16 @@ export function useGame() {
 
   const endTurn = useCallback((playerId) => {
     dispatch({ type: 'END_TURN', playerId });
+  }, []);
+
+  const startTurnTimer = useCallback((deadlineAt) => {
+    dispatch({ type: 'START_TURN_TIMER', deadlineAt });
+  }, []);
+
+  const extendTurn = useCallback((playerId) => {
+    // Date.now() is read HERE, in the UI layer, and passed in — the reducer
+    // stays a pure function of (state, action). See reducer.js's timer cases.
+    dispatch({ type: 'EXTEND_TURN', playerId, now: Date.now() });
   }, []);
 
   const ackStartupLaunch = useCallback(() => {
@@ -133,6 +145,8 @@ export function useGame() {
     learnSkill,
     upgradeBusiness,
     endTurn,
+    startTurnTimer,
+    extendTurn,
     ackStartupLaunch,
     ackFortuneCard,
     resolveExitOffer,

@@ -73,6 +73,78 @@ import groanDogWhimper from '../assets/audio/sfx/groan/dog-whimper-sad.mp3';
 import groanCreatureCrying from '../assets/audio/sfx/groan/creature-sad-crying.mp3';
 
 import errorGameOverWhistle from '../assets/audio/sfx/error/cartoon-whistle-game-over.mp3';
+import errorCartoonToyWhistle from '../assets/audio/sfx/error/cartoon-toy-whistle.mp3';
+
+import groanTromboneDisappoint from '../assets/audio/sfx/groan/trombone-disappoint.mp3';
+
+import laughChildHappily from '../assets/audio/sfx/laugh/child-laughing-happily.mp3';
+import laughKidGiggle from '../assets/audio/sfx/laugh/kid-giggle-laugh.mp3';
+import laughHappyChild from '../assets/audio/sfx/laugh/happy-child-laughing.mp3';
+
+import piggyStrongFart from '../assets/audio/sfx/piggy/cartoon-strong-fart.mp3';
+import piggyFartingBalloon from '../assets/audio/sfx/piggy/farting-balloon-deflate.mp3';
+import piggyFartTriple from '../assets/audio/sfx/piggy/cartoon-fart-triple.mp3';
+import piggyFartOrSplat from '../assets/audio/sfx/piggy/cartoon-fart-or-splat.mp3';
+import piggyFastSplat from '../assets/audio/sfx/piggy/funny-cartoon-fast-splat.mp3';
+import piggySillyPop from '../assets/audio/sfx/piggy/silly-pop-cluster.mp3';
+import piggyMoneyBagDrop from '../assets/audio/sfx/piggy/money-bag-drop.mp3';
+import piggyAtmKeypress from '../assets/audio/sfx/piggy/atm-cash-machine-keypress.mp3';
+
+import lemonadeStoppingTruck from '../assets/audio/sfx/lemonade/stopping-truck.mp3';
+
+import treehouseForestBirds from '../assets/audio/sfx/treehouse/forest-birds-singing.mp3';
+import treehouseLittleBirds from '../assets/audio/sfx/treehouse/little-birds-singing-in-the-trees.mp3';
+import treehouseCatPurr from '../assets/audio/sfx/treehouse/big-wild-cat-long-purr.mp3';
+import treehouseCatAngry from '../assets/audio/sfx/treehouse/angry-cartoon-kitty-meow.mp3';
+import treehouseCatHungry from '../assets/audio/sfx/treehouse/domestic-cat-hungry-meow.mp3';
+import treehouseCatBegging from '../assets/audio/sfx/treehouse/cartoon-kitty-begging-meow.mp3';
+import treehouseCatSweet from '../assets/audio/sfx/treehouse/sweet-kitty-meow.mp3';
+import treehouseLionRoar from '../assets/audio/sfx/treehouse/wild-lion-animal-roar.mp3';
+import treehouseLionWounded from '../assets/audio/sfx/treehouse/wounded-lion-growling.mp3';
+import treehouseLionGrowl from '../assets/audio/sfx/treehouse/big-wild-lion-growl.mp3';
+import treehouseFootsteps from '../assets/audio/sfx/treehouse/footsteps-in-the-forest-ground.mp3';
+
+import treasureMagicalCoinWin from '../assets/audio/sfx/treasure/magical-coin-win.mp3';
+import treasureGoldCoinPrize from '../assets/audio/sfx/treasure/gold-coin-prize.mp3';
+import treasureMelodicGoldPrice from '../assets/audio/sfx/treasure/melodic-gold-price.mp3';
+import treasureGameLootWin from '../assets/audio/sfx/treasure/game-loot-win.mp3';
+import treasureSmallWin from '../assets/audio/sfx/treasure/small-win.mp3';
+import treasureWindChimes from '../assets/audio/sfx/treasure/wind-chimes.mp3';
+import treasureStonesFalling from '../assets/audio/sfx/treasure/stones-and-rocks-falling.mp3';
+
+import paydayCoinsSound from '../assets/audio/sfx/payday/coins-sound.mp3';
+import paydayCoinWinNotification from '../assets/audio/sfx/payday/coin-win-notification.mp3';
+import paydayCoinsHandling from '../assets/audio/sfx/payday/coins-handling.mp3';
+import paydayClinkingCoins from '../assets/audio/sfx/payday/clinking-coins.mp3';
+
+import jackpotCasinoAlarm from '../assets/audio/sfx/jackpot/casino-jackpot-alarm-and-coins.mp3';
+import jackpotClassicWinnerAlarm from '../assets/audio/sfx/jackpot/classic-winner-alarm.mp3';
+import jackpotSlotMachinePayout from '../assets/audio/sfx/jackpot/slot-machine-payout-alarm.mp3';
+import jackpotMaleVoiceCheer from '../assets/audio/sfx/jackpot/male-voice-cheer-victory.mp3';
+
+import botQuickKiss from '../assets/audio/sfx/bot/quick-funny-kiss.mp3';
+import botLongKiss from '../assets/audio/sfx/bot/long-loving-kiss.mp3';
+import botChickenCluck from '../assets/audio/sfx/bot/chickens-clucking-short.mp3';
+import botFunnyKidVoice from '../assets/audio/sfx/bot/funny-kid-voice.mp3';
+import botHappyYoungGirl from '../assets/audio/sfx/bot/happy-young-girl.mp3';
+import botGirlNoNoNo from '../assets/audio/sfx/bot/cartoon-girl-saying-nonono.mp3';
+
+import skillPositiveSound from '../assets/audio/sfx/skill/cartoon-positive-sound.mp3';
+import skillTypewriterReturn from '../assets/audio/sfx/skill/typewriter-classic-return.mp3';
+import skillTypingDevice from '../assets/audio/sfx/skill/typing-on-an-electronic-device.mp3';
+import skillKeyboardTyping from '../assets/audio/sfx/skill/keyboard-typing.mp3';
+
+import timerTickTockClock from '../assets/audio/sfx/timer/tick-tock-clock-timer.mp3';
+import timerPercussionTickTock from '../assets/audio/sfx/timer/percussion-tick-tock-timer.mp3';
+import timerChildrenCountdown from '../assets/audio/sfx/timer/children-happy-countdown.mp3';
+
+import fireworksReal from '../assets/audio/sfx/fireworks/firework-rockets-explosions.mp3';
+
+import weatherBadThunder from '../assets/audio/sfx/weatherbad/thunder-deep-rumble.mp3';
+import weatherBadStormWind from '../assets/audio/sfx/weatherbad/storm-wind.mp3';
+import weatherBadHeavyRain from '../assets/audio/sfx/weatherbad/heavy-raindrops.mp3';
+import weatherGoodForestBirds from '../assets/audio/sfx/weathergood/forest-birds-singing.mp3';
+import weatherGoodLittleBirds from '../assets/audio/sfx/weathergood/little-birds-singing-in-the-trees.mp3';
 
 const note = (freq, start, duration, type = 'sine', gain = 1) => ({ freq, start, duration, type, gain });
 
@@ -225,6 +297,9 @@ const LAUGH_SAMPLES = [
   { weight: 10, build: () => sample(laughCartoonGiggle, 0.55) },
   { weight: 10, build: () => sample(laughFunnyCartoon, 0.6) },
   { weight: 10, build: () => sample(laughHyena, 0.55) },
+  { weight: 8, build: () => sample(laughChildHappily, 0.55) },
+  { weight: 8, build: () => sample(laughKidGiggle, 0.55) },
+  { weight: 8, build: () => sample(laughHappyChild, 0.55) },
 ];
 
 const CHEER_SAMPLES = [
@@ -248,6 +323,7 @@ const GROAN_SAMPLES = [
   { weight: 6, build: () => sample(groanPeopleMoaning, 0.4) },
   { weight: 6, build: () => sample(groanDogWhimper, 0.45) },
   { weight: 4, build: () => sample(groanCreatureCrying, 0.4) },
+  { weight: 8, build: () => sample(groanTromboneDisappoint, 0.5) },
 ];
 
 /** Mix a recorded-clip pool in alongside an existing synth recipe: the synth
@@ -264,6 +340,67 @@ function withSamples(synthRecipe, synthWeight, samplePool) {
 const ERROR_SAMPLES = [
   { weight: 3, build: () => sample(errorGameOverWhistle, 0.4) },
   { weight: 2, build: () => sample(groanPartyTrumpet, 0.35) },
+  { weight: 2, build: () => sample(errorCartoonToyWhistle, 0.4) },
+];
+
+// --- More recorded-clip pools, same weighted-pool shape as above -----------
+const PAYDAY_SAMPLES = [
+  { weight: 8, build: () => sample(paydayCoinsSound, 0.4) },
+  { weight: 8, build: () => sample(paydayCoinWinNotification, 0.4) },
+  { weight: 8, build: () => sample(paydayCoinsHandling, 0.4) },
+  { weight: 8, build: () => sample(paydayClinkingCoins, 0.4) },
+];
+
+// Reserved for the rarest win in the game — mixed into businessExit ON TOP
+// OF CHEER_SAMPLES (see SOUNDS.businessExit below), not used anywhere else,
+// so a casino jackpot alarm stays special rather than turning up on every
+// opportunity card.
+const JACKPOT_SAMPLES = [
+  { weight: 6, build: () => sample(jackpotCasinoAlarm, 0.45) },
+  { weight: 6, build: () => sample(jackpotClassicWinnerAlarm, 0.45) },
+  { weight: 6, build: () => sample(jackpotSlotMachinePayout, 0.45) },
+  { weight: 6, build: () => sample(jackpotMaleVoiceCheer, 0.5) },
+];
+
+const SKILL_SAMPLES = [
+  { weight: 8, build: () => sample(skillPositiveSound, 0.45) },
+  { weight: 6, build: () => sample(skillTypewriterReturn, 0.4) },
+  { weight: 6, build: () => sample(skillTypingDevice, 0.4) },
+  { weight: 6, build: () => sample(skillKeyboardTyping, 0.4) },
+];
+
+// The turn-timer low-time warning (see components/TurnTimer.jsx) fires once
+// per turn at most, so — unlike error — these can afford to be the common
+// case rather than a rare surprise.
+const TIMER_SAMPLES = [
+  { weight: 10, build: () => sample(timerTickTockClock, 0.4) },
+  { weight: 10, build: () => sample(timerPercussionTickTock, 0.4) },
+  { weight: 6, build: () => sample(timerChildrenCountdown, 0.4) },
+];
+
+const BOT_KISS_SAMPLES = [
+  { weight: 10, build: () => sample(botQuickKiss, 0.5) },
+  { weight: 10, build: () => sample(botLongKiss, 0.5) },
+];
+
+const BOT_SQUAWK_SAMPLES = [{ weight: 10, build: () => sample(botChickenCluck, 0.5) }];
+
+const BOT_OHYEAH_SAMPLES = [
+  { weight: 8, build: () => sample(botFunnyKidVoice, 0.5) },
+  { weight: 8, build: () => sample(botHappyYoungGirl, 0.5) },
+];
+
+const BOT_TAKEITBACK_SAMPLES = [{ weight: 10, build: () => sample(botGirlNoNoNo, 0.5) }];
+
+const WEATHER_GOOD_SAMPLES = [
+  { weight: 8, build: () => sample(weatherGoodForestBirds, 0.4) },
+  { weight: 8, build: () => sample(weatherGoodLittleBirds, 0.4) },
+];
+
+const WEATHER_BAD_SAMPLES = [
+  { weight: 8, build: () => sample(weatherBadThunder, 0.4) },
+  { weight: 8, build: () => sample(weatherBadStormWind, 0.4) },
+  { weight: 8, build: () => sample(weatherBadHeavyRain, 0.4) },
 ];
 
 // --- Piggy Bank: cute, greedy, a bit gross ---------------------------------
@@ -327,6 +464,18 @@ const PIGGY_SOUNDS = [
       noise(0, 0.42, { gain: 0.2, filterType: 'lowpass', filterFreq: 320, filterFreqEnd: 160, filterQ: 3, attack: 0.01 }),
     ],
   },
+  // Real recorded variants (same rare weight as the synth fart above) —
+  // more fart flavor, still genuinely rare.
+  { weight: 2, build: () => sample(piggyStrongFart, 0.5) },
+  { weight: 1, build: () => sample(piggyFartingBalloon, 0.5) },
+  { weight: 1, build: () => sample(piggyFartTriple, 0.5) },
+  { weight: 1, build: () => sample(piggyFartOrSplat, 0.5) },
+  // Real splat/pop variants, in the same family as the synth "Bubble pop" above.
+  { weight: 6, build: () => sample(piggyFastSplat, 0.4) },
+  { weight: 6, build: () => sample(piggySillyPop, 0.4) },
+  // Real bank/money sounds — this IS a piggy bank, after all.
+  { weight: 10, build: () => sample(piggyMoneyBagDrop, 0.4) },
+  { weight: 8, build: () => sample(piggyAtmKeypress, 0.4) },
 ];
 
 // --- Lemonade Stands & More: a small service business at work ---------------
@@ -385,6 +534,9 @@ const LEMONADE_SOUNDS = [
       noise(0.13, 0.07, { gain: 0.14, filterType: 'highpass', filterFreq: 3400, attack: 0.001 }),
     ],
   },
+  // A real delivery truck pulling up — same "something arrived" family as
+  // the synth Delivery horn above.
+  { weight: 10, build: () => sample(lemonadeStoppingTruck, 0.4) },
 ];
 
 // --- Tree House: building it, and living around it -------------------------
@@ -456,6 +608,22 @@ const TREEHOUSE_SOUNDS = [
       sweep(760, 330, 0.6, 0.32, 'sawtooth', 0.2),
     ],
   },
+  // Real bird variants, same family/weight as the synth "Bird in the branches" above.
+  { weight: 7, build: () => sample(treehouseForestBirds, 0.4) },
+  { weight: 7, build: () => sample(treehouseLittleBirds, 0.4) },
+  // Real cat variants, same family/weight as the synth "Cat, unimpressed" above.
+  { weight: 2, build: () => sample(treehouseCatPurr, 0.4) },
+  { weight: 2, build: () => sample(treehouseCatAngry, 0.4) },
+  { weight: 2, build: () => sample(treehouseCatHungry, 0.4) },
+  { weight: 2, build: () => sample(treehouseCatBegging, 0.4) },
+  { weight: 2, build: () => sample(treehouseCatSweet, 0.4) },
+  // Real lion roars/growls — same rare, absurd-in-a-backyard-treehouse
+  // weight as the synth jungle yodel above.
+  { weight: 1, build: () => sample(treehouseLionRoar, 0.45) },
+  { weight: 1, build: () => sample(treehouseLionWounded, 0.4) },
+  { weight: 1, build: () => sample(treehouseLionGrowl, 0.45) },
+  // Someone's climbing up — a light ambient touch.
+  { weight: 4, build: () => sample(treehouseFootsteps, 0.35) },
 ];
 
 // --- Treasure Chest: speculative, glittery, slightly ominous ----------------
@@ -494,6 +662,14 @@ const TREASURE_SOUNDS = [
     weight: 20,
     build: () => [note(1046.5, 0, 0.6, 'sine', 0.26), note(1567.98, 0.02, 0.45, 'sine', 0.12)],
   },
+  // Real loot/gold variants, same "speculative, glittery" family as above.
+  { weight: 10, build: () => sample(treasureMagicalCoinWin, 0.4) },
+  { weight: 10, build: () => sample(treasureGoldCoinPrize, 0.4) },
+  { weight: 8, build: () => sample(treasureMelodicGoldPrice, 0.4) },
+  { weight: 8, build: () => sample(treasureGameLootWin, 0.4) },
+  { weight: 8, build: () => sample(treasureSmallWin, 0.4) },
+  { weight: 8, build: () => sample(treasureWindChimes, 0.4) },
+  { weight: 8, build: () => sample(treasureStonesFalling, 0.4) },
 ];
 
 export const SOUNDS = {
@@ -541,14 +717,17 @@ export const SOUNDS = {
     note(760, 0.14, 0.14, 'sawtooth', 0.55),
   ],
 
-  // Learning a skill — a clean bell-like ding.
-  skill: [note(880, 0, 0.14, 'sine', 0.6), note(1320, 0.02, 0.18, 'sine', 0.3)],
+  // Learning a skill — a clean bell-like ding, or a real "positive ding"/
+  // studying-at-a-desk clip.
+  skill: withSamples([note(880, 0, 0.14, 'sine', 0.6), note(1320, 0.02, 0.18, 'sine', 0.3)], 24, SKILL_SAMPLES),
 
   // Ending a turn / rolling the weather — a couple of short percussive taps.
   endTurn: [note(300, 0, 0.05, 'square', 0.35), note(340, 0.07, 0.05, 'square', 0.3)],
 
-  // Payday — a light double coin clink.
-  payday: [note(990, 0, 0.06, 'triangle', 0.4), note(1180, 0.05, 0.08, 'triangle', 0.4)],
+  // Payday — a light double coin clink, or a real coin-jingle clip. This
+  // fires every month for every player, so real clips stay common/light
+  // rather than the bigger jackpot sounds reserved for businessExit below.
+  payday: withSamples([note(990, 0, 0.06, 'triangle', 0.4), note(1180, 0.05, 0.08, 'triangle', 0.4)], 30, PAYDAY_SAMPLES),
 
   // Opportunity fortune card — a bright ascending major arpeggio, or (about
   // half the time) a real crowd cheer/applause clip for extra punch.
@@ -570,13 +749,29 @@ export const SOUNDS = {
     GROAN_SAMPLES
   ),
 
-  // Weather flip — a magical ascending shimmer.
-  weather: [
-    note(660, 0, 0.08, 'sine', 0.3),
-    note(880, 0.05, 0.08, 'sine', 0.3),
-    note(1108.73, 0.1, 0.08, 'sine', 0.3),
-    note(1318.51, 0.15, 0.2, 'sine', 0.35),
-  ],
+  // Weather flip — a magical ascending shimmer, mixed with real birdsong
+  // (good weather) or real thunder/storm/rain (bad weather) depending on
+  // the new stage's mood — see hooks/useGameSounds.js's resolveSound.
+  weatherGood: withSamples(
+    [
+      note(660, 0, 0.08, 'sine', 0.3),
+      note(880, 0.05, 0.08, 'sine', 0.3),
+      note(1108.73, 0.1, 0.08, 'sine', 0.3),
+      note(1318.51, 0.15, 0.2, 'sine', 0.35),
+    ],
+    30,
+    WEATHER_GOOD_SAMPLES
+  ),
+  weatherBad: withSamples(
+    [
+      note(660, 0, 0.08, 'sine', 0.3),
+      note(880, 0.05, 0.08, 'sine', 0.3),
+      note(1108.73, 0.1, 0.08, 'sine', 0.3),
+      note(1318.51, 0.15, 0.2, 'sine', 0.35),
+    ],
+    30,
+    WEATHER_BAD_SAMPLES
+  ),
 
   // Badge earned — a short triumphant fanfare, or a real crowd cheer.
   badge: withSamples(
@@ -594,22 +789,35 @@ export const SOUNDS = {
   // register-ish double ding followed by a bright ascending flourish, bigger
   // than the badge fanfare since a 20x offer is the rarest payday in the
   // game.
-  businessExit: withSamples(
-    [
-      note(1046.5, 0, 0.07, 'square', 0.5),
-      note(1318.51, 0.06, 0.09, 'square', 0.5),
-      note(659.25, 0.16, 0.09, 'sine', 0.5),
-      note(880, 0.24, 0.09, 'sine', 0.55),
-      note(1108.73, 0.32, 0.1, 'sine', 0.58),
-      note(1567.98, 0.41, 0.26, 'sine', 0.6),
-    ],
-    50,
-    CHEER_SAMPLES
-  ),
+  // Mixes in BOTH the general crowd-cheer pool and the casino/jackpot pool
+  // reserved just for this event — the rarest payday in the game gets the
+  // widest variety.
+  businessExit: () =>
+    pickWeighted([
+      {
+        weight: 40,
+        build: () => [
+          note(1046.5, 0, 0.07, 'square', 0.5),
+          note(1318.51, 0.06, 0.09, 'square', 0.5),
+          note(659.25, 0.16, 0.09, 'sine', 0.5),
+          note(880, 0.24, 0.09, 'sine', 0.55),
+          note(1108.73, 0.32, 0.1, 'sine', 0.58),
+          note(1567.98, 0.41, 0.26, 'sine', 0.6),
+        ],
+      },
+      ...CHEER_SAMPLES,
+      ...JACKPOT_SAMPLES,
+    ]),
 
   // Game over — the victory fanfare plus a fresh, randomized burst of
-  // fireworks and crowd cheering layered on top every time.
-  gameover: () => [...GAMEOVER_FANFARE, ...buildFireworks(), ...buildCheer()],
+  // fireworks and crowd cheering layered on top every time. About a third
+  // of the time, a real firework recording joins the synthesized shells.
+  gameover: () => [
+    ...GAMEOVER_FANFARE,
+    ...buildFireworks(),
+    ...buildCheer(),
+    ...(Math.random() < 0.35 ? sample(fireworksReal, 0.35) : []),
+  ],
 
   // Available standalone too (e.g. a future "watch the fireworks again"
   // replay button) — same generators the gameover sound uses.
@@ -623,12 +831,12 @@ export const SOUNDS = {
   // Bot goof-off sound effects — see game/chatEngine.js's
   // generateBotTurnFlavor() and gameConfig.js BOT_PERSONALITIES' sfxPool.
   // Each robot has a chance, on its own turn, to play one of these silly
-  // noises instead of (or alongside) a spoken line. All original
-  // synthesized bits — no sampled/licensed audio — just built to hit the
-  // same goofy notes as a fart, a burp, a hype shout, a groan, a "take
-  // that back!", a cartoon laugh, a screech, a mock-dramatic hero sting, a
-  // hiccup, a chicken squawk, an airhorn blast, a smooch, a mic drop, and a
-  // sneeze.
+  // noises instead of (or alongside) a spoken line — a fart, a burp, a
+  // hype shout, a groan, a "take that back!", a cartoon laugh, a screech, a
+  // mock-dramatic hero sting, a hiccup, a chicken squawk, an airhorn blast,
+  // a smooch, a mic drop, and a sneeze. Mostly synthesized; a few (laugh,
+  // kiss, squawk, hype shout, "take it back") mix in real recorded clips
+  // too — see the *_SAMPLES pools above.
   // ---------------------------------------------------------------------
   botFart: [
     note(150, 0, 0.06, 'sawtooth', 0.45),
@@ -641,13 +849,21 @@ export const SOUNDS = {
     sweep(220, 90, 0, 0.28, 'sawtooth', 0.5),
     noise(0, 0.12, { gain: 0.22, filterType: 'lowpass', filterFreq: 600, filterQ: 0.8, attack: 0.003 }),
   ],
-  botOhYeah: [
-    sweep(300, 700, 0, 0.22, 'sawtooth', 0.5),
-    note(880, 0.2, 0.12, 'triangle', 0.45),
-    note(660, 0.3, 0.12, 'triangle', 0.4),
-  ],
+  botOhYeah: withSamples(
+    [
+      sweep(300, 700, 0, 0.22, 'sawtooth', 0.5),
+      note(880, 0.2, 0.12, 'triangle', 0.45),
+      note(660, 0.3, 0.12, 'triangle', 0.4),
+    ],
+    16,
+    BOT_OHYEAH_SAMPLES
+  ),
   botGroan: [sweep(300, 150, 0, 0.5, 'sawtooth', 0.4), sweep(280, 140, 0.05, 0.5, 'triangle', 0.25)],
-  botTakeItBack: [sweep(500, 900, 0, 0.15, 'square', 0.4), note(200, 0.16, 0.14, 'square', 0.45)],
+  botTakeItBack: withSamples(
+    [sweep(500, 900, 0, 0.15, 'square', 0.4), note(200, 0.16, 0.14, 'square', 0.45)],
+    10,
+    BOT_TAKEITBACK_SAMPLES
+  ),
   botLaugh: withSamples(
     [
       note(440, 0, 0.08, 'square', 0.4),
@@ -667,14 +883,19 @@ export const SOUNDS = {
   ],
   // A sudden interrupted little "hic!"
   botHiccup: [note(300, 0, 0.05, 'square', 0.4), note(520, 0.09, 0.045, 'square', 0.45)],
-  // A chicken-ish squawk — perfect for Leeroy's avatar.
-  botSquawk: [
-    note(600, 0, 0.05, 'sawtooth', 0.4),
-    note(750, 0.04, 0.05, 'sawtooth', 0.42),
-    note(550, 0.09, 0.05, 'sawtooth', 0.4),
-    note(800, 0.13, 0.07, 'sawtooth', 0.45),
-    noise(0, 0.22, { gain: 0.2, filterType: 'bandpass', filterFreq: 1800, filterFreqEnd: 2400, filterQ: 3, attack: 0.005 }),
-  ],
+  // A chicken-ish squawk — perfect for Leeroy's avatar. Sometimes a real
+  // chicken cluck instead.
+  botSquawk: withSamples(
+    [
+      note(600, 0, 0.05, 'sawtooth', 0.4),
+      note(750, 0.04, 0.05, 'sawtooth', 0.42),
+      note(550, 0.09, 0.05, 'sawtooth', 0.4),
+      note(800, 0.13, 0.07, 'sawtooth', 0.45),
+      noise(0, 0.22, { gain: 0.2, filterType: 'bandpass', filterFreq: 1800, filterFreqEnd: 2400, filterQ: 3, attack: 0.005 }),
+    ],
+    20,
+    BOT_SQUAWK_SAMPLES
+  ),
   // A hype airhorn blast — two slightly-detuned tones beating against each
   // other for texture, with a little pitch droop at the end.
   botAirhorn: [
@@ -682,8 +903,8 @@ export const SOUNDS = {
     note(221, 0, 0.4, 'square', 0.3),
     sweep(220, 190, 0.25, 0.2, 'sawtooth', 0.4),
   ],
-  // A quick, cute "mwah!"
-  botKiss: [sweep(500, 900, 0, 0.08, 'sine', 0.4), sweep(900, 500, 0.08, 0.1, 'sine', 0.35)],
+  // A quick, cute "mwah!" — or a real kiss sound.
+  botKiss: withSamples([sweep(500, 900, 0, 0.08, 'sine', 0.4), sweep(900, 500, 0.08, 0.1, 'sine', 0.35)], 20, BOT_KISS_SAMPLES),
   // A confident low thud, like dropping a mic.
   botMicDrop: [note(90, 0, 0.18, 'sine', 0.5), noise(0, 0.15, { gain: 0.3, filterType: 'lowpass', filterFreq: 300, filterQ: 0.7, attack: 0.002 })],
   // Building sniffle, then the "AH-CHOO!" release.
@@ -695,4 +916,13 @@ export const SOUNDS = {
   // Something couldn't be done — mostly the tiny synth blip, occasionally a
   // real "uh-oh" clip.
   error: withSamples([note(220, 0, 0.12, 'square', 0.35)], 20, ERROR_SAMPLES),
+
+  // The turn timer's low-time warning (see components/TurnTimer.jsx) — a
+  // quick synth tick-tock, or (more than half the time, since this fires at
+  // most once per turn) a real clock/countdown clip for real urgency.
+  timerWarning: withSamples(
+    [note(1200, 0, 0.05, 'square', 0.3), note(1200, 0.15, 0.05, 'square', 0.3)],
+    18,
+    TIMER_SAMPLES
+  ),
 };

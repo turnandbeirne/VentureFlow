@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import '../styles/game.css';
 import { getDifficulty } from '../data/gameConfig';
 import { usePlaySpeed } from '../hooks/usePlaySpeed';
+import { turnOrdinal, currentTurnTally } from '../game/turnClock';
 import { playSound } from '../audio/soundEngine';
 import { playMusicTrack } from '../audio/musicEngine';
 import WeatherBadge from './WeatherBadge';
@@ -20,6 +21,7 @@ import Brand from './Brand';
 import LeaderboardModal from './LeaderboardModal';
 import RulebookModal from './RulebookModal';
 import SpeedControl from './SpeedControl';
+import TurnTimer from './TurnTimer';
 import StartupLaunchModal from './StartupLaunchModal';
 import PlayerDetailModal from './PlayerDetailModal';
 
@@ -46,6 +48,11 @@ export default function GameBoard({ game }) {
   const [showRulebook, setShowRulebook] = useState(false);
   const [selectedPlayerId, setSelectedPlayerId] = useState(null);
   const activePlayer = players[activePlayerIndex];
+  // What the active player has bought during THIS turn — the shop uses it to
+  // warn that selling those units back carries the same-turn resale fee,
+  // rather than letting the player discover it from the receipt. Declared
+  // after `activePlayer`, which it reads.
+  const sameTurnBuys = currentTurnTally(activePlayer?.turnBuys, turnOrdinal(state));
 
   // The soft instrumental plays for the whole time the board is up —
   // through every month, every turn, fortune-card recaps included — since
@@ -73,14 +80,20 @@ export default function GameBoard({ game }) {
       const t = setTimeout(() => game.ackFortuneCard(), speed.recapAdvanceMs);
       return () => clearTimeout(t);
     }
-  }, [status, currentFortuneEntry, currentFortunePlayer, game, speed]);
+    // Depends on the STABLE useCallback, not the whole `game` object: App
+    // rebuilds that object on every one of its renders, so listing it here
+    // cleared and restarted this timer each time. Harmless only because
+    // nothing currently re-renders App during a recap — but at the fastest
+    // speed (200ms) any future ticking state in App would restart the timer
+    // faster than it could fire and hang the game on the recap screen.
+  }, [status, currentFortuneEntry, currentFortunePlayer, game.ackFortuneCard, speed]);
 
   // Auto-dismiss error toasts.
   useEffect(() => {
     if (!state.lastError) return;
     const t = setTimeout(() => game.clearError(), 2400);
     return () => clearTimeout(t);
-  }, [state.lastError, game]);
+  }, [state.lastError, game.clearError]);
 
   return (
     <div className="vf-page">
@@ -96,6 +109,16 @@ export default function GameBoard({ game }) {
                   down the moment it starts moving faster than you can
                   follow — mid-turn if need be. */}
               <SpeedControl />
+              {/* Only renders when this game was started with the timer on
+                  and it's a human's live turn — see TurnTimer.jsx. */}
+              <TurnTimer
+                enabled={!!state.turnTimer && isHumanTurn}
+                deadlineAt={state.turnDeadlineAt}
+                player={activePlayer}
+                onStart={game.startTurnTimer}
+                onExtend={() => game.extendTurn(activePlayer.id)}
+                onExpire={() => game.endTurn(activePlayer.id)}
+              />
               <button
                 type="button"
                 className="vf-btn vf-btn--sm vf-btn--ghost"
@@ -154,15 +177,32 @@ export default function GameBoard({ game }) {
           />
 
           <div className={`vf-turn-banner ${isHumanTurn ? '' : 'vf-turn-banner--ai'}`}>
-            {status === 'exitOffer'
-              ? `💼 ${exitOfferPlayer?.name || 'Someone'} has a buyout offer to decide on...`
-              : status === 'monthRecap'
-              ? '📬 Reading this month\'s fortune cards...'
-              : isHumanTurn
-              ? `${activePlayer.avatar} ${
-                  activePlayer.name.toLowerCase() === 'you' ? 'Your' : `${activePlayer.name}'s`
-                } turn — what will you do?`
-              : `🤖 ${activePlayer?.name} is thinking...`}
+            <span className="vf-turn-banner__text">
+              {status === 'exitOffer'
+                ? `💼 ${exitOfferPlayer?.name || 'Someone'} has a buyout offer to decide on...`
+                : status === 'monthRecap'
+                ? '📬 Reading this month\'s fortune cards...'
+                : isHumanTurn
+                ? `${activePlayer.avatar} ${
+                    activePlayer.name.toLowerCase() === 'you' ? 'Your' : `${activePlayer.name}'s`
+                  } turn — what will you do?`
+                : `🤖 ${activePlayer?.name} is thinking...`}
+            </span>
+            {/* A second "Done!" button, mirroring ActionBar's, so a human
+                who's ready to pass can end their turn from up here without
+                scrolling past the shop first — see ActionBar.jsx for the
+                original at the bottom of the board, which stays in place
+                for anyone who scrolls down anyway. Same enable condition,
+                same handler; this is a duplicate control, not a new one. */}
+            {isHumanTurn && (
+              <button
+                type="button"
+                className="vf-btn vf-btn--primary vf-btn--sm vf-turn-banner__end-btn"
+                onClick={() => game.endTurn(activePlayer.id)}
+              >
+                Done! Roll the weather 🎲
+              </button>
+            )}
           </div>
 
           <AssetShop
@@ -172,6 +212,7 @@ export default function GameBoard({ game }) {
             allPlayers={players}
             weather={weather}
             weatherIncomeAmounts={weatherIncomeAmounts}
+            sameTurnBuys={sameTurnBuys}
             disabled={!isHumanTurn}
             onBuy={(assetId) => game.buyAsset(activePlayer.id, assetId, 1)}
             onSell={(assetId) => game.sellAsset(activePlayer.id, assetId, 1)}
@@ -186,14 +227,21 @@ export default function GameBoard({ game }) {
           />
         </div>
 
-        {/* Sidebar: weather detail, chat, and the event log all stay in view
+        {/* Sidebar: weather detail, the event log, and chat all stay in view
             at once on wider screens (sticky) instead of requiring scrolling
             past the board below them — falls back to stacking under the
-            board on narrow screens, see game.css's .vf-board-layout. */}
+            board on narrow screens, see game.css's .vf-board-layout.
+            EventLog sits above ChatPanel: what actually happened this
+            month is the thing you want to catch up on first, with the
+            robots' in-character banter as a lower-priority feed below it. */}
         <div className="vf-board-sidebar">
-          <WeatherCard weather={weather} />
-          <ChatPanel chat={chat} players={players} onSendChat={game.sendChat} />
+          <WeatherCard
+            weather={weather}
+            weatherIncomeAmounts={weatherIncomeAmounts}
+            weatherSeverityId={state.weatherSeverityId}
+          />
           <EventLog log={log} />
+          <ChatPanel chat={chat} players={players} onSendChat={game.sendChat} />
         </div>
       </div>
 
@@ -216,6 +264,8 @@ export default function GameBoard({ game }) {
         open={showRulebook}
         difficultyId={state.difficultyId}
         scenarioId={state.scenarioId}
+        weatherSeverityId={state.weatherSeverityId}
+        turnTimer={!!state.turnTimer}
         onClose={() => setShowRulebook(false)}
       />
 

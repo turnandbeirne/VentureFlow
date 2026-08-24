@@ -1,7 +1,13 @@
 // ============================================================================
 // New-game factory
 // ============================================================================
-import { GAME_LENGTH_MONTHS, getDifficulty, DEFAULT_DIFFICULTY_ID } from '../data/gameConfig';
+import {
+  GAME_LENGTH_MONTHS,
+  getDifficulty,
+  DEFAULT_DIFFICULTY_ID,
+  TURN_TIME_SECONDS,
+  getWeatherSeverity,
+} from '../data/gameConfig';
 import { createPlayerRoster, rollMonthlyIncomeAmounts } from './players';
 import { createInitialPrices } from './market';
 import { createWeatherState } from './weather';
@@ -13,9 +19,11 @@ export function createNewGame(
   difficultyId = DEFAULT_DIFFICULTY_ID,
   botConfigs = [],
   scenarioId = DEFAULT_SCENARIO_ID,
-  humanAvatars = []
+  humanAvatars = [],
+  options = {}
 ) {
   const difficulty = getDifficulty(difficultyId);
+  const severity = getWeatherSeverity(options.weatherSeverityId);
   const scenario = getScenario(scenarioId);
   // Most scenarios use the normal opening weather (see weather.js's
   // createWeatherState); Survive the Crash overrides it to start mid-storm
@@ -25,6 +33,10 @@ export function createNewGame(
     status: 'playing', // 'playing' | 'monthRecap' | 'gameover'
     mode,
     difficultyId: difficulty.id,
+    // How hard the economy swings this game — see gameConfig.js's
+    // WEATHER_SEVERITIES. In state rather than a device preference: every
+    // seat shares one economy.
+    weatherSeverityId: severity.id,
     scenarioId: scenario.id,
     monthlyAllowance: difficulty.monthlyAllowance,
     month: 1,
@@ -35,7 +47,7 @@ export function createNewGame(
     // both are available before the first payday ever happens. See
     // players.js's rollMonthlyIncomeAmounts and turnEngine.js, which
     // rerolls this every month-end after.
-    weatherIncomeAmounts: rollMonthlyIncomeAmounts(weather),
+    weatherIncomeAmounts: rollMonthlyIncomeAmounts(weather, severity.id),
     assetPrices: createInitialPrices(),
     previousAssetPrices: createInitialPrices(),
     players: createPlayerRoster(mode, humanNames, difficulty, botConfigs, humanAvatars),
@@ -54,6 +66,13 @@ export function createNewGame(
     // Reset on every hand-off; never read for a human's turn.
     aiTurnSteps: 0,
     aiTurnDone: false,
+    // Turn timer — chosen at setup and stored HERE rather than in a device
+    // preference (unlike play speed), because every seat at the table has
+    // to be playing by the same rule and it must survive a reload mid-game.
+    // `turnDeadlineAt` is a wall-clock ms timestamp, set by the UI when a
+    // human turn begins; null whenever no clock is running.
+    turnTimer: options.turnTimer ? { seconds: TURN_TIME_SECONDS } : null,
+    turnDeadlineAt: null,
     seenLessons: [], // concept ids already shown this game — see game/lessons.js
   };
 }
