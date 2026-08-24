@@ -1,8 +1,8 @@
 // ============================================================================
-// Sound library — data-driven tone/noise "recipes"
+// Sound library — data-driven tone/noise/sample "recipes"
 // ----------------------------------------------------------------------------
-// Every effect is a tiny sequence of synthesized notes (no audio files to
-// load or license). Two kinds of note:
+// Most effects are a tiny sequence of synthesized notes (no audio files to
+// load or license). Three kinds of note:
 //
 //   tone  { freq, start, duration, type, gain, freqEnd? }
 //     freq      pitch in Hz
@@ -18,16 +18,67 @@
 //     Filtered white noise — used for anything a pure oscillator can't
 //     convincingly make: firework crackle, applause claps, crowd texture.
 //
+//   sample { kind: 'sample', src, gain }
+//     A short recorded clip (royalty-free, Mixkit License) instead of a
+//     synthesized note — see the *_SAMPLES pools below. Always the sole
+//     note in its recipe; soundEngine.js just decodes `src` and plays it.
+//
 // A SOUNDS entry is normally a static array of notes. A few big one-off
 // celebration sounds (fireworks/cheering/applause, and gameover which layers
 // them in) are instead a FUNCTION that generates a fresh randomized note
 // list every time it's called, so they don't sound identical on every game.
+// The alert-y moments (fortune cards, badges, buyouts, a bot's laugh, "oops")
+// are similarly functions, but built with withSamples() below — a weighted
+// pickWeighted() between the original synth recipe and a pool of recorded
+// clips, so they mostly still sound like themselves but sometimes surprise
+// you with something real.
 //
 // Tune the whole game's audio feel by editing this file — nothing else
 // needs to change.
 // ============================================================================
 
+// ----------------------------------------------------------------------------
+// Recorded clips (added alongside the synthesized sounds above) — short,
+// royalty-free (Mixkit License: free for commercial/personal use, no
+// attribution required) real-world stings for the moments that most wanted
+// a bit more character than an oscillator can give: a genuine laugh, a real
+// crowd cheer, a classic "sad trombone." Each one is tiny (a few KB to
+// ~140KB) and gets mixed INTO the existing weighted pools below rather than
+// replacing them — so an opportunity card, a badge, or a buyout offer still
+// usually plays its own distinct synth cue, but sometimes surprises you with
+// a real recording instead. See soundEngine.js's playSampleNote for how a
+// `kind: 'sample'` note actually gets decoded and played.
+// ----------------------------------------------------------------------------
+import laughCartoonGiggle from '../assets/audio/sfx/laugh/cartoon-giggle.mp3';
+import laughFunnyCartoon from '../assets/audio/sfx/laugh/funny-cartoon-laugh.mp3';
+import laughHyena from '../assets/audio/sfx/laugh/hyena-cartoon-laugh.mp3';
+
+import cheerGirlsAudience from '../assets/audio/sfx/cheer/girls-audience-applause.mp3';
+import cheerMediumCrowd from '../assets/audio/sfx/cheer/medium-crowd-applause.mp3';
+import cheerStadiumLight from '../assets/audio/sfx/cheer/stadium-crowd-light-applause.mp3';
+import cheerLightWithLaughter from '../assets/audio/sfx/cheer/light-applause-with-laughter-audience.mp3';
+import cheerEndOfShow from '../assets/audio/sfx/cheer/end-of-show-clapping-crowd.mp3';
+import cheerOneMan from '../assets/audio/sfx/cheer/one-man-clapping.mp3';
+import cheerSmallGroup from '../assets/audio/sfx/cheer/small-group-clapping.mp3';
+import cheerConferenceStrong from '../assets/audio/sfx/cheer/conference-audience-clapping-strongly.mp3';
+import cheerClappingSlowly from '../assets/audio/sfx/cheer/clapping-slowly.mp3';
+
+import groanSadTrombone from '../assets/audio/sfx/groan/slow-sad-trombone-fail.mp3';
+import groanFailurePiano from '../assets/audio/sfx/groan/cartoon-failure-piano.mp3';
+import groanSadPartyHornA from '../assets/audio/sfx/groan/cartoon-sad-party-horn.mp3';
+import groanSadPartyHornB from '../assets/audio/sfx/groan/sad-party-horn-sound.mp3';
+import groanPartyTrumpet from '../assets/audio/sfx/groan/party-trumpet-horn-isolated.mp3';
+import groanPeopleMoaning from '../assets/audio/sfx/groan/people-moaning-sadly.mp3';
+import groanDogWhimper from '../assets/audio/sfx/groan/dog-whimper-sad.mp3';
+import groanCreatureCrying from '../assets/audio/sfx/groan/creature-sad-crying.mp3';
+
+import errorGameOverWhistle from '../assets/audio/sfx/error/cartoon-whistle-game-over.mp3';
+
 const note = (freq, start, duration, type = 'sine', gain = 1) => ({ freq, start, duration, type, gain });
+
+/** A single recorded clip, played as-is (no scheduling — see
+ * soundEngine.js's playSampleNote). Always its own one-note "recipe." */
+const sample = (src, gain = 1) => [{ kind: 'sample', src, gain }];
 
 // A tone that sweeps from `freq` up/down to `freqEnd` — firework whistles,
 // crowd "whoop"s.
@@ -134,6 +185,317 @@ const GAMEOVER_FANFARE = [
   note(1318.51, 0.47, 0.32, 'triangle', 0.6),
 ];
 
+// ============================================================================
+// Per-asset sound POOLS — variety, so buying twenty of something doesn't
+// play the identical blip twenty times
+// ----------------------------------------------------------------------------
+// Each buyable asset has a family of short character sounds rather than one
+// fixed effect, picked fresh on every purchase. A `weight` biases the pick:
+// the everyday sounds come up often, and the joke ones (the fart, the Tarzan
+// yodel) are genuinely rare, which is what makes them land when they do.
+//
+// Randomness here is plain Math.random on purpose. Everything under
+// src/game/ routes through the seeded PRNG because it affects game STATE and
+// has to be reproducible; sound is pure presentation, never stored, and
+// nothing downstream depends on which variant played.
+// ============================================================================
+
+/** Scale every note in a recipe — used so a sale reuses the buy pool at a
+ * lower level rather than needing a second set of sounds. */
+function quieter(recipe, factor) {
+  return recipe.map((n) => ({ ...n, gain: (n.gain ?? 1) * factor }));
+}
+
+/** Pick one variant from a weighted pool and return its note list. */
+function pickWeighted(pool) {
+  const total = pool.reduce((sum, v) => sum + v.weight, 0);
+  let roll = Math.random() * total;
+  for (const variant of pool) {
+    roll -= variant.weight;
+    if (roll <= 0) return variant.build();
+  }
+  return pool[pool.length - 1].build();
+}
+
+// --- Recorded-clip pools: mixed into the alert sounds below -----------------
+// Same weighted-pool shape as the asset pools above, so pickWeighted works
+// unchanged. Gain is tuned per-clip (real recordings vary a lot in loudness;
+// these were leveled to sit alongside the synthesized sounds, not over them).
+const LAUGH_SAMPLES = [
+  { weight: 10, build: () => sample(laughCartoonGiggle, 0.55) },
+  { weight: 10, build: () => sample(laughFunnyCartoon, 0.6) },
+  { weight: 10, build: () => sample(laughHyena, 0.55) },
+];
+
+const CHEER_SAMPLES = [
+  { weight: 8, build: () => sample(cheerGirlsAudience, 0.45) },
+  { weight: 8, build: () => sample(cheerMediumCrowd, 0.4) },
+  { weight: 8, build: () => sample(cheerStadiumLight, 0.4) },
+  { weight: 8, build: () => sample(cheerLightWithLaughter, 0.4) },
+  { weight: 8, build: () => sample(cheerEndOfShow, 0.4) },
+  { weight: 4, build: () => sample(cheerOneMan, 0.5) },
+  { weight: 6, build: () => sample(cheerSmallGroup, 0.45) },
+  { weight: 6, build: () => sample(cheerConferenceStrong, 0.4) },
+  { weight: 4, build: () => sample(cheerClappingSlowly, 0.5) },
+];
+
+const GROAN_SAMPLES = [
+  { weight: 10, build: () => sample(groanSadTrombone, 0.5) },
+  { weight: 10, build: () => sample(groanFailurePiano, 0.55) },
+  { weight: 8, build: () => sample(groanSadPartyHornA, 0.5) },
+  { weight: 6, build: () => sample(groanSadPartyHornB, 0.5) },
+  { weight: 6, build: () => sample(groanPartyTrumpet, 0.5) },
+  { weight: 6, build: () => sample(groanPeopleMoaning, 0.4) },
+  { weight: 6, build: () => sample(groanDogWhimper, 0.45) },
+  { weight: 4, build: () => sample(groanCreatureCrying, 0.4) },
+];
+
+/** Mix a recorded-clip pool in alongside an existing synth recipe: the synth
+ * version stays the common case (keeps each event sounding like itself),
+ * the real clips show up often enough to keep things fresh. */
+function withSamples(synthRecipe, synthWeight, samplePool) {
+  return () => pickWeighted([{ weight: synthWeight, build: () => synthRecipe }, ...samplePool]);
+}
+
+// A couple of lighter, rarer options for the small/frequent "error" blip —
+// this can fire on every mistyped chat message, so it stays mostly the tiny
+// synth beep with only an occasional real-clip surprise, never a full
+// sad-trombone production every time.
+const ERROR_SAMPLES = [
+  { weight: 3, build: () => sample(errorGameOverWhistle, 0.4) },
+  { weight: 2, build: () => sample(groanPartyTrumpet, 0.35) },
+];
+
+// --- Piggy Bank: cute, greedy, a bit gross ---------------------------------
+const PIGGY_SOUNDS = [
+  {
+    // Oink — two short nasal grunts, pitch dropping.
+    weight: 22,
+    build: () => [
+      sweep(420, 300, 0, 0.09, 'sawtooth', 0.32),
+      sweep(380, 250, 0.11, 0.11, 'sawtooth', 0.3),
+    ],
+  },
+  {
+    // Slurp — a wet rising suck that ends in a little pop.
+    weight: 16,
+    build: () => [
+      noise(0, 0.18, { gain: 0.24, filterType: 'bandpass', filterFreq: 700, filterFreqEnd: 2600, filterQ: 4 }),
+      note(rand(680, 820), 0.18, 0.05, 'sine', 0.35),
+    ],
+  },
+  {
+    // Bubble pop — a single round blip that snaps upward.
+    weight: 18,
+    build: () => [
+      sweep(rand(300, 420), rand(900, 1200), 0, 0.06, 'sine', 0.4),
+      noise(0.05, 0.03, { gain: 0.16, filterType: 'highpass', filterFreq: 2600, attack: 0.001 }),
+    ],
+  },
+  {
+    // A tiny cheer — two bright ascending notes.
+    weight: 16,
+    build: () => [note(660, 0, 0.07, 'triangle', 0.34), note(880, 0.07, 0.12, 'triangle', 0.32)],
+  },
+  {
+    // Contented "ahhh" — a sighing fall.
+    weight: 12,
+    build: () => [sweep(520, 330, 0, 0.3, 'sine', 0.26)],
+  },
+  {
+    // Munching — three quick chomps.
+    weight: 12,
+    build: () => [
+      noise(0, 0.05, { gain: 0.22, filterType: 'lowpass', filterFreq: 900, attack: 0.001 }),
+      noise(0.09, 0.05, { gain: 0.2, filterType: 'lowpass', filterFreq: 800, attack: 0.001 }),
+      noise(0.18, 0.06, { gain: 0.18, filterType: 'lowpass', filterFreq: 700, attack: 0.001 }),
+    ],
+  },
+  {
+    // Belch.
+    weight: 7,
+    build: () => [
+      sweep(150, 90, 0, 0.34, 'sawtooth', 0.32),
+      noise(0, 0.34, { gain: 0.14, filterType: 'lowpass', filterFreq: 420, filterQ: 2, attack: 0.02 }),
+    ],
+  },
+  {
+    // Rare: the fart.
+    weight: 2,
+    build: () => [
+      sweep(rand(105, 135), rand(58, 78), 0, 0.42, 'sawtooth', 0.34),
+      noise(0, 0.42, { gain: 0.2, filterType: 'lowpass', filterFreq: 320, filterFreqEnd: 160, filterQ: 3, attack: 0.01 }),
+    ],
+  },
+];
+
+// --- Lemonade Stands & More: a small service business at work ---------------
+const LEMONADE_SOUNDS = [
+  {
+    // Service bell — bright strike with a long shimmering tail.
+    weight: 20,
+    build: () => [
+      note(2093, 0, 0.5, 'sine', 0.3),
+      note(3136, 0, 0.34, 'sine', 0.14),
+      noise(0, 0.02, { gain: 0.12, filterType: 'highpass', filterFreq: 4000, attack: 0.001 }),
+    ],
+  },
+  {
+    // Cash register — the drawer clunk, then a two-note cha-ching.
+    weight: 20,
+    build: () => [
+      noise(0, 0.05, { gain: 0.26, filterType: 'bandpass', filterFreq: 900, filterQ: 1.2, attack: 0.001 }),
+      note(1318, 0.05, 0.14, 'triangle', 0.32),
+      note(1760, 0.13, 0.26, 'triangle', 0.3),
+    ],
+  },
+  {
+    // Delivery horn — two short blasts.
+    weight: 14,
+    build: () => [note(392, 0, 0.11, 'square', 0.22), note(392, 0.15, 0.16, 'square', 0.2)],
+  },
+  {
+    // Blender / smoothie machine spinning up and cutting out.
+    weight: 12,
+    build: () => [
+      noise(0, 0.34, { gain: 0.2, filterType: 'bandpass', filterFreq: 600, filterFreqEnd: 1500, filterQ: 2, attack: 0.05 }),
+      sweep(120, 190, 0, 0.34, 'sawtooth', 0.12),
+    ],
+  },
+  {
+    // "Order up!" — two quick counter dings.
+    weight: 14,
+    build: () => [note(1568, 0, 0.13, 'sine', 0.28), note(2093, 0.12, 0.22, 'sine', 0.26)],
+  },
+  {
+    // Coins dropping into the tin.
+    weight: 12,
+    build: () => [
+      note(rand(1500, 1900), 0, 0.07, 'triangle', 0.24),
+      note(rand(1100, 1400), 0.08, 0.07, 'triangle', 0.22),
+      note(rand(800, 1000), 0.15, 0.13, 'triangle', 0.2),
+    ],
+  },
+  {
+    // Ice into a cup — a bright rattle.
+    weight: 8,
+    build: () => [
+      noise(0, 0.05, { gain: 0.2, filterType: 'highpass', filterFreq: 3800, attack: 0.001 }),
+      noise(0.06, 0.05, { gain: 0.17, filterType: 'highpass', filterFreq: 4200, attack: 0.001 }),
+      noise(0.13, 0.07, { gain: 0.14, filterType: 'highpass', filterFreq: 3400, attack: 0.001 }),
+    ],
+  },
+];
+
+// --- Tree House: building it, and living around it -------------------------
+const TREEHOUSE_SOUNDS = [
+  {
+    // Hammering — three wooden thwacks.
+    weight: 20,
+    build: () => [
+      noise(0, 0.06, { gain: 0.3, filterType: 'bandpass', filterFreq: 500, filterQ: 1.4, attack: 0.001 }),
+      noise(0.16, 0.06, { gain: 0.28, filterType: 'bandpass', filterFreq: 520, filterQ: 1.4, attack: 0.001 }),
+      noise(0.32, 0.08, { gain: 0.26, filterType: 'bandpass', filterFreq: 470, filterQ: 1.4, attack: 0.001 }),
+    ],
+  },
+  {
+    // Handsaw — two rasping strokes.
+    weight: 14,
+    build: () => [
+      noise(0, 0.22, { gain: 0.2, filterType: 'bandpass', filterFreq: 1400, filterFreqEnd: 2600, filterQ: 2.5, attack: 0.03 }),
+      noise(0.26, 0.2, { gain: 0.18, filterType: 'bandpass', filterFreq: 2400, filterFreqEnd: 1300, filterQ: 2.5, attack: 0.03 }),
+    ],
+  },
+  {
+    // Paint roller — soft swishes.
+    weight: 10,
+    build: () => [
+      noise(0, 0.2, { gain: 0.14, filterType: 'bandpass', filterFreq: 2200, filterQ: 0.8, attack: 0.06 }),
+      noise(0.24, 0.2, { gain: 0.12, filterType: 'bandpass', filterFreq: 1900, filterQ: 0.8, attack: 0.06 }),
+    ],
+  },
+  {
+    // Doorbell — the classic ding-dong.
+    weight: 14,
+    build: () => [note(659.25, 0, 0.32, 'sine', 0.3), note(523.25, 0.3, 0.5, 'sine', 0.28)],
+  },
+  {
+    // Lawnmower a few gardens away.
+    weight: 10,
+    build: () => [
+      sweep(88, 104, 0, 0.5, 'sawtooth', 0.16),
+      noise(0, 0.5, { gain: 0.12, filterType: 'lowpass', filterFreq: 700, filterQ: 1.5, attack: 0.08 }),
+    ],
+  },
+  {
+    // Bird in the branches.
+    weight: 14,
+    build: () => [
+      sweep(2400, 3400, 0, 0.06, 'sine', 0.22),
+      sweep(3200, 2500, 0.09, 0.06, 'sine', 0.2),
+      sweep(2600, 3600, 0.2, 0.05, 'sine', 0.18),
+    ],
+  },
+  {
+    // Cat, unimpressed.
+    weight: 10,
+    build: () => [
+      sweep(520, 780, 0, 0.16, 'sawtooth', 0.16),
+      sweep(780, 430, 0.15, 0.3, 'sawtooth', 0.16),
+    ],
+  },
+  {
+    // Rare: the jungle yodel.
+    weight: 3,
+    build: () => [
+      sweep(330, 620, 0, 0.18, 'sawtooth', 0.24),
+      sweep(620, 460, 0.18, 0.1, 'sawtooth', 0.22),
+      sweep(460, 700, 0.28, 0.1, 'sawtooth', 0.22),
+      sweep(700, 480, 0.38, 0.12, 'sawtooth', 0.22),
+      sweep(480, 760, 0.5, 0.1, 'sawtooth', 0.2),
+      sweep(760, 330, 0.6, 0.32, 'sawtooth', 0.2),
+    ],
+  },
+];
+
+// --- Treasure Chest: speculative, glittery, slightly ominous ----------------
+const TREASURE_SOUNDS = [
+  {
+    // Sparkle cascade.
+    weight: 34,
+    build: () => [
+      note(880, 0, 0.06, 'sine', 0.3),
+      note(1174, 0.05, 0.06, 'sine', 0.28),
+      note(1568, 0.1, 0.06, 'sine', 0.26),
+      note(2093, 0.15, 0.22, 'sine', 0.24),
+    ],
+  },
+  {
+    // Heavy lid creaking open.
+    weight: 22,
+    build: () => [
+      sweep(180, 320, 0, 0.34, 'sawtooth', 0.12),
+      noise(0, 0.34, { gain: 0.12, filterType: 'bandpass', filterFreq: 900, filterFreqEnd: 1800, filterQ: 3, attack: 0.05 }),
+      note(1568, 0.3, 0.26, 'sine', 0.2),
+    ],
+  },
+  {
+    // Gems tumbling.
+    weight: 24,
+    build: () => [
+      note(rand(1700, 2200), 0, 0.05, 'triangle', 0.22),
+      note(rand(1300, 1700), 0.06, 0.05, 'triangle', 0.2),
+      note(rand(2000, 2600), 0.12, 0.05, 'triangle', 0.2),
+      note(rand(1500, 1900), 0.19, 0.14, 'triangle', 0.18),
+    ],
+  },
+  {
+    // A single deep, expensive-sounding chime.
+    weight: 20,
+    build: () => [note(1046.5, 0, 0.6, 'sine', 0.26), note(1567.98, 0.02, 0.45, 'sine', 0.12)],
+  },
+];
+
 export const SOUNDS = {
   // Soft UI tap — mode selection, dismiss buttons, generic clicks.
   click: [note(520, 0, 0.06, 'triangle', 0.5)],
@@ -148,33 +510,29 @@ export const SOUNDS = {
   sell: [note(700, 0, 0.08, 'triangle', 0.6), note(520, 0.06, 0.1, 'triangle', 0.5)],
 
   // Piggy Bank — cute, soft, safe. A gentle double "boop."
-  buy_piggy: [note(440, 0, 0.08, 'sine', 0.5), note(440, 0.09, 0.11, 'sine', 0.45)],
-  sell_piggy: [note(392, 0, 0.13, 'sine', 0.4)],
+  // Each asset draws from its own pool of character sounds (see the
+  // *_SOUNDS pools above) rather than repeating one fixed blip. Selling
+  // reuses the same pool at a lower gain, so an asset still SOUNDS like
+  // itself on the way out without the sale feeling like a celebration.
+  buy_piggy: () => pickWeighted(PIGGY_SOUNDS),
+  sell_piggy: () => quieter(pickWeighted(PIGGY_SOUNDS), 0.6),
+  buy_lemonade: () => pickWeighted(LEMONADE_SOUNDS),
+  sell_lemonade: () => quieter(pickWeighted(LEMONADE_SOUNDS), 0.6),
+  buy_treehouse: () => pickWeighted(TREEHOUSE_SOUNDS),
+  sell_treehouse: () => quieter(pickWeighted(TREEHOUSE_SOUNDS), 0.6),
+  buy_treasure: () => pickWeighted(TREASURE_SOUNDS),
+  sell_treasure: () => quieter(pickWeighted(TREASURE_SOUNDS), 0.6),
 
-  // Lemonade Stands & More — bright and bouncy, like a little "sproing."
-  buy_lemonade: [
-    note(660, 0, 0.06, 'triangle', 0.55),
-    note(830, 0.05, 0.06, 'triangle', 0.5),
-    note(990, 0.1, 0.13, 'triangle', 0.55),
+  // The physical feel of the button itself — a very short, punchy "thock"
+  // played on every press, including each repeat of a press-and-hold. It's
+  // deliberately tiny and low: it has to survive being fired ten times a
+  // second without becoming noise, which the asset character sounds above
+  // would not. Paired with the border flash in game.css.
+  buttonPress: [
+    note(190, 0, 0.035, 'square', 0.3),
+    note(95, 0.012, 0.05, 'sine', 0.26),
+    noise(0, 0.02, { gain: 0.12, filterType: 'lowpass', filterFreq: 1400, attack: 0.001 }),
   ],
-  sell_lemonade: [note(700, 0, 0.07, 'triangle', 0.45), note(550, 0.06, 0.1, 'triangle', 0.4)],
-
-  // Tree House — warm and cozy, a little wooden chime.
-  buy_treehouse: [
-    note(392, 0, 0.09, 'triangle', 0.45),
-    note(494, 0.08, 0.09, 'triangle', 0.48),
-    note(587.33, 0.16, 0.15, 'triangle', 0.52),
-  ],
-  sell_treehouse: [note(440, 0, 0.06, 'square', 0.3), note(370, 0.06, 0.11, 'square', 0.3)],
-
-  // Treasure Chest — shimmery and exciting, big risk energy.
-  buy_treasure: [
-    note(523.25, 0, 0.06, 'sawtooth', 0.35),
-    note(659.25, 0.05, 0.06, 'sawtooth', 0.35),
-    note(783.99, 0.1, 0.06, 'sawtooth', 0.4),
-    note(1046.5, 0.15, 0.2, 'sine', 0.5),
-  ],
-  sell_treasure: [note(880, 0, 0.05, 'sine', 0.4), note(660, 0.05, 0.05, 'sine', 0.35), note(440, 0.1, 0.13, 'sine', 0.35)],
 
   // Starting a business — an ascending "whoosh" sweep of three notes.
   business: [
@@ -192,15 +550,25 @@ export const SOUNDS = {
   // Payday — a light double coin clink.
   payday: [note(990, 0, 0.06, 'triangle', 0.4), note(1180, 0.05, 0.08, 'triangle', 0.4)],
 
-  // Opportunity fortune card — a bright ascending major arpeggio.
-  fortuneGood: [
-    note(523.25, 0, 0.1, 'sine', 0.55),
-    note(659.25, 0.09, 0.1, 'sine', 0.55),
-    note(783.99, 0.18, 0.16, 'sine', 0.6),
-  ],
+  // Opportunity fortune card — a bright ascending major arpeggio, or (about
+  // half the time) a real crowd cheer/applause clip for extra punch.
+  fortuneGood: withSamples(
+    [
+      note(523.25, 0, 0.1, 'sine', 0.55),
+      note(659.25, 0.09, 0.1, 'sine', 0.55),
+      note(783.99, 0.18, 0.16, 'sine', 0.6),
+    ],
+    55,
+    CHEER_SAMPLES
+  ),
 
-  // Setback fortune card — a gentle "womp womp", never scary.
-  fortuneBad: [note(392, 0, 0.14, 'triangle', 0.45), note(311.13, 0.12, 0.22, 'triangle', 0.45)],
+  // Setback fortune card — a gentle "womp womp" (never scary), or a real
+  // comedic groan/trombone/party-horn-fail clip for variety.
+  fortuneBad: withSamples(
+    [note(392, 0, 0.14, 'triangle', 0.45), note(311.13, 0.12, 0.22, 'triangle', 0.45)],
+    55,
+    GROAN_SAMPLES
+  ),
 
   // Weather flip — a magical ascending shimmer.
   weather: [
@@ -210,26 +578,34 @@ export const SOUNDS = {
     note(1318.51, 0.15, 0.2, 'sine', 0.35),
   ],
 
-  // Badge earned — a short triumphant fanfare.
-  badge: [
-    note(523.25, 0, 0.11, 'square', 0.4),
-    note(659.25, 0.1, 0.11, 'square', 0.4),
-    note(783.99, 0.2, 0.11, 'square', 0.42),
-    note(1046.5, 0.3, 0.26, 'square', 0.48),
-  ],
+  // Badge earned — a short triumphant fanfare, or a real crowd cheer.
+  badge: withSamples(
+    [
+      note(523.25, 0, 0.11, 'square', 0.4),
+      note(659.25, 0.1, 0.11, 'square', 0.4),
+      note(783.99, 0.2, 0.11, 'square', 0.42),
+      note(1046.5, 0.3, 0.26, 'square', 0.48),
+    ],
+    55,
+    CHEER_SAMPLES
+  ),
 
   // Business exit / buyout offer — a "cha-ching!" jackpot: a quick cash-
   // register-ish double ding followed by a bright ascending flourish, bigger
   // than the badge fanfare since a 20x offer is the rarest payday in the
   // game.
-  businessExit: [
-    note(1046.5, 0, 0.07, 'square', 0.5),
-    note(1318.51, 0.06, 0.09, 'square', 0.5),
-    note(659.25, 0.16, 0.09, 'sine', 0.5),
-    note(880, 0.24, 0.09, 'sine', 0.55),
-    note(1108.73, 0.32, 0.1, 'sine', 0.58),
-    note(1567.98, 0.41, 0.26, 'sine', 0.6),
-  ],
+  businessExit: withSamples(
+    [
+      note(1046.5, 0, 0.07, 'square', 0.5),
+      note(1318.51, 0.06, 0.09, 'square', 0.5),
+      note(659.25, 0.16, 0.09, 'sine', 0.5),
+      note(880, 0.24, 0.09, 'sine', 0.55),
+      note(1108.73, 0.32, 0.1, 'sine', 0.58),
+      note(1567.98, 0.41, 0.26, 'sine', 0.6),
+    ],
+    50,
+    CHEER_SAMPLES
+  ),
 
   // Game over — the victory fanfare plus a fresh, randomized burst of
   // fireworks and crowd cheering layered on top every time.
@@ -272,13 +648,17 @@ export const SOUNDS = {
   ],
   botGroan: [sweep(300, 150, 0, 0.5, 'sawtooth', 0.4), sweep(280, 140, 0.05, 0.5, 'triangle', 0.25)],
   botTakeItBack: [sweep(500, 900, 0, 0.15, 'square', 0.4), note(200, 0.16, 0.14, 'square', 0.45)],
-  botLaugh: [
-    note(440, 0, 0.08, 'square', 0.4),
-    note(370, 0.09, 0.08, 'square', 0.4),
-    note(440, 0.19, 0.08, 'square', 0.4),
-    note(370, 0.28, 0.08, 'square', 0.4),
-    note(490, 0.38, 0.12, 'square', 0.42),
-  ],
+  botLaugh: withSamples(
+    [
+      note(440, 0, 0.08, 'square', 0.4),
+      note(370, 0.09, 0.08, 'square', 0.4),
+      note(440, 0.19, 0.08, 'square', 0.4),
+      note(370, 0.28, 0.08, 'square', 0.4),
+      note(490, 0.38, 0.12, 'square', 0.42),
+    ],
+    30,
+    LAUGH_SAMPLES
+  ),
   botScreech: [noise(0, 0.35, { gain: 0.4, filterType: 'bandpass', filterFreq: 2600, filterFreqEnd: 3400, filterQ: 6, attack: 0.01 })],
   botHeroSting: [
     note(196, 0, 0.14, 'sawtooth', 0.5),
@@ -312,6 +692,7 @@ export const SOUNDS = {
     noise(0.18, 0.15, { gain: 0.4, filterType: 'highpass', filterFreq: 1200, filterQ: 0.6, attack: 0.001 }),
   ],
 
-  // Something couldn't be done (reserved for future use).
-  error: [note(220, 0, 0.12, 'square', 0.35)],
+  // Something couldn't be done — mostly the tiny synth blip, occasionally a
+  // real "uh-oh" clip.
+  error: withSamples([note(220, 0, 0.12, 'square', 0.35)], 20, ERROR_SAMPLES),
 };
