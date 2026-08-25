@@ -120,12 +120,25 @@
    it never overlaps the header above it, and once you've scrolled past
    that natural position it pins to the top of the viewport (same idiom as
    .vf-board-sidebar below) so your cash/net-worth/passive numbers stay in
-   view through the whole shop + action bar, on phone or desktop alike. */
-.vf-stats-hud {
+   view through the whole shop + action bar, on phone or desktop alike.
+
+   The sticky positioning is on THIS wrapper, deliberately not on the
+   button inside it that scrolls horizontally (.vf-stats-hud below) — an
+   element can't safely be both `position: sticky` and its own
+   `overflow: auto` scroll container on iOS/WebKit (every browser on
+   iPhone, not just Safari itself): it silently drops the sticky behavior
+   there, even though desktop browsers render it fine. Splitting the two
+   responsibilities across parent/child avoids the bug outright rather
+   than working around a specific engine's quirks. */
+.vf-stats-hud-wrap {
   position: sticky;
   top: 0.6rem;
   z-index: 30;
   align-self: flex-start;
+  max-width: 100%;
+}
+
+.vf-stats-hud {
   display: flex;
   align-items: center;
   gap: 0.7rem;
