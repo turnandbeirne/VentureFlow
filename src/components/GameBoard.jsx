@@ -24,6 +24,7 @@ import SpeedControl from './SpeedControl';
 import TurnTimer from './TurnTimer';
 import StartupLaunchModal from './StartupLaunchModal';
 import PlayerDetailModal from './PlayerDetailModal';
+import StatsHUD from './StatsHUD';
 
 export default function GameBoard({ game }) {
   const { state } = game;
@@ -53,6 +54,12 @@ export default function GameBoard({ game }) {
   // rather than letting the player discover it from the receipt. Declared
   // after `activePlayer`, which it reads.
   const sameTurnBuys = currentTurnTally(activePlayer?.turnBuys, turnOrdinal(state));
+  // "You," for the persistent stats strip below: the active player when
+  // it's a human's turn (so hotseat pass-and-play always shows whoever's
+  // actually holding the device), otherwise the first human in the roster
+  // (so solo mode still shows YOUR numbers while a robot plays, instead of
+  // the robot's) — see StatsHUD.jsx.
+  const hudPlayer = activePlayer?.type === 'human' ? activePlayer : players.find((p) => p.type === 'human') || null;
 
   // The soft instrumental plays for the whole time the board is up —
   // through every month, every turn, fortune-card recaps included — since
@@ -99,6 +106,17 @@ export default function GameBoard({ game }) {
     <div className="vf-page">
       <div className="vf-board-layout">
         <div className="vf-card vf-board">
+          <StatsHUD
+            player={hudPlayer}
+            prices={assetPrices}
+            allPlayers={players}
+            month={month}
+            weatherIncomeAmounts={weatherIncomeAmounts}
+            onOpenPortfolio={(playerId) => {
+              setSelectedPlayerId(playerId);
+            }}
+          />
+
           <div className="vf-header">
             <Brand size="sm" align="left" />
             <div className="vf-header__right">

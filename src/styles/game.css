@@ -115,6 +115,79 @@
   color: var(--vf-ink-soft);
 }
 
+/* Persistent stats strip (StatsHUD.jsx) ---------------------------------
+   Sticky, not fixed — it lives at the very top of .vf-board's own flow, so
+   it never overlaps the header above it, and once you've scrolled past
+   that natural position it pins to the top of the viewport (same idiom as
+   .vf-board-sidebar below) so your cash/net-worth/passive numbers stay in
+   view through the whole shop + action bar, on phone or desktop alike. */
+.vf-stats-hud {
+  position: sticky;
+  top: 0.6rem;
+  z-index: 30;
+  align-self: flex-start;
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  max-width: 100%;
+  overflow-x: auto;
+  padding: 0.4rem 0.7rem;
+  background: var(--vf-white);
+  color: var(--vf-ink);
+  border: var(--vf-border-width) solid var(--vf-border);
+  border-radius: var(--vf-radius-pill);
+  box-shadow: var(--vf-shadow-sm);
+  font-family: inherit;
+  font-weight: 700;
+  font-size: 0.82rem;
+  cursor: pointer;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.vf-stats-hud::-webkit-scrollbar {
+  display: none;
+}
+
+.vf-stats-hud__item {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  white-space: nowrap;
+}
+
+.vf-stats-hud__item--worth {
+  color: var(--vf-teal-dark);
+}
+
+.vf-stats-hud__icon {
+  font-size: 0.95rem;
+  line-height: 1;
+}
+
+.vf-stats-hud__portfolio-hint {
+  white-space: nowrap;
+  color: var(--vf-ink-soft);
+  font-weight: 600;
+  padding-left: 0.35rem;
+  border-left: 2px solid var(--vf-cream-deep);
+}
+
+@media (max-width: 520px) {
+  .vf-stats-hud {
+    gap: 0.5rem;
+    padding: 0.35rem 0.6rem;
+    font-size: 0.76rem;
+    /* The tap hint is the first thing to go on a phone — the whole pill
+       is already the tap target, this was just a label for it. */
+    justify-content: flex-start;
+  }
+
+  .vf-stats-hud__portfolio-hint {
+    display: none;
+  }
+}
+
 /* Month progress ------------------------------------------------------ */
 .vf-progress {
   display: flex;
