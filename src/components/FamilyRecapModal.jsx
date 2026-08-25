@@ -1,6 +1,7 @@
 import { FINANCIAL_LESSONS, getScenario } from '../data/gameConfig';
 import { getBadgeInfo } from '../game/badges';
 import { netWorth } from '../game/players';
+import { buildInsights } from '../game/insights';
 import { playSound } from '../audio/soundEngine';
 
 const GENERIC_PROMPTS = [
@@ -71,17 +72,34 @@ export default function FamilyRecapModal({ open, onClose, state, prices }) {
 
           <div className="vf-recap__section-title">🏁 Final standings</div>
           <ul className="vf-recap__list">
-            {ranked.map((p, i) => (
-              <li key={p.id}>
-                #{i + 1} {p.avatar} {p.name} — ${netWorth(p, prices).toLocaleString()}
-                {p.badges.length > 0 && (
-                  <span className="vf-recap__badges">
-                    {' '}
-                    · Badges: {p.badges.map((bid) => getBadgeInfo(bid)?.name).filter(Boolean).join(', ')}
-                  </span>
-                )}
-              </li>
-            ))}
+            {ranked.map((p, i) => {
+              // Only for human players — a robot's own portfolio patterns
+              // aren't a useful drill-down for the family/classroom reading
+              // this together. Same heuristic buildInsights already uses on
+              // the game-over screen, just per-player here instead of only
+              // for the winner.
+              const playerInsights = p.type === 'human' ? buildInsights(p, prices) : [];
+              return (
+                <li key={p.id}>
+                  #{i + 1} {p.avatar} {p.name} — ${netWorth(p, prices).toLocaleString()}
+                  {p.badges.length > 0 && (
+                    <span className="vf-recap__badges">
+                      {' '}
+                      · Badges: {p.badges.map((bid) => getBadgeInfo(bid)?.name).filter(Boolean).join(', ')}
+                    </span>
+                  )}
+                  {playerInsights.length > 0 && (
+                    <ul className="vf-recap__list" style={{ marginTop: '0.3rem' }}>
+                      {playerInsights.map((insight) => (
+                        <li key={insight.text} style={{ fontSize: '0.85rem', color: 'var(--vf-ink-soft)' }}>
+                          {insight.icon} {insight.text}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </li>
+              );
+            })}
           </ul>
 
           <div className="vf-recap__section-title">🗣️ Talk about it</div>

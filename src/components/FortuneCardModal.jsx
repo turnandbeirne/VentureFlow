@@ -1,4 +1,5 @@
 import { playSound } from '../audio/soundEngine';
+import LessonTip from './LessonTip';
 
 export default function FortuneCardModal({ entry, onContinue }) {
   if (!entry) return null;
@@ -25,6 +26,7 @@ export default function FortuneCardModal({ entry, onContinue }) {
         <div className="vf-modal__why">
           <strong>Why?</strong>
           {card.why}
+          <LessonTip conceptId={good ? 'opportunity' : 'emergencyFund'} />
         </div>
         <button type="button" className="vf-btn vf-btn--primary vf-btn--lg" onClick={handleContinue}>
           Got it!

@@ -125,6 +125,18 @@ export function loadGame() {
     const parsed = JSON.parse(raw);
     const state = normalizeState(parsed?.state || null);
     if (!state) return null;
+    // A finished game is not something to resume — the only thing waiting
+    // on the other side of "gameover" is the New Game button, so a save
+    // left in that state must not be handed back verbatim. Without this,
+    // useGame's lazy useReducer init returns the stale gameover state on
+    // the very first render, and App.jsx has no way to tell "resuming a
+    // real game" from "resurrecting a finished one" — the player reopens
+    // the app days later and is dropped right back on the OLD game's
+    // final GameOverScreen instead of the landing screen.
+    if (state.status === 'gameover') {
+      clearSavedGame();
+      return null;
+    }
     // Resume the exact random sequence this game was on. A save from before
     // this existed simply has no `rng` and keeps the old behaviour.
     restoreRng(parsed?.rng);

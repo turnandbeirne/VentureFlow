@@ -11,6 +11,7 @@ import { useGlobalLeaderboard } from '../hooks/useGlobalLeaderboard';
 import { buildInsights } from '../game/insights';
 import { downloadTextFile, slugForFilename } from '../game/downloadFile';
 import { buildScoreReport, buildLedgerReport, buildPlayByPlayReport } from '../game/gameRecord';
+import { buildRecapShareUrl } from '../game/recapShare';
 import VolumeControl from './VolumeControl';
 import MusicControl from './MusicControl';
 import Brand from './Brand';
@@ -48,6 +49,7 @@ export default function GameOverScreen({ state, onPlayAgain, onRecordProfileResu
   const [showLeaderboard, setShowLeaderboard] = useState(false);
   const [showRecap, setShowRecap] = useState(false);
   const [shareCopied, setShareCopied] = useState(false);
+  const [recapLinkCopied, setRecapLinkCopied] = useState(false);
   const [unlockCelebration, setUnlockCelebration] = useState(null);
   // Which standings row (if any) has its full portfolio breakdown open —
   // read-only here (game's over, nothing left to upgrade), but this is
@@ -178,6 +180,38 @@ export default function GameOverScreen({ state, onPlayAgain, onRecordProfileResu
   function handleDownloadPlayByPlay() {
     playSound('click');
     downloadTextFile(`ventureflow-play-by-play-${fileDateStamp}.txt`, buildPlayByPlayReport(state));
+  }
+
+  // A self-contained link (the recap data lives in the URL itself, see
+  // game/recapShare.js) a parent or teacher can open with nothing but a
+  // browser — no account, no app install, no server round trip. Shares the
+  // exact same clipboard-with-a-prompt-fallback pattern as
+  // handleShareResult below, since both are "put some text where the user
+  // can paste it" in the end.
+  async function handleCopyRecapLink() {
+    playSound('click');
+    const url = buildRecapShareUrl(state);
+    try {
+      await navigator.clipboard.writeText(url);
+      setRecapLinkCopied(true);
+      setTimeout(() => setRecapLinkCopied(false), 2500);
+    } catch {
+      // eslint-disable-next-line no-alert
+      window.prompt('Copy this recap link:', url);
+    }
+  }
+
+  // Opens the player's own email app/webmail with a short note and the
+  // same shareable link already filled in — no email is ever sent FROM
+  // this app or through any server of ours; the browser just hands off to
+  // whatever mailto: handler is already configured on the device, same as
+  // clicking a mailto link on any other website.
+  function handleEmailRecap() {
+    playSound('click');
+    const url = buildRecapShareUrl(state);
+    const subject = `VentureFlow recap — ${winner.name}'s game`;
+    const body = `Here's how our VentureFlow game went — final standings, what we talked about, and a few notes on how it played out:\n\n${url}\n\nNo account or app needed, just open the link.`;
+    window.location.href = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
   }
 
   async function handleShareResult() {
@@ -412,6 +446,21 @@ export default function GameOverScreen({ state, onPlayAgain, onRecordProfileResu
             </button>
             <button type="button" className="vf-btn vf-btn--sm vf-btn--ghost" onClick={handleDownloadPlayByPlay}>
               📜 Play by Play
+            </button>
+          </div>
+          {/* A parent or teacher who wasn't at the table doesn't need a
+              file at all — a link they can open cold gives them the same
+              standings/concepts/insights a downloaded file would, with zero
+              setup on their end. See game/recapShare.js + RecapViewer.jsx. */}
+          <div className="vf-gameover__downloads-title" style={{ marginTop: '0.6rem' }}>
+            👪 Share with a parent or teacher
+          </div>
+          <div className="vf-gameover__downloads-row">
+            <button type="button" className="vf-btn vf-btn--sm vf-btn--ghost" onClick={handleCopyRecapLink}>
+              {recapLinkCopied ? '✅ Link copied!' : '🔗 Copy Recap Link'}
+            </button>
+            <button type="button" className="vf-btn vf-btn--sm vf-btn--ghost" onClick={handleEmailRecap}>
+              📧 Email Recap
             </button>
           </div>
         </div>

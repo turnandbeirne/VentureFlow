@@ -217,7 +217,7 @@ export const BUSINESS_INCOME_MAX = 70;
 // Both modes seat up to MAX_PLAYERS. Solo is you plus up to MAX_PLAYERS - 1
 // robots (7 named personalities exist, so three distinct opponents is never
 // a problem); Hot-Seat is up to MAX_PLAYERS humans passing one device.
-// PLAYER_AVATARS has 8 entries, comfortably more than a full table needs.
+// PLAYER_AVATARS has 24 entries, comfortably more than a full table needs.
 export const MAX_PLAYERS = 4;
 export const MAX_AI_PLAYERS = MAX_PLAYERS - 1;
 
@@ -507,13 +507,14 @@ export const ASSETS = [
   },
   {
     id: 'lemonade',
-    name: 'Lemonade Stands & More',
+    name: 'Seasoned Services',
     // Explicit plural — the event log now says "bought 14 Piggy Banks"
-    // rather than 14 separate lines, and naive pluralisation mangles a
-    // name like "Lemonade Stands & More".
-    plural: 'Lemonade Stands',
+    // rather than 14 separate lines, and naive pluralisation would mangle
+    // an already-plural-shaped name like "Seasoned Services" into
+    // "Seasoned Servicess".
+    plural: 'Seasoned Services',
     icon: '🍋',
-    tagline: 'Seasonal services like food trucks, lawncare, & more!',
+    tagline: 'Lemonade stands, food trucks, lawncare, sitting services & more!',
     kind: 'bouncy',
     basePrice: 75,
     volatility: 0.15,
@@ -1658,7 +1659,11 @@ export const BUSINESS_NAMES = [
 // small bit of extra replay incentive beyond any single game. Hot-seat mode
 // only ever indexes the first 3 entries (its max player count), so adding
 // more avatars at the end here never changes that path's behavior.
-export const PLAYER_AVATARS = ['🦊', '🐼', '🐸', '🦁', '🐨', '🐯', '🦄', '🐲'];
+export const PLAYER_AVATARS = [
+  '🦊', '🐼', '🐸', '🦁', '🐨', '🐯', '🦄', '🐲',
+  '🐶', '🐱', '🐰', '🐻', '🐷', '🐮', '🦉', '🐙',
+  '🦋', '🐢', '🦖', '🐳', '🦈', '🐝', '🦜', '🐧',
+];
 export const STARTER_AVATAR_COUNT = 3;
 
 // Each entry's `avatar` must be one of PLAYER_AVATARS above (index >=
@@ -1667,25 +1672,80 @@ export const STARTER_AVATAR_COUNT = 3;
 // localStorage — separate from any single game save, so this persists
 // across "New Game"/"Play Again" and even across devices sharing the same
 // browser profile.
+//
+// Deliberately spans every requirement type meetsRequirement() knows
+// (games played, badges, net worth, passive income, businesses started,
+// businesses sold) rather than just escalating one counter — a trader who
+// never starts a business and a builder who never sells one should both
+// have unlocks waiting on them, not just whoever racks up the most games.
+// Roughly ordered easy-to-hard, but the type varies on purpose so the
+// early unlocks don't all reward the exact same play style.
 export const AVATAR_UNLOCKS = [
+  { avatar: '🐶', requirement: { type: 'gamesPlayed', value: 1 }, hint: 'Finish your first game' },
   { avatar: '🦁', requirement: { type: 'gamesPlayed', value: 3 }, hint: 'Play 3 games' },
+  { avatar: '🐰', requirement: { type: 'badgesEarned', value: 2 }, hint: 'Earn 2 badges total (across all your games)' },
+  { avatar: '🐱', requirement: { type: 'netWorth', value: 500 }, hint: 'Finish a game with $500+ net worth' },
   { avatar: '🐨', requirement: { type: 'badgesEarned', value: 5 }, hint: 'Earn 5 badges total (across all your games)' },
+  { avatar: '🐮', requirement: { type: 'passiveIncome', value: 50 }, hint: 'Reach $50/mo passive income in a game' },
+  { avatar: '🐻', requirement: { type: 'gamesPlayed', value: 5 }, hint: 'Play 5 games' },
   { avatar: '🐯', requirement: { type: 'netWorth', value: 2000 }, hint: 'Finish a game with $2,000+ net worth' },
+  { avatar: '🐷', requirement: { type: 'netWorth', value: 1000 }, hint: 'Finish a game with $1,000+ net worth' },
+  { avatar: '🐙', requirement: { type: 'businessesStarted', value: 5 }, hint: 'Start 5 businesses total (across all your games)' },
+  { avatar: '🦉', requirement: { type: 'badgesEarned', value: 10 }, hint: 'Earn 10 badges total (across all your games)' },
   { avatar: '🦄', requirement: { type: 'gamesPlayed', value: 10 }, hint: 'Play 10 games' },
+  { avatar: '🐢', requirement: { type: 'netWorth', value: 5000 }, hint: 'Finish a game with $5,000+ net worth' },
   { avatar: '🐲', requirement: { type: 'passiveIncome', value: 300 }, hint: 'Reach $300/mo passive income in a game' },
+  { avatar: '🦋', requirement: { type: 'gamesPlayed', value: 15 }, hint: 'Play 15 games' },
+  { avatar: '🐝', requirement: { type: 'businessesSold', value: 3 }, hint: 'Sell 3 businesses total (across all your games)' },
+  { avatar: '🦖', requirement: { type: 'businessesStarted', value: 15 }, hint: 'Start 15 businesses total (across all your games)' },
+  { avatar: '🐳', requirement: { type: 'passiveIncome', value: 600 }, hint: 'Reach $600/mo passive income in a game' },
+  { avatar: '🦈', requirement: { type: 'netWorth', value: 10000 }, hint: 'Finish a game with $10,000+ net worth' },
+  { avatar: '🦜', requirement: { type: 'gamesPlayed', value: 25 }, hint: 'Play 25 games' },
+  { avatar: '🐧', requirement: { type: 'passiveIncome', value: 1000 }, hint: 'Reach $1,000/mo passive income in a game' },
 ];
 
 // A cosmetic board theme, unlocked the same way as avatars — see
 // game/profile.js + App.jsx (applies the selected theme as a data
-// attribute the CSS keys off of).
+// attribute the CSS keys off of). Each swaps only the "brand" tokens
+// (theme.css's [data-theme='...'] blocks) — the semantic colors (green =
+// good, red = bad, blue = info) are never touched by a theme, so a color's
+// MEANING stays consistent no matter which one is active.
 export const BOARD_THEMES = [
   { id: 'classic', name: 'Classic', icon: '🎨', requirement: null },
+  {
+    id: 'grove',
+    name: 'Sunny Grove',
+    icon: '🌿',
+    requirement: { type: 'gamesPlayed', value: 2 },
+    hint: 'Play 2 games',
+  },
+  {
+    id: 'ocean',
+    name: 'Ocean Breeze',
+    icon: '🌊',
+    requirement: { type: 'netWorth', value: 3000 },
+    hint: 'Finish a game with $3,000+ net worth',
+  },
+  {
+    id: 'berry',
+    name: 'Berry Pop',
+    icon: '🍓',
+    requirement: { type: 'badgesEarned', value: 6 },
+    hint: 'Earn 6 badges total (across all your games)',
+  },
   {
     id: 'gold',
     name: 'Gold Table',
     icon: '✨',
     requirement: { type: 'badgesEarned', value: 8 },
     hint: 'Earn 8 badges total (across all your games)',
+  },
+  {
+    id: 'arcade',
+    name: 'Midnight Arcade',
+    icon: '🌌',
+    requirement: { type: 'gamesPlayed', value: 20 },
+    hint: 'Play 20 games',
   },
 ];
 

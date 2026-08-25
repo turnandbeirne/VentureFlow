@@ -9,6 +9,22 @@ import {
 import { effectiveRentPerUnit, perUnitIncome, totalUnitsOwned, interestRateFor, isInterestBonusMonth } from '../game/players';
 import { useHoldRepeat } from '../hooks/useHoldRepeat';
 import { playSound } from '../audio/soundEngine';
+import LessonTip from './LessonTip';
+
+// Which FINANCIAL_LESSONS concept (gameConfig.js) each asset's card links
+// to when "Teach Me" mode is on — picked so the four cards together cover
+// four DIFFERENT concepts rather than repeating one: Piggy Bank is the
+// classic "keep some cash safe" asset (emergencyFund), Seasoned Services'
+// income is literally driven by the weather (marketCycles), Tree House is
+// the textbook passive-income asset (passiveIncome), and Treasure Chest is
+// the one asset that pays nothing except what the next buyer offers
+// (riskReward — speculation).
+const ASSET_LESSON_CONCEPT = {
+  piggy: 'emergencyFund',
+  lemonade: 'marketCycles',
+  treehouse: 'passiveIncome',
+  treasure: 'riskReward',
+};
 
 /** A quick 1-4 dot risk meter from an asset's volatility, paired with its
  * existing riskLabel text (gameConfig.js) — teaches the risk/reward
@@ -84,7 +100,10 @@ function AssetCard({ asset, price, previousPrice, owned, cash, totalOwned, weath
   return (
     <div className="vf-card vf-asset-card">
       <span className="vf-asset-card__icon">{asset.icon}</span>
-      <span className="vf-asset-card__name">{asset.name}</span>
+      <span className="vf-asset-card__name">
+        {asset.name}
+        <LessonTip conceptId={ASSET_LESSON_CONCEPT[asset.id]} />
+      </span>
       <span className="vf-asset-card__tagline">{asset.tagline}</span>
       <span className="vf-asset-card__risk" title={`Volatility: how much the price can swing in one month`}>
         <span className="vf-asset-card__risk-dots" aria-hidden="true">
@@ -175,6 +194,7 @@ export default function AssetShop({
       <div className="vf-section-title">
         <span>🛒</span>
         <span>Buy things that grow</span>
+        <LessonTip conceptId="diversification" />
         <span className="vf-section-title__hint">Hold Buy/Sell to go faster</span>
       </div>
       <div className="vf-shop-grid">

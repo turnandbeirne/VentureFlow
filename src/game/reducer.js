@@ -199,7 +199,7 @@ export function gameReducer(state, action) {
       return withResult(sellAsset(state, action.playerId, action.assetId, action.qty));
 
     case 'START_BUSINESS': {
-      const result = startBusiness(state, action.playerId);
+      const result = startBusiness(state, action.playerId, action.name);
       const next = withResult(result);
       if (!result.ok) return next;
       // A HUMAN player's new business gets a launch celebration (see

@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import '../styles/game.css';
 import { getDifficulty } from '../data/gameConfig';
 import { usePlaySpeed } from '../hooks/usePlaySpeed';
-import { useTeachMode } from '../hooks/useTeachMode';
 import { turnOrdinal, currentTurnTally } from '../game/turnClock';
 import { playSound } from '../audio/soundEngine';
 import { playMusicTrack } from '../audio/musicEngine';
@@ -24,7 +23,6 @@ import RulebookModal from './RulebookModal';
 import SpeedControl from './SpeedControl';
 import TurnTimer from './TurnTimer';
 import StartupLaunchModal from './StartupLaunchModal';
-import StartBusinessModal from './StartBusinessModal';
 import PlayerDetailModal from './PlayerDetailModal';
 import StatsHUD from './StatsHUD';
 
@@ -47,13 +45,9 @@ export default function GameBoard({ game }) {
   // Read live so a mid-game change to the slider takes effect on the very
   // next beat — including the robot-recap auto-advance below.
   const { speed } = usePlaySpeed();
-  const { teachMode, toggle: toggleTeachMode } = useTeachMode();
   const [showLeaderboard, setShowLeaderboard] = useState(false);
   const [showRulebook, setShowRulebook] = useState(false);
   const [selectedPlayerId, setSelectedPlayerId] = useState(null);
-  // Naming step between tapping "Start Business" and the launch
-  // celebration — see StartBusinessModal.jsx.
-  const [showStartBusiness, setShowStartBusiness] = useState(false);
   const activePlayer = players[activePlayerIndex];
   // What the active player has bought during THIS turn — the shop uses it to
   // warn that selling those units back carries the same-turn resale fee,
@@ -143,27 +137,6 @@ export default function GameBoard({ game }) {
                 onExtend={() => game.extendTurn(activePlayer.id)}
                 onExpire={() => game.endTurn(activePlayer.id)}
               />
-              {/* Toggles the on-demand ❓ lesson tooltips scattered across
-                  the board (asset cards, weather, fortune cards, business
-                  actions/upgrades — see LessonTip.jsx). A device-level
-                  preference (hooks/useTeachMode.js), not part of the game
-                  itself, so it can be flipped on or off mid-game and stays
-                  set for next time. */}
-              <button
-                type="button"
-                className={`vf-btn vf-btn--sm ${teachMode ? 'vf-btn--go' : 'vf-btn--ghost'}`}
-                title={
-                  teachMode
-                    ? 'Teach Me mode is ON — tap Teach Me to hide the ❓ lesson tips'
-                    : 'Turn on Teach Me mode for ❓ lesson tips on cards, weather, and more'
-                }
-                onClick={() => {
-                  playSound('click');
-                  toggleTeachMode();
-                }}
-              >
-                🎓 Teach Me
-              </button>
               <button
                 type="button"
                 className="vf-btn vf-btn--sm vf-btn--ghost"
@@ -266,10 +239,7 @@ export default function GameBoard({ game }) {
           <ActionBar
             player={activePlayer}
             disabled={!isHumanTurn}
-            onStartBusiness={() => {
-              playSound('click');
-              setShowStartBusiness(true);
-            }}
+            onStartBusiness={() => game.startBusiness(activePlayer.id)}
             onLearnSkill={() => game.learnSkill(activePlayer.id)}
             onDone={() => game.endTurn(activePlayer.id)}
           />
@@ -322,21 +292,6 @@ export default function GameBoard({ game }) {
           certainly has open behind it. */}
       {state.pendingLaunch && (
         <StartupLaunchModal launch={state.pendingLaunch} onContinue={game.ackStartupLaunch} />
-      )}
-
-      {/* Naming step, opened by ActionBar's Start Business button, above —
-          confirming here is what actually dispatches START_BUSINESS; the
-          launch celebration modal above then picks up from the resulting
-          state.pendingLaunch. */}
-      {showStartBusiness && activePlayer && (
-        <StartBusinessModal
-          existingNames={activePlayer.businesses.map((b) => b.name)}
-          onConfirm={(name) => {
-            game.startBusiness(activePlayer.id, name);
-            setShowStartBusiness(false);
-          }}
-          onCancel={() => setShowStartBusiness(false)}
-        />
       )}
 
       {selectedPlayer && (

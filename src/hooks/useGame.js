@@ -88,8 +88,8 @@ export function useGame() {
     dispatch({ type: 'SELL_ASSET', playerId, assetId, qty });
   }, []);
 
-  const startBusiness = useCallback((playerId) => {
-    dispatch({ type: 'START_BUSINESS', playerId });
+  const startBusiness = useCallback((playerId, name) => {
+    dispatch({ type: 'START_BUSINESS', playerId, name });
   }, []);
 
   const learnSkill = useCallback((playerId) => {

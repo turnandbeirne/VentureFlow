@@ -534,17 +534,6 @@
   min-width: 160px;
 }
 
-/* Wraps a button + its optional LessonTip (see ActionBar.jsx) as one flex
-   item, so adding the "Teach Me" tip never changes the two buttons' own
-   sizing relative to each other. */
-.vf-action-bar__item {
-  display: flex;
-  align-items: center;
-  gap: 0.3rem;
-  flex: 1;
-  min-width: 160px;
-}
-
 .vf-done-row {
   display: flex;
   justify-content: center;
@@ -965,74 +954,6 @@
   text-align: left;
 }
 
-/* "Teach Me" on-demand lesson tooltips (see LessonTip.jsx) --------------- */
-.vf-lesson-tip {
-  position: relative;
-  display: inline-block;
-  margin-left: 0.35rem;
-  vertical-align: middle;
-}
-
-.vf-lesson-tip__toggle {
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  border: 2px solid var(--vf-border);
-  background: var(--vf-yellow);
-  color: var(--vf-ink);
-  font-size: 0.65rem;
-  font-weight: 800;
-  line-height: 1;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0;
-  cursor: pointer;
-  flex-shrink: 0;
-}
-
-.vf-lesson-tip__toggle--open {
-  background: var(--vf-ink);
-  color: var(--vf-white);
-}
-
-.vf-lesson-tip__bubble {
-  position: absolute;
-  z-index: 25;
-  top: calc(100% + 0.35rem);
-  left: 50%;
-  transform: translateX(-50%);
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-  width: max-content;
-  max-width: min(260px, 80vw);
-  padding: 0.65rem 0.8rem;
-  background: var(--vf-cream);
-  border: var(--vf-border-width) solid var(--vf-border);
-  border-radius: var(--vf-radius-md);
-  box-shadow: var(--vf-shadow-sm);
-  font-size: 0.78rem;
-  font-weight: 500;
-  line-height: 1.4;
-  text-align: left;
-  color: var(--vf-ink);
-  animation: vf-pop-in 0.12s ease;
-}
-
-.vf-lesson-tip__bubble strong {
-  color: var(--vf-teal-dark);
-}
-
-/* For a tip that lives near the right edge of its container (e.g. the
-   weather badge in the board's top-right header row) — anchors the bubble
-   to the right so it opens leftward instead of overflowing off-screen. */
-.vf-lesson-tip--right .vf-lesson-tip__bubble {
-  left: auto;
-  right: 0;
-  transform: none;
-}
-
 /* Unlocks viewer -------------------------------------------------------- */
 .vf-unlocks {
   width: 100%;
@@ -1200,105 +1121,6 @@
 
 .vf-modal__actions .vf-btn {
   flex: 1;
-}
-
-/* Start-business naming step (see StartBusinessModal.jsx) --------------- */
-.vf-start-business-modal {
-  max-width: 460px;
-}
-
-.vf-start-business-modal__preview {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.2rem;
-  padding: 1rem;
-  border-radius: var(--vf-radius-lg);
-  border: var(--vf-border-width) solid var(--vf-border);
-}
-
-.vf-start-business-modal__preview-hero {
-  font-size: 2.5rem;
-  line-height: 1;
-}
-
-.vf-start-business-modal__preview-name {
-  font-weight: 700;
-  font-size: 1.05rem;
-  color: var(--vf-ink);
-}
-
-.vf-start-business-modal__preview-props {
-  display: flex;
-  gap: 0.4rem;
-  font-size: 1.1rem;
-}
-
-.vf-start-business-modal__suggestions {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 0.5rem;
-}
-
-.vf-start-business-modal__suggestion {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  padding: 0.55rem 0.6rem;
-  border-radius: var(--vf-radius-md);
-  border: 2px solid var(--vf-border);
-  background: var(--vf-white);
-  font-weight: 600;
-  font-size: 0.82rem;
-  text-align: left;
-  cursor: pointer;
-  transition: border-color 0.12s ease, background 0.12s ease;
-}
-
-.vf-start-business-modal__suggestion:hover {
-  border-color: var(--vf-teal);
-}
-
-.vf-start-business-modal__suggestion--picked {
-  border-color: var(--vf-teal-dark);
-  background: var(--vf-teal-light, var(--vf-cream));
-}
-
-.vf-start-business-modal__suggestion-hero {
-  font-size: 1.3rem;
-  line-height: 1;
-  flex-shrink: 0;
-}
-
-.vf-start-business-modal__suggestion-name {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.vf-start-business-modal__custom-label {
-  font-size: 0.8rem;
-  font-weight: 600;
-  color: var(--vf-ink-soft);
-  text-align: left;
-  margin-top: 0.2rem;
-}
-
-.vf-start-business-modal__custom-input {
-  width: 100%;
-  padding: 0.6rem 0.75rem;
-  border-radius: var(--vf-radius-md);
-  border: 2px solid var(--vf-border);
-  font-size: 0.95rem;
-  font-family: inherit;
-  color: var(--vf-ink);
-  background: var(--vf-white);
-}
-
-.vf-start-business-modal__custom-input:focus {
-  outline: none;
-  border-color: var(--vf-teal);
-  box-shadow: 0 0 0 3px var(--vf-teal-light, var(--vf-teal));
 }
 
 /* Business health coloring (see game/businessUpgrades.js's

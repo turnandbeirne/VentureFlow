@@ -40,7 +40,16 @@ function loadKidsGame() {
   try {
     const raw = localStorage.getItem(KIDS_STORAGE_KEY);
     if (!raw) return null;
-    return JSON.parse(raw)?.state || null;
+    const state = JSON.parse(raw)?.state || null;
+    // Mirrors the same fix in game/persistence.js's loadGame(): a finished
+    // game must not be handed back verbatim, or a kid reopening the app
+    // days later lands right back on the old game's final screen instead
+    // of a fresh start.
+    if (state?.status === 'gameover') {
+      clearKidsGame();
+      return null;
+    }
+    return state;
   } catch (err) {
     console.warn('VentureFlow Kids: could not load saved game.', err);
     return null;

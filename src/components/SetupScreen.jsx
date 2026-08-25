@@ -26,6 +26,7 @@ import {
   DAILY_CHALLENGE_SCENARIO_ID,
 } from '../game/dailyChallenge';
 import { useProfile } from '../hooks/useProfile';
+import { useTeachMode } from '../hooks/useTeachMode';
 import VolumeControl from './VolumeControl';
 import MusicControl from './MusicControl';
 import Brand from './Brand';
@@ -77,6 +78,7 @@ export default function SetupScreen({ onStart, onBack }) {
   const infoScenario = infoScenarioId ? SCENARIOS.find((s) => s.id === infoScenarioId) : null;
 
   const { profile, avatars, avatarProgress, themeProgress, selectTheme } = useProfile();
+  const { teachMode, setTeachMode } = useTeachMode();
   const [avatarChoices, setAvatarChoices] = useState(() =>
     Array.from({ length: MAX_PLAYERS }, (_, i) => avatars[i % avatars.length])
   );
@@ -202,6 +204,12 @@ export default function SetupScreen({ onStart, onBack }) {
       <div className="vf-topbar-corner">
         <VolumeControl />
         <MusicControl />
+        {/* See LandingScreen.jsx's matching link for why this is a plain
+            <a> to the static /kids route rather than an onStart mode. */}
+        <a href="/kids" className="vf-kids-link vf-kids-link--sm" onClick={() => playSound('click')}>
+          <span className="vf-kids-link__icon">🧒</span>
+          Kids Version
+        </a>
         <button type="button" className="vf-btn vf-btn--sm vf-btn--ghost" onClick={openUnlocks}>
           🏅 Unlocks
         </button>
@@ -423,6 +431,31 @@ export default function SetupScreen({ onStart, onBack }) {
                 {TURN_TIME_SECONDS} seconds per turn. Each player can add {TURN_EXTENSION_SECONDS} more seconds up to{' '}
                 {TURN_EXTENSIONS_PER_PLAYER} times a game. When time runs out the turn just passes — nothing you
                 already bought is lost.
+              </span>
+            </span>
+          </label>
+        </div>
+
+        {/* A device preference (hooks/useTeachMode.js), not per-game state
+            like the timer above — flipping it here turns it on right away
+            everywhere it's read, board included if a game's already in
+            progress, and it stays on for next time until turned back off. */}
+        <div className="vf-card vf-timer-option">
+          <label className="vf-timer-option__row">
+            <input
+              type="checkbox"
+              checked={teachMode}
+              onChange={(e) => {
+                playSound('click');
+                setTeachMode(e.target.checked);
+              }}
+            />
+            <span>
+              <strong>🎓 Teach Me mode</strong>
+              <span className="vf-timer-option__blurb">
+                Adds a small ❓ next to asset cards, the weather, fortune cards, and business actions — tap any of
+                them for a plain-language explanation of the real financial idea behind that part of the game. Can
+                also be turned on or off mid-game from the board.
               </span>
             </span>
           </label>

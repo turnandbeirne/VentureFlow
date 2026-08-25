@@ -159,14 +159,23 @@ export function sellAsset(state, playerId, assetId, qty = 1) {
   };
 }
 
-export function startBusiness(state, playerId) {
+export function startBusiness(state, playerId, chosenName) {
   const player = findPlayer(state, playerId);
   if (!player) return { state, ok: false, error: 'Invalid player.' };
   if (player.cash < BUSINESS_COST) return { state, ok: false, error: 'Not enough cash to start a business.' };
   if (player.skillTokens < BUSINESS_SKILL_COST) return { state, ok: false, error: 'Not enough skill tokens.' };
 
   const income = randomInt(BUSINESS_INCOME_MIN, BUSINESS_INCOME_MAX);
-  const name = pickBusinessName(player.businesses);
+  // A human gets to pick from StartBusinessModal.jsx (their own typed name,
+  // or one of the whimsical suggestions it offers) — trimmed and capped so
+  // a pasted essay can't blow out every card that renders this name. An AI
+  // (or a human who somehow submits blank) falls back to the same random
+  // whimsical pick as always. Either way, businessArt.js turns whatever
+  // name lands here into the storefront art — a human choosing "Ice Cream
+  // Truck" over "Auntie Betty's Bakery" IS choosing the business's type,
+  // there's no separate archetype system to keep in sync with it.
+  const trimmedChosen = typeof chosenName === 'string' ? chosenName.trim().slice(0, 40) : '';
+  const name = trimmedChosen || pickBusinessName(player.businesses);
   // player.businessSeq (not businesses.length + 1 — see its comment in
   // players.js) so an id never gets reused after a business exit removes
   // one from the array; a game saved before businessSeq existed falls back

@@ -399,6 +399,40 @@ button {
   --vf-cream-deep: #fbe9b8;
 }
 
+[data-theme='grove'] {
+  --vf-teal: #2f9e44;
+  --vf-teal-dark: #237032;
+  --vf-orange: #d9a441;
+  --vf-orange-dark: #b3812c;
+  --vf-cream: #f3f7ea;
+  --vf-cream-deep: #e4edd3;
+}
+
+[data-theme='ocean'] {
+  --vf-teal: #1c7ed6;
+  --vf-teal-dark: #155ea3;
+  --vf-yellow: #ffd43b;
+  --vf-cream: #eaf6fb;
+  --vf-cream-deep: #d3edf7;
+}
+
+[data-theme='berry'] {
+  --vf-teal: #d6336c;
+  --vf-teal-dark: #a61e4d;
+  --vf-orange: #ae3ec9;
+  --vf-orange-dark: #862e9c;
+  --vf-cream: #fdf0f6;
+  --vf-cream-deep: #fbdce9;
+}
+
+[data-theme='arcade'] {
+  --vf-teal: #5f3dc4;
+  --vf-teal-dark: #4527a0;
+  --vf-orange: #f08c00;
+  --vf-cream: #f1edfb;
+  --vf-cream-deep: #e0d6f7;
+}
+
 @keyframes vf-pop-in {
   from {
     opacity: 0;
