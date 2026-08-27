@@ -1,0 +1,760 @@
+/* ============================================================================
+   VentureFlow: Just for Kids — visual language
+   ----------------------------------------------------------------------------
+   Deliberately its OWN namespace (every class is prefixed `kv-`, nothing here
+   touches `.vf-*`) and its own CSS variables, so this file can be imported
+   only by src/kids/** components without any risk of bleeding into the main
+   game's look. Bigger everything — text, tap targets, corner radii — since
+   this is built for kids under 8: chunky rounded shapes, high-contrast
+   candy colors, generous spacing so small fingers on a tablet don't mis-tap.
+   ============================================================================ */
+
+.kv-app {
+  --kv-bg: #fff7e6;
+  --kv-bg-grad: linear-gradient(160deg, #fff2cc 0%, #ffe0f0 45%, #e0f2ff 100%);
+  --kv-card: #ffffff;
+  --kv-ink: #33244d;
+  --kv-ink-soft: #6b5b8a;
+  --kv-primary: #7c4dff;
+  --kv-primary-dark: #5e2fe0;
+  --kv-accent: #ff9800;
+  --kv-accent-dark: #e67e00;
+  --kv-pink: #ff5c8a;
+  --kv-green: #29c76f;
+  --kv-blue: #29b6d8;
+  --kv-yellow: #ffd23f;
+  --kv-shadow: 0 10px 26px rgba(90, 50, 150, 0.16);
+  --kv-shadow-sm: 0 4px 10px rgba(90, 50, 150, 0.14);
+  --kv-radius: 26px;
+  --kv-radius-sm: 16px;
+
+  min-height: 100vh;
+  background: var(--kv-bg-grad);
+  color: var(--kv-ink);
+  font-family: 'Fredoka', system-ui, sans-serif;
+  font-size: 18px;
+  line-height: 1.35;
+}
+
+.kv-app * {
+  box-sizing: border-box;
+}
+
+.kv-app button {
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.kv-scroll {
+  overflow: auto;
+  scrollbar-width: thin;
+}
+
+/* ---- shared building blocks ------------------------------------------- */
+
+.kv-card {
+  background: var(--kv-card);
+  border-radius: var(--kv-radius);
+  box-shadow: var(--kv-shadow);
+  padding: 20px;
+}
+
+.kv-btn {
+  border: none;
+  border-radius: 999px;
+  padding: 14px 26px;
+  font-weight: 700;
+  font-size: 1.05em;
+  color: #fff;
+  background: var(--kv-primary);
+  box-shadow: var(--kv-shadow-sm);
+  transition: transform 0.12s ease, box-shadow 0.12s ease, filter 0.12s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: center;
+}
+
+.kv-btn:hover:not(:disabled) {
+  transform: translateY(-2px) scale(1.02);
+  filter: brightness(1.05);
+}
+
+.kv-btn:active:not(:disabled) {
+  transform: translateY(1px) scale(0.98);
+}
+
+.kv-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  filter: grayscale(0.3);
+}
+
+.kv-btn--huge {
+  padding: 22px 40px;
+  font-size: 1.4em;
+  border-radius: 28px;
+}
+
+.kv-btn--accent {
+  background: var(--kv-accent);
+}
+
+.kv-btn--pink {
+  background: var(--kv-pink);
+}
+
+.kv-btn--green {
+  background: var(--kv-green);
+}
+
+.kv-btn--blue {
+  background: var(--kv-blue);
+}
+
+.kv-btn--ghost {
+  background: rgba(124, 77, 255, 0.1);
+  color: var(--kv-primary-dark);
+  box-shadow: none;
+}
+
+.kv-btn--sm {
+  padding: 9px 16px;
+  font-size: 0.9em;
+}
+
+.kv-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: rgba(124, 77, 255, 0.12);
+  color: var(--kv-primary-dark);
+  font-weight: 700;
+  font-size: 0.9em;
+}
+
+.kv-title {
+  font-size: 2.2em;
+  font-weight: 700;
+  margin: 0 0 6px;
+}
+
+.kv-subtitle {
+  color: var(--kv-ink-soft);
+  font-size: 1.1em;
+  margin: 0 0 18px;
+}
+
+.kv-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(51, 36, 77, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  z-index: 200;
+}
+
+.kv-modal {
+  background: var(--kv-card);
+  border-radius: var(--kv-radius);
+  box-shadow: var(--kv-shadow);
+  padding: 28px;
+  max-width: 560px;
+  width: 100%;
+  max-height: 88vh;
+  overflow: auto;
+  text-align: center;
+}
+
+.kv-modal__icon {
+  font-size: 3.2em;
+  line-height: 1;
+  margin-bottom: 6px;
+}
+
+/* ---- Landing ------------------------------------------------------------ */
+
+.kv-landing {
+  max-width: 880px;
+  margin: 0 auto;
+  padding: 40px 20px 60px;
+  text-align: center;
+}
+
+.kv-landing__mascot {
+  font-size: 5em;
+  line-height: 1;
+  margin-bottom: 10px;
+  animation: kv-bounce 2.4s ease-in-out infinite;
+}
+
+@keyframes kv-bounce {
+  0%, 100% { transform: translateY(0) rotate(-3deg); }
+  50% { transform: translateY(-10px) rotate(3deg); }
+}
+
+.kv-landing__brand {
+  font-size: 2.6em;
+  font-weight: 700;
+  margin: 0 0 4px;
+  color: var(--kv-primary-dark);
+}
+
+.kv-landing__tag {
+  color: var(--kv-ink-soft);
+  font-size: 1.2em;
+  margin: 0 0 28px;
+}
+
+.kv-landing__cta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 16px;
+  margin-bottom: 30px;
+}
+
+.kv-landing__back {
+  margin-top: 30px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--kv-ink-soft);
+  text-decoration: none;
+  font-weight: 700;
+}
+
+.kv-landing__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 16px;
+  margin-top: 10px;
+  text-align: left;
+}
+
+.kv-landing__grid .kv-card {
+  text-align: center;
+}
+
+/* ---- Setup ---------------------------------------------------------------- */
+
+.kv-setup {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 30px 20px 60px;
+}
+
+.kv-setup__step {
+  margin-bottom: 26px;
+}
+
+.kv-setup__label {
+  font-weight: 700;
+  font-size: 1.2em;
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.kv-setup__name-input {
+  width: 100%;
+  padding: 16px 18px;
+  border-radius: var(--kv-radius-sm);
+  border: 3px solid rgba(124, 77, 255, 0.25);
+  font-size: 1.2em;
+  font-family: inherit;
+  color: var(--kv-ink);
+  background: #fff;
+}
+
+.kv-setup__name-input:focus {
+  outline: none;
+  border-color: var(--kv-primary);
+}
+
+.kv-choice-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: 12px;
+}
+
+.kv-choice {
+  border: 3px solid transparent;
+  background: #fff;
+  border-radius: var(--kv-radius-sm);
+  padding: 16px 10px;
+  text-align: center;
+  box-shadow: var(--kv-shadow-sm);
+  font-weight: 700;
+  transition: transform 0.12s ease, border-color 0.12s ease;
+}
+
+.kv-choice:hover {
+  transform: translateY(-2px);
+}
+
+.kv-choice--selected {
+  border-color: var(--kv-primary);
+  background: rgba(124, 77, 255, 0.08);
+}
+
+.kv-choice__icon {
+  font-size: 2.4em;
+  display: block;
+  margin-bottom: 6px;
+}
+
+.kv-choice__sub {
+  font-weight: 500;
+  font-size: 0.82em;
+  color: var(--kv-ink-soft);
+  display: block;
+  margin-top: 2px;
+}
+
+/* ---- Board ---------------------------------------------------------------- */
+
+.kv-board {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 16px 16px 60px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.kv-board__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.kv-board__header-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 700;
+  font-size: 1.3em;
+  color: var(--kv-primary-dark);
+}
+
+.kv-board__header-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.kv-month {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.kv-month__bar {
+  flex: 1;
+  height: 14px;
+  border-radius: 999px;
+  background: rgba(124, 77, 255, 0.12);
+  overflow: hidden;
+}
+
+.kv-month__fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--kv-blue), var(--kv-primary));
+  border-radius: 999px;
+  transition: width 0.4s ease;
+}
+
+.kv-weather-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 18px;
+}
+
+.kv-weather-banner__icon {
+  font-size: 2.2em;
+}
+
+.kv-turn-banner {
+  text-align: center;
+  font-weight: 700;
+  font-size: 1.3em;
+  padding: 14px;
+  border-radius: var(--kv-radius-sm);
+  background: linear-gradient(90deg, #fff2cc, #ffe0f0);
+  color: var(--kv-primary-dark);
+}
+
+.kv-turn-banner--ai {
+  background: linear-gradient(90deg, #e0f2ff, #f0e8ff);
+}
+
+.kv-roster {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+
+.kv-roster__chip {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 12px;
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: var(--kv-shadow-sm);
+  border: 3px solid transparent;
+  font-weight: 700;
+  font-size: 0.85em;
+  min-width: 76px;
+}
+
+.kv-roster__chip--active {
+  border-color: var(--kv-accent);
+  transform: scale(1.08);
+}
+
+.kv-roster__avatar {
+  font-size: 1.8em;
+}
+
+.kv-player-spotlight {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 22px;
+}
+
+.kv-player-spotlight__avatar {
+  font-size: 3.6em;
+  background: rgba(124, 77, 255, 0.1);
+  border-radius: 50%;
+  width: 90px;
+  height: 90px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+}
+
+.kv-player-spotlight__name {
+  font-size: 1.4em;
+  font-weight: 700;
+  margin: 0 0 4px;
+}
+
+.kv-player-spotlight__stats {
+  display: flex;
+  gap: 18px;
+  flex-wrap: wrap;
+  margin-top: 6px;
+}
+
+.kv-stat {
+  display: flex;
+  flex-direction: column;
+}
+
+.kv-stat__value {
+  font-size: 1.3em;
+  font-weight: 700;
+  color: var(--kv-primary-dark);
+}
+
+.kv-stat__label {
+  font-size: 0.78em;
+  color: var(--kv-ink-soft);
+  font-weight: 600;
+}
+
+.kv-action-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+}
+
+.kv-biz-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 12px;
+}
+
+.kv-biz-card {
+  background: #fff;
+  border-radius: var(--kv-radius-sm);
+  padding: 14px;
+  text-align: center;
+  box-shadow: var(--kv-shadow-sm);
+  border: none;
+  font-weight: 700;
+}
+
+.kv-biz-card__icon {
+  font-size: 2.2em;
+  display: block;
+  margin-bottom: 4px;
+}
+
+.kv-biz-card__income {
+  color: var(--kv-green);
+  font-weight: 700;
+  font-size: 0.85em;
+}
+
+/* ---- Shop modal ------------------------------------------------------- */
+
+.kv-shop-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 14px;
+  text-align: left;
+}
+
+.kv-shop-card {
+  background: #faf7ff;
+  border-radius: var(--kv-radius-sm);
+  padding: 14px;
+  box-shadow: var(--kv-shadow-sm);
+}
+
+.kv-shop-card__icon {
+  font-size: 2.4em;
+}
+
+.kv-shop-card__name {
+  font-weight: 700;
+  margin: 6px 0 2px;
+}
+
+.kv-shop-card__price {
+  color: var(--kv-ink-soft);
+  font-size: 0.9em;
+  margin-bottom: 8px;
+}
+
+.kv-shop-card__owned {
+  font-size: 0.85em;
+  color: var(--kv-primary-dark);
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.kv-shop-card__row {
+  display: flex;
+  gap: 8px;
+}
+
+.kv-round-btn {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  border: none;
+  font-size: 1.3em;
+  font-weight: 700;
+  color: #fff;
+  background: var(--kv-primary);
+  box-shadow: var(--kv-shadow-sm);
+}
+
+.kv-round-btn--sell {
+  background: var(--kv-ink-soft);
+}
+
+.kv-round-btn:disabled {
+  opacity: 0.35;
+}
+
+/* ---- Chat / jokes -------------------------------------------------------- */
+
+.kv-chat {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.kv-chat__feed {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 360px;
+  padding-right: 4px;
+}
+
+.kv-bubble {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.kv-bubble__avatar {
+  font-size: 1.6em;
+  flex: 0 0 auto;
+}
+
+.kv-bubble__body {
+  background: #f2eeff;
+  border-radius: 16px;
+  padding: 10px 14px;
+  font-size: 0.95em;
+}
+
+.kv-bubble__name {
+  font-weight: 700;
+  font-size: 0.8em;
+  color: var(--kv-primary-dark);
+  display: block;
+  margin-bottom: 2px;
+}
+
+.kv-bubble--human .kv-bubble__body {
+  background: #e0f2ff;
+}
+
+.kv-joke {
+  background: linear-gradient(135deg, #fff7d6, #ffe8f0);
+  border-radius: 18px;
+  padding: 12px 16px;
+}
+
+.kv-joke__line {
+  font-weight: 600;
+  margin: 2px 0;
+}
+
+.kv-joke__reveal-btn {
+  margin-top: 6px;
+}
+
+.kv-chat__input-row {
+  display: flex;
+  gap: 8px;
+}
+
+.kv-chat__input {
+  flex: 1;
+  padding: 12px 14px;
+  border-radius: 999px;
+  border: 3px solid rgba(124, 77, 255, 0.2);
+  font-family: inherit;
+  font-size: 0.95em;
+}
+
+.kv-chat__input:focus {
+  outline: none;
+  border-color: var(--kv-primary);
+}
+
+.kv-chat__quick-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* ---- Event feed ---------------------------------------------------------- */
+
+.kv-feed {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 300px;
+}
+
+.kv-feed__entry {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #faf7ff;
+  border-radius: 14px;
+  padding: 8px 12px;
+  font-size: 0.92em;
+}
+
+.kv-feed__entry-icon {
+  font-size: 1.3em;
+}
+
+/* ---- Game over ------------------------------------------------------------ */
+
+.kv-gameover {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 40px 20px 60px;
+  text-align: center;
+}
+
+.kv-gameover__winner {
+  font-size: 4em;
+  margin-bottom: 6px;
+}
+
+.kv-standings {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 20px 0;
+  text-align: left;
+}
+
+.kv-standings__row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: #faf7ff;
+  border-radius: 16px;
+  padding: 12px 16px;
+  font-weight: 700;
+}
+
+.kv-standings__rank {
+  font-size: 1.3em;
+  width: 34px;
+  text-align: center;
+}
+
+.kv-standings__value {
+  margin-left: auto;
+  color: var(--kv-primary-dark);
+}
+
+/* ---- misc ------------------------------------------------------------------ */
+
+.kv-toast {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--kv-ink);
+  color: #fff;
+  padding: 12px 22px;
+  border-radius: 999px;
+  font-weight: 700;
+  box-shadow: var(--kv-shadow);
+  z-index: 300;
+}
+
+.kv-block-reason {
+  font-size: 0.8em;
+  color: var(--kv-ink-soft);
+  margin-top: 6px;
+}
+
+@media (max-width: 640px) {
+  .kv-app {
+    font-size: 16px;
+  }
+  .kv-player-spotlight {
+    flex-direction: column;
+    text-align: center;
+  }
+}
