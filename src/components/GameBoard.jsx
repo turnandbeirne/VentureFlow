@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
 import '../styles/game.css';
-import { getDifficulty } from '../data/gameConfig';
+import { getDifficulty, ASSETS } from '../data/gameConfig';
 import { usePlaySpeed } from '../hooks/usePlaySpeed';
 import { useTeachMode } from '../hooks/useTeachMode';
 import { turnOrdinal, currentTurnTally } from '../game/turnClock';
+import { totalUnitsOwned } from '../game/players';
 import { playSound } from '../audio/soundEngine';
 import { playMusicTrack } from '../audio/musicEngine';
 import WeatherBadge from './WeatherBadge';
@@ -27,8 +28,10 @@ import StartupLaunchModal from './StartupLaunchModal';
 import StartBusinessModal from './StartBusinessModal';
 import PlayerDetailModal from './PlayerDetailModal';
 import StatsHUD from './StatsHUD';
+import AssetHistoryModal from './AssetHistoryModal';
+import GameEndingRecap from './GameEndingRecap';
 
-export default function GameBoard({ game }) {
+export default function GameBoard({ game, readOnly = false, onExitReadOnly }) {
   const { state } = game;
   const {
     players,
@@ -51,6 +54,10 @@ export default function GameBoard({ game }) {
   const [showLeaderboard, setShowLeaderboard] = useState(false);
   const [showRulebook, setShowRulebook] = useState(false);
   const [selectedPlayerId, setSelectedPlayerId] = useState(null);
+  // Which asset (if any) has its price/cashflow history chart open — see
+  // AssetHistoryModal.jsx, opened from a "📊 History" button on each
+  // AssetShop card.
+  const [selectedAssetId, setSelectedAssetId] = useState(null);
   // Naming step between tapping "Start Business" and the launch
   // celebration — see StartBusinessModal.jsx.
   const [showStartBusiness, setShowStartBusiness] = useState(false);
@@ -75,7 +82,8 @@ export default function GameBoard({ game }) {
     playMusicTrack('background');
   }, []);
   const selectedPlayer = selectedPlayerId ? players.find((p) => p.id === selectedPlayerId) : null;
-  const isHumanTurn = status === 'playing' && activePlayer?.type === 'human';
+  const selectedAsset = selectedAssetId ? ASSETS.find((a) => a.id === selectedAssetId) : null;
+  const isHumanTurn = !readOnly && status === 'playing' && activePlayer?.type === 'human';
   const currentFortuneEntry = status === 'monthRecap' ? state.fortuneRecap[state.fortuneRecapIndex] : null;
   const currentFortunePlayer = currentFortuneEntry
     ? players.find((p) => p.id === currentFortuneEntry.playerId)
@@ -193,16 +201,29 @@ export default function GameBoard({ game }) {
                 {difficulty.icon} {difficulty.name}
               </span>
               <WeatherBadge weather={weather} />
-              <button
-                type="button"
-                className="vf-btn vf-btn--sm vf-btn--ghost"
-                onClick={() => {
-                  playSound('click');
-                  game.newGame();
-                }}
-              >
-                New Game
-              </button>
+              {readOnly ? (
+                <button
+                  type="button"
+                  className="vf-btn vf-btn--sm vf-btn--ghost"
+                  onClick={() => {
+                    playSound('click');
+                    onExitReadOnly?.();
+                  }}
+                >
+                  ← Back to Recap
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className="vf-btn vf-btn--sm vf-btn--ghost"
+                  onClick={() => {
+                    playSound('click');
+                    game.newGame();
+                  }}
+                >
+                  New Game
+                </button>
+              )}
             </div>
           </div>
 
@@ -223,7 +244,11 @@ export default function GameBoard({ game }) {
 
           <div className={`vf-turn-banner ${isHumanTurn ? '' : 'vf-turn-banner--ai'}`}>
             <span className="vf-turn-banner__text">
-              {status === 'exitOffer'
+              {readOnly
+                ? '🏁 Final game board — here\'s how everything ended up'
+                : status === 'gameEnding'
+                ? '🏁 That\'s a wrap! Browse the recap, then head to the leaderboard.'
+                : status === 'exitOffer'
                 ? `💼 ${exitOfferPlayer?.name || 'Someone'} has a buyout offer to decide on...`
                 : status === 'monthRecap'
                 ? '📬 Reading this month\'s fortune cards...'
@@ -261,6 +286,7 @@ export default function GameBoard({ game }) {
             disabled={!isHumanTurn}
             onBuy={(assetId) => game.buyAsset(activePlayer.id, assetId, 1)}
             onSell={(assetId) => game.sellAsset(activePlayer.id, assetId, 1)}
+            onViewHistory={(assetId) => setSelectedAssetId(assetId)}
           />
 
           <ActionBar
@@ -353,6 +379,32 @@ export default function GameBoard({ game }) {
           canUpgrade={isHumanTurn && selectedPlayer.id === activePlayer?.id}
           onUpgradeBusiness={(playerId, businessId, trackId) => game.upgradeBusiness(playerId, businessId, trackId)}
           onClose={() => setSelectedPlayerId(null)}
+        />
+      )}
+
+      {selectedAsset && (
+        <AssetHistoryModal
+          asset={selectedAsset}
+          history={state.assetHistory?.[selectedAsset.id]}
+          currentMonth={month}
+          currentPrice={assetPrices[selectedAsset.id]}
+          totalOwned={totalUnitsOwned(players, selectedAsset.id)}
+          weatherIncomeAmounts={weatherIncomeAmounts}
+          onClose={() => setSelectedAssetId(null)}
+        />
+      )}
+
+      {/* The full end-of-game recap — every fortune card each player drew
+          all game, plus clickable per-player net worth / passive cash flow
+          / earnings timelines. See turnEngine.js's acknowledgeFortuneCard
+          (sets this status instead of jumping straight to 'gameover') and
+          finalizeGameOver (what "Continue to Leaderboard" dispatches). No
+          auto-advance — this is meant to be browsed, not raced through. */}
+      {status === 'gameEnding' && (
+        <GameEndingRecap
+          players={players}
+          defaultPlayerId={hudPlayer?.id}
+          onContinue={() => game.finalizeGameOver()}
         />
       )}
 

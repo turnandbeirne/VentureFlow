@@ -24,7 +24,14 @@ import FamilyRecapModal from './FamilyRecapModal';
 import PlayerDetailModal from './PlayerDetailModal';
 import WealthPile from './WealthPile';
 
-export default function GameOverScreen({ state, onPlayAgain, onRecordProfileResult }) {
+// Same Supabase project the global leaderboard already talks to (see
+// game/globalLeaderboard.js and vf-source-snapshot-2026-08-23.md) — a
+// public, unauthenticated Edge Function (send-recap-email) that sends the
+// actual email via Resend. Plain fetch, no supabase-js dependency, so the
+// game keeps working fully offline aside from this one opt-in action.
+const RECAP_EMAIL_ENDPOINT = 'https://iwpysmrmunirsvdrecmw.supabase.co/functions/v1/send-recap-email';
+
+export default function GameOverScreen({ state, onPlayAgain, onRecordProfileResult, onViewBoard }) {
   const { players, assetPrices, winnerId, mode, difficultyId, scenarioId, dailyChallengeDate, month } = state;
   const ranked = [...players].sort((a, b) => netWorth(b, assetPrices) - netWorth(a, assetPrices));
   const winner = players.find((p) => p.id === winnerId) || ranked[0];
@@ -50,6 +57,14 @@ export default function GameOverScreen({ state, onPlayAgain, onRecordProfileResu
   const [showRecap, setShowRecap] = useState(false);
   const [shareCopied, setShareCopied] = useState(false);
   const [recapLinkCopied, setRecapLinkCopied] = useState(false);
+  const [recapEmail, setRecapEmail] = useState('');
+  // idle | sending | sent | error — separate from scoreEmail/globalStatus
+  // above: this is a DIFFERENT address (whoever should receive the recap,
+  // not necessarily the player saving their score) and a different action
+  // entirely (an email actually gets sent, vs. scoreEmail which is
+  // documented as "kept private, never sent anywhere").
+  const [recapEmailStatus, setRecapEmailStatus] = useState('idle');
+  const [recapEmailError, setRecapEmailError] = useState('');
   const [unlockCelebration, setUnlockCelebration] = useState(null);
   // Which standings row (if any) has its full portfolio breakdown open —
   // read-only here (game's over, nothing left to upgrade), but this is
@@ -103,6 +118,15 @@ export default function GameOverScreen({ state, onPlayAgain, onRecordProfileResu
   function handlePlayAgain() {
     playSound('click');
     onPlayAgain();
+  }
+
+  // "What did the board actually look like at the end?" — reopens the same
+  // GameBoard the game was just played on, read-only (App.jsx swaps to it
+  // instead of re-rendering this screen; "← Back to Recap" in its header
+  // comes right back here). Only shown when the caller wired it up.
+  function handleViewBoard() {
+    playSound('click');
+    onViewBoard?.();
   }
 
   function handleSaveScore() {
@@ -201,17 +225,36 @@ export default function GameOverScreen({ state, onPlayAgain, onRecordProfileResu
     }
   }
 
-  // Opens the player's own email app/webmail with a short note and the
-  // same shareable link already filled in — no email is ever sent FROM
-  // this app or through any server of ours; the browser just hands off to
-  // whatever mailto: handler is already configured on the device, same as
-  // clicking a mailto link on any other website.
-  function handleEmailRecap() {
+  // Actually sends the recap by email, via a small Supabase Edge Function
+  // (send-recap-email) that calls Resend's API from a venturemaker.org
+  // address — replaces an earlier `mailto:` version that silently did
+  // nothing on any device without a default mail client configured. The
+  // function only ever emails a link this page generated to an address
+  // typed right here — see that function's own header comment for the
+  // abuse-surface reasoning. Falls back to suggesting Copy Recap Link if
+  // the send fails (e.g. before Resend is fully set up on the backend).
+  async function handleEmailRecap(e) {
+    e.preventDefault();
     playSound('click');
-    const url = buildRecapShareUrl(state);
-    const subject = `VentureFlow recap — ${winner.name}'s game`;
-    const body = `Here's how our VentureFlow game went — final standings, what we talked about, and a few notes on how it played out:\n\n${url}\n\nNo account or app needed, just open the link.`;
-    window.location.href = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    const to = recapEmail.trim();
+    if (!to) return;
+    setRecapEmailStatus('sending');
+    setRecapEmailError('');
+    try {
+      const recapUrl = buildRecapShareUrl(state);
+      const resp = await fetch(RECAP_EMAIL_ENDPOINT, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ to, recapUrl, winnerName: winner.name, scenarioName: scenario.name }),
+      });
+      const data = await resp.json().catch(() => ({}));
+      if (!resp.ok) throw new Error(data.error || 'The email could not be sent.');
+      setRecapEmailStatus('sent');
+      setTimeout(() => setRecapEmailStatus('idle'), 3000);
+    } catch (err) {
+      setRecapEmailStatus('error');
+      setRecapEmailError(err.message || 'The email could not be sent — try Copy Recap Link instead.');
+    }
   }
 
   async function handleShareResult() {
@@ -427,6 +470,11 @@ export default function GameOverScreen({ state, onPlayAgain, onRecordProfileResu
           <button type="button" className="vf-btn vf-btn--ghost" onClick={openRecap}>
             📋 Family Recap
           </button>
+          {onViewBoard && (
+            <button type="button" className="vf-btn vf-btn--ghost" onClick={handleViewBoard}>
+              🗺️ View Game Board
+            </button>
+          )}
           <button type="button" className="vf-btn vf-btn--go vf-btn--lg" onClick={handlePlayAgain}>
             Play Again 🔁
           </button>
@@ -459,10 +507,28 @@ export default function GameOverScreen({ state, onPlayAgain, onRecordProfileResu
             <button type="button" className="vf-btn vf-btn--sm vf-btn--ghost" onClick={handleCopyRecapLink}>
               {recapLinkCopied ? '✅ Link copied!' : '🔗 Copy Recap Link'}
             </button>
-            <button type="button" className="vf-btn vf-btn--sm vf-btn--ghost" onClick={handleEmailRecap}>
-              📧 Email Recap
-            </button>
           </div>
+          <form className="vf-gameover__email-row" onSubmit={handleEmailRecap}>
+            <input
+              type="email"
+              className="vf-text-input vf-gameover__email-input"
+              placeholder="parent or teacher's email"
+              value={recapEmail}
+              onChange={(e) => {
+                setRecapEmail(e.target.value);
+                if (recapEmailStatus === 'error') setRecapEmailStatus('idle');
+              }}
+              maxLength={254}
+            />
+            <button
+              type="submit"
+              className="vf-btn vf-btn--sm vf-btn--ghost"
+              disabled={recapEmailStatus === 'sending' || !recapEmail.trim()}
+            >
+              {recapEmailStatus === 'sending' ? 'Sending…' : recapEmailStatus === 'sent' ? '✅ Sent!' : '📧 Email Recap'}
+            </button>
+          </form>
+          {recapEmailStatus === 'error' && <span className="vf-field-error">{recapEmailError}</span>}
         </div>
 
         <div className="vf-gameover__venturemaker">

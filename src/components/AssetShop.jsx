@@ -46,7 +46,7 @@ function crowdingLabel(totalOwned) {
   return 'Market: very crowded';
 }
 
-function AssetCard({ asset, price, previousPrice, owned, cash, totalOwned, weather, weatherIncomeAmounts, boughtThisTurn = 0, onBuy, onSell, disabled }) {
+function AssetCard({ asset, price, previousPrice, owned, cash, totalOwned, weather, weatherIncomeAmounts, boughtThisTurn = 0, onBuy, onSell, disabled, onViewHistory }) {
   const trendUp = price >= previousPrice;
   const trendPct = previousPrice ? Math.round(((price - previousPrice) / previousPrice) * 100) : 0;
   const canBuy = !disabled && cash >= price;
@@ -153,6 +153,19 @@ function AssetCard({ asset, price, previousPrice, owned, cash, totalOwned, weath
         <span className="vf-asset-card__no-income">💵 Price only — no monthly income</span>
       )}
       <span className="vf-asset-card__owned">You have: {owned}</span>
+      {onViewHistory && (
+        <button
+          type="button"
+          className="vf-btn vf-btn--sm vf-btn--ghost vf-asset-card__history-btn"
+          title="See this asset's price and cashflow, month by month"
+          onClick={() => {
+            playSound('click');
+            onViewHistory(asset.id);
+          }}
+        >
+          📊 History
+        </button>
+      )}
       {boughtThisTurn > 0 && (
         <span
           className="vf-asset-card__resale"
@@ -188,6 +201,7 @@ export default function AssetShop({
   disabled,
   onBuy,
   onSell,
+  onViewHistory,
 }) {
   return (
     <div>
@@ -213,6 +227,7 @@ export default function AssetShop({
             disabled={disabled}
             onBuy={() => onBuy(asset.id)}
             onSell={() => onSell(asset.id)}
+            onViewHistory={onViewHistory}
           />
         ))}
       </div>

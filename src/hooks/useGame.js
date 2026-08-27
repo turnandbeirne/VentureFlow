@@ -60,6 +60,13 @@ export function useGame() {
     return () => clearTimeout(aiTimeoutRef.current);
   }, [state, speed]);
 
+  // The 'gameEnding' pause (the final month's "that's a wrap" recap, between
+  // the last fortune card and the actual Game Over screen — see
+  // turnEngine.js's acknowledgeFortuneCard/finalizeGameOver) no longer
+  // auto-advances: it's a full recap dashboard now (GameEndingRecap.jsx),
+  // not a beat to sit through, so the player leaves it with the "Continue to
+  // Leaderboard" button whenever they're done browsing — no timer to race.
+
   const startGame = useCallback((mode, humanNames, difficultyId, botConfigs, options = {}) => {
     dispatch({
       type: 'START_GAME',
@@ -122,6 +129,10 @@ export function useGame() {
     dispatch({ type: 'ACK_FORTUNE_CARD' });
   }, []);
 
+  const finalizeGameOver = useCallback(() => {
+    dispatch({ type: 'FINALIZE_GAME_OVER' });
+  }, []);
+
   const resolveExitOffer = useCallback((playerId, accept) => {
     dispatch({ type: 'RESOLVE_EXIT_OFFER', playerId, accept });
   }, []);
@@ -149,6 +160,7 @@ export function useGame() {
     extendTurn,
     ackStartupLaunch,
     ackFortuneCard,
+    finalizeGameOver,
     resolveExitOffer,
     sendChat,
     clearError,

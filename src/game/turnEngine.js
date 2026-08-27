@@ -34,6 +34,8 @@ import {
   rollMonthlyIncomeAmounts,
   allowanceModifierPercent,
   businessPauseStatus,
+  perUnitIncome,
+  totalUnitsOwned,
 } from './players';
 import { getScenario, checkScenarioObjective } from './scenarios';
 import { resolvePendingRnd, pruneExpiredBoosts, applyBusinessDecline } from './businessUpgrades';
@@ -347,6 +349,13 @@ function finishMonthEnd(state, players, logEntries, month, scenario, leaderBefor
       // `expiresMonth` is the last month a modifier still applies to.
       allowanceMods: (p.allowanceMods || []).filter((m) => m.expiresMonth > month),
       ledger: [...(p.ledger || []), { month, type: 'in', amount: income, source: 'Payday', detail: parts.join(' + ') }],
+      // Per-player timelines for the end-of-game recap (see
+      // components/GameEndingRecap.jsx) — same one-point-per-completed-month
+      // convention as netWorthHistory below, captured right here since this
+      // is where these two numbers already get computed for the actual cash
+      // credit, so there's no second calculation to keep in sync.
+      passiveIncomeHistory: [...(p.passiveIncomeHistory || []), { month, passiveIncome: breakdown.total }],
+      totalIncomeHistory: [...(p.totalIncomeHistory || []), { month, income }],
     };
   });
   logEntries.push({ icon: '💰', message: `Payday! Everyone collected their allowance and passive income.`, kind: 'payday' });
@@ -365,11 +374,25 @@ function finishMonthEnd(state, players, logEntries, month, scenario, leaderBefor
     // type(s) directly — catches every current and future cash-moving
     // effect type without this file needing to know its name.
     const cashDelta = applied.player.cash - player.cash;
+    // Permanent record of every card this player has ever drawn — unlike
+    // fortuneRecap below (which only holds THIS month's cards, and is
+    // cleared once they're all viewed), this is never cleared. Powers the
+    // end-of-game recap's per-player fortune-card list (see
+    // components/GameEndingRecap.jsx). Applied regardless of whether the
+    // card moved cash — a price shift or skill token still belongs in the
+    // record.
+    const withCardHistory = {
+      ...applied.player,
+      fortuneCardHistory: [
+        ...(applied.player.fortuneCardHistory || []),
+        { month, deckId, card, description: applied.description },
+      ],
+    };
     players[i] = cashDelta !== 0
       ? {
-          ...applied.player,
+          ...withCardHistory,
           ledger: [
-            ...(applied.player.ledger || []),
+            ...(withCardHistory.ledger || []),
             {
               month,
               type: cashDelta > 0 ? 'in' : 'out',
@@ -379,7 +402,7 @@ function finishMonthEnd(state, players, logEntries, month, scenario, leaderBefor
             },
           ],
         }
-      : applied.player;
+      : withCardHistory;
     prices = applied.prices;
     logEntries.push({
       icon: card.icon,
@@ -446,6 +469,23 @@ function finishMonthEnd(state, players, logEntries, month, scenario, leaderBefor
     netWorthHistory: [...(p.netWorthHistory || []), { month, netWorth: netWorth(p, prices) }],
   }));
 
+  // 10b) Per-asset price/cashflow history snapshot — same one-point-per-
+  // completed-month convention as the net worth history just above, used by
+  // AssetHistoryModal.jsx's "📊 History" chart on each asset shop card.
+  // Cashflow here is the asset's OWN per-unit monthly income (perUnitIncome
+  // — the same function AssetShop.jsx already uses to show "current
+  // per-unit income" on the card), not any one player's actual take: it's
+  // asset-intrinsic, so it doesn't matter who (if anyone) owns it. Uses the
+  // just-drifted post-fortune-card prices, same as everything else settled
+  // this month-end.
+  const assetHistory = { ...(state.assetHistory || {}) };
+  for (const asset of ASSETS) {
+    const price = prices[asset.id] ?? asset.basePrice;
+    const totalOwned = totalUnitsOwned(players, asset.id);
+    const cashflow = perUnitIncome(asset, { price, totalOwned, weatherIncomeAmounts });
+    assetHistory[asset.id] = [...(assetHistory[asset.id] || []), { month, price, cashflow }];
+  }
+
   // 11) Lead-change callout — a bit of extra excitement when the standings
   // actually flip (skipped in a solo/no-real-leader-yet situation — see
   // currentLeaderId above). Reacted to by game/chatEngine.js and given its
@@ -467,6 +507,16 @@ function finishMonthEnd(state, players, logEntries, month, scenario, leaderBefor
   const nextMonth = month + 1;
   const isGameOver = nextMonth > GAME_LENGTH_MONTHS;
 
+  // The FINAL month used to jump status straight to 'gameover' here,
+  // skipping 'monthRecap' entirely — which meant that month's fortune cards
+  // (drawn above in step 5, same as every other month) were computed into
+  // fortuneRecap but never actually SHOWN, since GameBoard.jsx only renders
+  // the fortune-card modal during 'monthRecap'. Now every month, final one
+  // included, always goes to 'monthRecap' first; `pendingGameOver` is what
+  // acknowledgeFortuneCard (below) checks once the player has clicked
+  // through that recap, to send them to 'gameEnding' (the full end-of-game
+  // recap dashboard — see components/GameEndingRecap.jsx) instead of back
+  // to 'playing'.
   let nextState = {
     ...state,
     players,
@@ -476,14 +526,20 @@ function finishMonthEnd(state, players, logEntries, month, scenario, leaderBefor
     weatherIncomeAmounts,
     month: isGameOver ? state.month : nextMonth,
     activePlayerIndex: 0,
-    status: isGameOver ? 'gameover' : 'monthRecap',
+    status: 'monthRecap',
+    pendingGameOver: isGameOver,
     fortuneRecap,
     fortuneRecapIndex: 0,
     pendingExitOffer: null,
     pendingMonthEnd: null,
+    assetHistory,
   };
 
   if (isGameOver) {
+    // Standings are already final at this point — nothing about
+    // players/prices changes between now and the eventual 'gameover'
+    // screen, so winnerId is computed here rather than deferred to
+    // finalizeGameOver, which just flips the status once the pause ends.
     const ranked = [...players].sort((a, b) => netWorth(b, prices) - netWorth(a, prices));
     nextState.winnerId = ranked[0].id;
     logEntries.push({ icon: '🏆', message: `Game over! ${ranked[0].name} wins with $${netWorth(ranked[0], prices)}!`, kind: 'gameover' });
@@ -518,11 +574,36 @@ export function resolveExitOfferDecision(state, playerId, accept) {
   return finishMonthEnd(state, outcome.players, [outcome.logEntry], month, scenario, leaderBefore, outcome.fortuneRecapEntry);
 }
 
-/** Advance to the next queued fortune-card recap, or back to normal play. */
+/**
+ * Advance to the next queued fortune-card recap, or — once they've all been
+ * seen — either back to normal play, or, if this was the FINAL month
+ * (`pendingGameOver`, set by finishMonthEnd above), on to 'gameEnding': the
+ * full end-of-game recap dashboard (components/GameEndingRecap.jsx —
+ * every fortune card drawn all game, plus clickable per-player net worth /
+ * passive income / earnings timelines), instead of yanking the player
+ * straight to the leaderboard the instant they dismiss the last card. That
+ * screen waits for a manual "Continue to Leaderboard" click — see
+ * finalizeGameOver below for what that lands on.
+ */
 export function acknowledgeFortuneCard(state) {
   const nextIndex = state.fortuneRecapIndex + 1;
   if (nextIndex < state.fortuneRecap.length) {
     return { ...state, fortuneRecapIndex: nextIndex };
   }
+  if (state.pendingGameOver) {
+    return { ...state, status: 'gameEnding', pendingGameOver: false, fortuneRecap: [], fortuneRecapIndex: 0 };
+  }
   return { ...state, status: 'playing', fortuneRecap: [], fortuneRecapIndex: 0 };
+}
+
+/**
+ * Ends the 'gameEnding' recap and actually shows the Game Over screen.
+ * Dispatched by GameEndingRecap.jsx's "Continue to Leaderboard" button —
+ * there's no auto-advance timer, so this only ever fires on a deliberate
+ * click. Winner/standings were already finalized back in finishMonthEnd —
+ * nothing about the game state changes here except which screen shows.
+ */
+export function finalizeGameOver(state) {
+  if (state.status !== 'gameEnding') return state;
+  return { ...state, status: 'gameover' };
 }

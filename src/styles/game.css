@@ -1988,6 +1988,23 @@
   flex-wrap: wrap;
 }
 
+/* The "Email Recap" input + send button (see GameOverScreen.jsx's
+   handleEmailRecap) — a small inline form rather than its own modal, since
+   it's just one field. */
+.vf-gameover__email-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-top: 0.5rem;
+}
+
+.vf-gameover__email-input {
+  flex: 1 1 220px;
+  max-width: 280px;
+}
+
 .vf-gameover__venturemaker {
   display: flex;
   justify-content: center;
@@ -2601,4 +2618,297 @@
   font-weight: 600;
   line-height: 1.3;
   color: var(--vf-orange-dark);
+}
+
+/* Per-asset price/cashflow history (AssetHistoryModal.jsx) ------------------ */
+.vf-asset-card__history-btn {
+  align-self: flex-start;
+  margin-top: -0.2rem;
+}
+
+.vf-asset-history {
+  width: 100%;
+  max-width: 520px;
+  max-height: 86vh;
+  overflow-y: auto;
+  padding: 1.25rem;
+  background: var(--vf-white);
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  text-align: left;
+}
+
+.vf-asset-history__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+}
+
+.vf-asset-history__title {
+  font-size: 1.15rem;
+  font-weight: 700;
+}
+
+.vf-asset-history__tagline {
+  margin: -0.3rem 0 0.2rem;
+  font-size: 0.82rem;
+  color: var(--vf-ink-soft);
+}
+
+.vf-asset-history__empty {
+  font-size: 0.86rem;
+  color: var(--vf-ink-soft);
+  text-align: center;
+  padding: 1rem 0;
+}
+
+/* Small single-series line charts shared by both metrics in the modal —
+   see the dataviz skill: price and cashflow are different scales, so each
+   gets its OWN chart (one axis apiece) rather than one dual-axis chart. */
+.vf-mini-chart {
+  width: 100%;
+}
+
+.vf-mini-chart svg {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.vf-mini-chart__title {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--vf-ink-soft);
+  margin-bottom: 0.15rem;
+}
+
+.vf-mini-chart__title-value {
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+
+.vf-mini-chart__grid {
+  stroke: var(--vf-cream-deep);
+  stroke-width: 1;
+}
+
+.vf-mini-chart__axis {
+  stroke: var(--vf-ink-soft);
+  stroke-width: 1;
+  opacity: 0.5;
+}
+
+.vf-mini-chart__axis-label {
+  font-size: 9px;
+  fill: var(--vf-ink-soft);
+  font-family: 'Fredoka', system-ui, sans-serif;
+}
+
+.vf-mini-chart__line {
+  fill: none;
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.vf-mini-chart__marker {
+  stroke: var(--vf-white);
+  stroke-width: 1.5;
+}
+
+/* End-of-game recap (components/GameEndingRecap.jsx) --------------------- */
+/* The 'gameEnding' screen — replaces the old plain countdown overlay with a
+   browsable dashboard: pick any player, see their fortune cards and three
+   per-metric timelines. Noticeably wider than the other modals (.vf-modal
+   at 420px, .vf-rulebook at 620px) since it's carrying charts AND a card
+   list side by side on anything wider than a tablet. */
+.vf-ending-recap {
+  width: 100%;
+  max-width: 900px;
+  max-height: 90vh;
+  overflow-y: auto;
+  padding: 1.5rem;
+  background: var(--vf-white);
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  text-align: left;
+}
+
+.vf-ending-recap__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.vf-ending-recap__title {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.vf-ending-recap__title h2 {
+  margin: 0;
+  font-size: 1.3rem;
+}
+
+.vf-ending-recap__icon {
+  font-size: 2.2rem;
+  line-height: 1;
+}
+
+.vf-ending-recap__hint {
+  margin: 0.15rem 0 0;
+  font-size: 0.84rem;
+  color: var(--vf-ink-soft);
+}
+
+.vf-ending-recap__players {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.vf-ending-recap__player-chip {
+  appearance: none;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-family: inherit;
+  font-size: 0.86rem;
+  font-weight: 600;
+  color: var(--vf-ink);
+  background: var(--vf-cream);
+  border: 2px solid transparent;
+  border-radius: var(--vf-radius-pill);
+  padding: 0.4rem 0.85rem;
+}
+
+.vf-ending-recap__player-chip--active {
+  background: var(--vf-white);
+  border-color: var(--vf-border);
+  box-shadow: var(--vf-shadow-sm);
+}
+
+.vf-ending-recap__body {
+  display: grid;
+  grid-template-columns: minmax(220px, 340px) 1fr;
+  gap: 1.25rem;
+  min-height: 0;
+}
+
+.vf-ending-recap__charts {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.vf-ending-recap__cards {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  min-height: 0;
+}
+
+.vf-ending-recap__cards-title {
+  font-weight: 700;
+  font-size: 0.92rem;
+}
+
+.vf-ending-recap__cards-empty {
+  font-size: 0.86rem;
+  color: var(--vf-ink-soft);
+}
+
+.vf-ending-recap__card-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  overflow-y: auto;
+  padding-right: 0.3rem;
+}
+
+@media (max-width: 720px) {
+  .vf-ending-recap__body {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Individual fortune-card rows inside the recap — a compact cousin of
+   FortuneCardModal.jsx's full-screen pop-in, since this list can run to a
+   couple dozen cards across a whole game. */
+.vf-ending-card {
+  border: 2px solid var(--vf-border);
+  border-radius: var(--vf-radius-sm);
+  padding: 0.6rem 0.75rem;
+  background: var(--vf-cream);
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.vf-ending-card--good {
+  border-color: var(--vf-green-dark);
+}
+
+.vf-ending-card--bad {
+  border-color: var(--vf-red-dark);
+}
+
+.vf-ending-card__top {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.vf-ending-card__icon {
+  font-size: 1.3rem;
+}
+
+.vf-ending-card__title {
+  font-weight: 700;
+  font-size: 0.9rem;
+  flex: 1;
+}
+
+.vf-ending-card__month {
+  font-size: 0.75rem;
+  color: var(--vf-ink-soft);
+}
+
+.vf-ending-card__flavor {
+  margin: 0;
+  font-size: 0.82rem;
+  font-style: italic;
+  color: var(--vf-ink-soft);
+}
+
+.vf-ending-card__effect {
+  font-size: 0.86rem;
+  font-weight: 600;
+}
+
+.vf-ending-card__effect--good {
+  color: var(--vf-green-dark);
+}
+
+.vf-ending-card__effect--bad {
+  color: var(--vf-red-dark);
+}
+
+.vf-ending-card__why {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  font-size: 0.8rem;
+  color: var(--vf-ink-soft);
 }
