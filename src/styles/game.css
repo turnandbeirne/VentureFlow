@@ -2299,3 +2299,49 @@
   line-height: 1.3;
   color: var(--vf-orange-dark);
 }
+
+/* "Why can't I hear anything?" control ---------------------------------------- */
+.vf-audio-status {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.25rem;
+  max-width: 22rem;
+}
+
+.vf-audio-status__btn {
+  white-space: nowrap;
+  /* Eye-catching, but it must not MOVE: this button only appears when the
+     player cannot hear the game, and clicking it is the fix — so it should
+     never be a moving target. Pulsing the border does the job without
+     shifting the hit area. */
+  animation: vf-audio-status-pulse 2s ease-in-out infinite;
+}
+
+.vf-audio-status__detail {
+  margin: 0;
+  padding: 0.4rem 0.6rem;
+  background: var(--vf-white);
+  border: 2px solid var(--vf-border);
+  border-radius: var(--vf-radius-sm);
+  font-size: 0.7rem;
+  line-height: 1.35;
+  text-align: left;
+  color: var(--vf-ink-soft);
+}
+
+@keyframes vf-audio-status-pulse {
+  0%,
+  100% {
+    border-color: var(--vf-border);
+  }
+  50% {
+    border-color: var(--vf-red-dark);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vf-audio-status__btn {
+    animation: none;
+  }
+}

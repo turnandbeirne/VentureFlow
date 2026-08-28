@@ -316,6 +316,57 @@ export function getMusicSettings() {
   return settings;
 }
 
+/** The music half of the same picture soundEngine's audioDiagnostics()
+ * paints — is a track loaded, is it actually playing, and is anything
+ * reaching the output? A track that is "playing" at gain 0 is exactly the
+ * bug that made the opening theme silent, so `outputVolume` is reported
+ * rather than assumed. */
+export function musicDiagnostics() {
+  return {
+    trackId: currentTrackId,
+    playing: !!(audio && !audio.paused),
+    outputVolume: Number(getOutputVolume().toFixed(3)),
+    contextState: audioContext ? audioContext.state : 'none',
+    level: levelId,
+    volume: settings.volume,
+    muted: settings.muted,
+  };
+}
+
+/**
+ * Make music audible from inside a user gesture — the companion to
+ * soundEngine's unlockAudio(). Resumes the context, unmutes if the player had
+ * it off, restarts the current track if the browser had refused it, and
+ * re-asserts the correct volume (the thing the old blocked-autoplay path
+ * forgot to do).
+ */
+export async function unlockMusic({ unmute = true } = {}) {
+  if (unmute && (settings.muted || settings.volume <= 0)) {
+    settings = { ...settings, muted: false, volume: settings.volume > 0 ? settings.volume : DEFAULT_VOLUME };
+    persistSettings();
+    notify();
+  }
+  const el = ensureAudio();
+  if (audioContext && audioContext.state !== 'running') {
+    try {
+      await audioContext.resume();
+    } catch {
+      // Reported by musicDiagnostics() below.
+    }
+  }
+  if (el && currentTrackId) {
+    if (el.paused) {
+      try {
+        await el.play();
+      } catch {
+        // Still refused.
+      }
+    }
+    fadeVolumeTo(targetVolumeFor(currentTrackId));
+  }
+  return musicDiagnostics();
+}
+
 export function setMusicVolume(volume) {
   settings = { ...settings, volume: Math.min(1, Math.max(0, volume)) };
   if (audio && currentTrackId) setOutputVolume(targetVolumeFor(currentTrackId));

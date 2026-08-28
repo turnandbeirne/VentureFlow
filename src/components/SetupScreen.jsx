@@ -28,6 +28,7 @@ import {
 import { useProfile } from '../hooks/useProfile';
 import VolumeControl from './VolumeControl';
 import MusicControl from './MusicControl';
+import AudioStatus from './AudioStatus';
 import Brand from './Brand';
 import VentureMakerLink from './VentureMakerLink';
 import LeaderboardModal from './LeaderboardModal';
@@ -203,6 +204,7 @@ export default function SetupScreen({ onStart, onBack }) {
       <div className="vf-topbar-corner">
         <VolumeControl />
         <MusicControl />
+        <AudioStatus />
         <button type="button" className="vf-btn vf-btn--sm vf-btn--ghost" onClick={openUnlocks}>
           🏅 Unlocks
         </button>

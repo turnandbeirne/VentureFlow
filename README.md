@@ -2259,3 +2259,60 @@ for the bundler's asset imports, returning a URL string for `.mp3` and
 friends. Without it `audio/musicEngine.js` couldn't be imported into a test at
 all, which is part of why this bug went unnoticed — the module was untestable
 outside a browser.
+
+## When you still can't hear anything: the game now tells you why
+
+A player who hears nothing has no way to tell three completely different
+problems apart, and they need completely different fixes:
+
+1. **Sound is muted** — theirs, or a previous session's. The setting lives in
+   `localStorage`, so it survives every reload *and every new build*, which
+   makes it look exactly like a bug that no amount of updating fixes.
+2. **The browser is blocking audio** — no user gesture yet, an embedded
+   preview pane, an iframe without `allow="autoplay"`, a muted tab, a strict
+   autoplay setting.
+3. **No Web Audio support at all.**
+
+From inside the page all three are identical: the code runs, notes get
+scheduled, silence comes out. Worth being blunt about a mistake in my own
+earlier verification here — I "confirmed audio worked" by counting
+`oscillator.start()` calls, which succeed just as happily into a *suspended*
+context. That measured that the game was trying, not that anything was
+audible.
+
+So there are now two honest primitives, `audioDiagnostics()` and
+`musicDiagnostics()`, reporting the real state including the AudioContext's
+own `state` and the music's actual output gain — and `unlockAudio()` /
+`unlockMusic()`, which resume everything from inside a real click.
+
+`components/AudioStatus.jsx` turns those into one button that appears **only
+when sound genuinely isn't working**, names the actual cause, and fixes it
+when clicked — because the click itself is a user gesture, which is the one
+thing a browser requires before granting audio. When sound is fine it renders
+nothing.
+
+If it still fails after clicking, it says so specifically rather than leaving
+you pressing a button that appears to do nothing:
+
+> Sound is still blocked (audio: suspended, music: suspended). If the game is
+> running inside a preview pane, open it in its own browser tab — embedded
+> frames are not allowed to play audio.
+
+Two details worth keeping:
+
+- **Before any gesture, nothing is reported.** A suspended context on a fresh
+  page is normal, and warning about it would nag every single load. Only once
+  a gesture has happened does a non-running context mean anything.
+- **The automatic unlock never unmutes.** `App.jsx` unlocks both engines on
+  the first interaction anywhere (so whether sound works no longer depends on
+  whether the first thing you clicked happened to play one), but it passes
+  `unmute: false`. Only the explicit button unmutes, because only that click
+  means "I want sound".
+
+The status button pulses its border rather than moving — it appears precisely
+when someone is trying to click it, and a moving target is worse for everyone
+and materially worse for anyone with motor difficulties.
+
+Five tests cover this, including that a fresh page is never accused of being
+broken, that a deliberate mute survives the automatic unlock, and that a
+browser which refuses to resume is correctly reported as blocked.

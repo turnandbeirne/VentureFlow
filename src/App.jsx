@@ -1,8 +1,10 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useGame } from './hooks/useGame';
 import { useGameSounds } from './hooks/useGameSounds';
 import { useChatSounds } from './hooks/useChatSounds';
 import { useProfile } from './hooks/useProfile';
+import { unlockAudio } from './audio/soundEngine';
+import { unlockMusic } from './audio/musicEngine';
 import LandingScreen from './components/LandingScreen';
 import SetupScreen from './components/SetupScreen';
 import GameBoard from './components/GameBoard';
@@ -30,6 +32,27 @@ export default function App() {
     setPreGameScreen('landing');
     game.newGame();
   }, [game]);
+
+  // Browsers refuse audio until the page has had a real user gesture, so the
+  // FIRST interaction anywhere — whatever it was for — is used to unlock both
+  // engines. Without this, whether sound works depends on whether the first
+  // thing you happened to click was something that plays a sound.
+  //
+  // `unmute: false` matters: this path must never override a player who
+  // deliberately turned sound off. Only the explicit AudioStatus button
+  // unmutes, because only that click means "I want sound".
+  useEffect(() => {
+    const unlock = () => {
+      unlockAudio({ unmute: false, testSound: null });
+      unlockMusic({ unmute: false });
+    };
+    document.addEventListener('pointerdown', unlock, { once: true });
+    document.addEventListener('keydown', unlock, { once: true });
+    return () => {
+      document.removeEventListener('pointerdown', unlock);
+      document.removeEventListener('keydown', unlock);
+    };
+  }, []);
 
   // Mounted once at the top so they keep watching the event log and bot
   // chat feed (and stay in sync with the volume/mute setting) no matter

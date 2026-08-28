@@ -11,6 +11,7 @@ import { useGlobalLeaderboard } from '../hooks/useGlobalLeaderboard';
 import { buildInsights } from '../game/insights';
 import VolumeControl from './VolumeControl';
 import MusicControl from './MusicControl';
+import AudioStatus from './AudioStatus';
 import Brand from './Brand';
 import VentureMakerLink from './VentureMakerLink';
 import LeaderboardModal from './LeaderboardModal';
@@ -195,6 +196,7 @@ export default function GameOverScreen({ state, onPlayAgain, onRecordProfileResu
       <div className="vf-topbar-corner">
         <VolumeControl />
         <MusicControl />
+        <AudioStatus />
         {/* A second Play Again, up here as well as at the very bottom. The
             game-over screen is long — standings, the net-worth chart, the
             insights, the save-your-score form — and someone who just wants

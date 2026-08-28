@@ -20,6 +20,13 @@ let noiseBuffer = null;
 let settings = loadSettings();
 const listeners = new Set();
 
+// Whether the page has had a real user gesture yet (set by unlockAudio,
+// which App.jsx calls on the first interaction anywhere). Before that, a
+// context that isn't running is completely normal and says nothing; after
+// it, the same state means the browser is genuinely refusing — and that
+// distinction is the whole point of audioDiagnostics' 'blocked' reason.
+let gestureSeen = false;
+
 function loadSettings() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
@@ -168,6 +175,100 @@ export function playSound(name) {
 
 export function getAudioSettings() {
   return settings;
+}
+
+// ============================================================================
+// Diagnostics and unlocking
+// ----------------------------------------------------------------------------
+// Every browser refuses to produce sound until the page has had a real user
+// gesture, and some environments refuse for longer than that — an embedded
+// preview pane, an iframe without `allow="autoplay"`, a tab the OS has muted,
+// a strict autoplay setting. From inside the page all of those look the same:
+// the code runs perfectly, notes get scheduled, and nothing is heard.
+//
+// So rather than assume it worked, the game can now ASK. `audioDiagnostics()`
+// reports the real state, and `unlockAudio()` — called from inside a genuine
+// click handler — resumes the context and confirms whether that succeeded.
+// components/AudioStatus.jsx turns those two into a visible control.
+// ============================================================================
+
+/**
+ * What is actually true about audio right now.
+ *
+ * `reason` is the single most useful thing here — it separates the three
+ * causes that are indistinguishable to a player who just hears nothing:
+ *   'muted'       — they (or a previous session) turned it off. Their choice,
+ *                   but easy to forget, and it persists in localStorage.
+ *   'blocked'     — the browser has not granted audio yet.
+ *   'unsupported' — no Web Audio at all.
+ *   'ok'          — sound should genuinely be audible.
+ */
+export function audioDiagnostics() {
+  const supported = typeof window !== 'undefined' && !!(window.AudioContext || window.webkitAudioContext);
+  const contextState = audioContext ? audioContext.state : 'none';
+  const silentBySetting = settings.muted || settings.volume <= 0;
+
+  let reason = 'ok';
+  if (!supported) reason = 'unsupported';
+  else if (silentBySetting) reason = 'muted';
+  else if (!gestureSeen) {
+    // Nothing has been clicked yet, so a suspended (or absent) context is
+    // exactly what a healthy page looks like. Claiming a problem here would
+    // put a scary warning on every fresh load.
+    reason = 'ok';
+  } else if (!audioContext || audioContext.state !== 'running') {
+    // A gesture HAS happened and audio still isn't running — the browser is
+    // refusing. This is the case that looks identical to "the game is
+    // broken" from the player's side: an embedded preview pane, an iframe
+    // with no `allow="autoplay"`, a muted tab, a strict autoplay setting.
+    reason = 'blocked';
+  }
+
+  return {
+    supported,
+    contextState,
+    volume: settings.volume,
+    muted: settings.muted,
+    reason,
+  };
+}
+
+/**
+ * Try to make sound work, from inside a user gesture.
+ *
+ * MUST be called synchronously from a real click/tap handler — that is the
+ * only context in which a browser will grant audio. Creates the context if it
+ * doesn't exist yet, resumes it if suspended, unmutes if the player had it
+ * off, and plays a short confirmation tone so success is audible rather than
+ * merely reported.
+ *
+ * Returns a promise for the post-attempt diagnostics, so a caller can tell
+ * the player what happened if it still didn't work.
+ */
+export async function unlockAudio({ unmute = true, testSound = 'click' } = {}) {
+  // Reaching here at all means a gesture happened — this is only ever called
+  // from a click/tap/keypress handler. See `gestureSeen` above.
+  gestureSeen = true;
+  if (unmute && (settings.muted || settings.volume <= 0)) {
+    settings = { ...settings, muted: false, volume: settings.volume > 0 ? settings.volume : DEFAULT_VOLUME };
+    persistSettings();
+    notify();
+  }
+
+  // Create the context here rather than waiting for the first sound, so its
+  // state is knowable and a refusal can actually be reported.
+  const ctx = ensureContext();
+  if (ctx && ctx.state !== 'running') {
+    try {
+      await ctx.resume();
+    } catch {
+      // Still refused — audioDiagnostics() below will report it.
+    }
+  }
+  if (testSound) playSound(testSound);
+  const result = audioDiagnostics();
+  notify(); // so any mounted AudioStatus re-reads immediately
+  return result;
 }
 
 export function setVolume(volume) {

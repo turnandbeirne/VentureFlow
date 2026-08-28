@@ -17,6 +17,7 @@ import FortuneCardModal from './FortuneCardModal';
 import BusinessExitOfferModal from './BusinessExitOfferModal';
 import VolumeControl from './VolumeControl';
 import MusicControl from './MusicControl';
+import AudioStatus from './AudioStatus';
 import Brand from './Brand';
 import LeaderboardModal from './LeaderboardModal';
 import RulebookModal from './RulebookModal';
@@ -116,6 +117,7 @@ export default function GameBoard({ game }) {
             <div className="vf-header__right">
               <VolumeControl />
               <MusicControl />
+              <AudioStatus />
               {/* Play speed lives in the board header, not just on setup,
                   because the whole point is being able to slow the table
                   down the moment it starts moving faster than you can

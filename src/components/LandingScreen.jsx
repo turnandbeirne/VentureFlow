@@ -22,6 +22,7 @@ import RulebookModal from './RulebookModal';
 import LeaderboardModal from './LeaderboardModal';
 import VolumeControl from './VolumeControl';
 import MusicControl from './MusicControl';
+import AudioStatus from './AudioStatus';
 import SpeedControl from './SpeedControl';
 import VentureMakerLink from './VentureMakerLink';
 
@@ -95,6 +96,7 @@ export default function LandingScreen({ onStart, onCustomize }) {
       <div className="vf-topbar-corner">
         <VolumeControl />
         <MusicControl />
+        <AudioStatus />
         <SpeedControl compact={false} />
       </div>
 

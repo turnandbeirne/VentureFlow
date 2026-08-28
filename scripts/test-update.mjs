@@ -1287,4 +1287,110 @@ await check('a muted player stays muted at every level', async () => {
   music.setMusicMuted(false);
 });
 
+// --- 10. Audio diagnostics: telling the three silences apart ---------------
+console.log('\nAudio diagnostics');
+
+// The sound engine needs the same DOM stand-ins the music engine got. The
+// stubs model what actually matters: a browser that refuses to resume an
+// AudioContext until it decides otherwise.
+function installSoundStubs({ resumable = true } = {}) {
+  const store = new Map();
+  globalThis.localStorage = {
+    getItem: (k) => (store.has(k) ? store.get(k) : null),
+    setItem: (k, v) => store.set(k, String(v)),
+    removeItem: (k) => store.delete(k),
+  };
+  class FakeCtx {
+    constructor() {
+      this.state = 'suspended';
+      this.destination = {};
+      this.sampleRate = 44100;
+      this.currentTime = 0;
+    }
+    createGain() {
+      return { gain: { value: 0, setValueAtTime() {}, linearRampToValueAtTime() {}, exponentialRampToValueAtTime() {} }, connect() {} };
+    }
+    createOscillator() {
+      return {
+        type: '',
+        frequency: { value: 0, setValueAtTime() {}, exponentialRampToValueAtTime() {} },
+        connect() {},
+        start() {},
+        stop() {},
+      };
+    }
+    createBufferSource() {
+      return { buffer: null, connect() {}, start() {}, stop() {} };
+    }
+    createBiquadFilter() {
+      return { type: '', Q: { value: 0 }, frequency: { value: 0, setValueAtTime() {}, linearRampToValueAtTime() {} }, connect() {} };
+    }
+    createBuffer(_c, length) {
+      return { duration: 2, getChannelData: () => new Float32Array(length) };
+    }
+    resume() {
+      if (!resumable) return Promise.reject(new Error('blocked'));
+      this.state = 'running';
+      return Promise.resolve();
+    }
+  }
+  globalThis.window = { AudioContext: FakeCtx };
+  return store;
+}
+
+installSoundStubs({ resumable: true });
+const sound = await import('../src/audio/soundEngine.js');
+
+await check('a fresh page is never accused of being broken', () => {
+  // Before any gesture, a suspended or absent context is exactly what a
+  // healthy page looks like — warning about it would nag every single load.
+  const d = sound.audioDiagnostics();
+  assert.equal(d.reason, 'ok', `a fresh page reported "${d.reason}"`);
+});
+
+await check('a muted player is told they are muted, not that audio is broken', async () => {
+  sound.setVolume(0.6);
+  sound.toggleMuted(); // -> muted
+  assert.equal(sound.audioDiagnostics().reason, 'muted');
+
+  // Unlocking from the explicit button both unmutes and reports success —
+  // the click IS the fix.
+  const after = await sound.unlockAudio({ testSound: null });
+  assert.equal(after.reason, 'ok');
+  assert.equal(after.muted, false);
+});
+
+await check('volume dragged to zero reads as muted, not as blocked', async () => {
+  sound.setVolume(0);
+  assert.equal(sound.audioDiagnostics().reason, 'muted');
+  const after = await sound.unlockAudio({ testSound: null });
+  assert.equal(after.reason, 'ok');
+  assert.ok(after.volume > 0, 'unlocking must restore an audible volume');
+});
+
+await check('an automatic unlock never overrides a deliberate mute', async () => {
+  sound.setVolume(0.6);
+  if (!sound.getAudioSettings().muted) sound.toggleMuted();
+  assert.equal(sound.getAudioSettings().muted, true);
+  // This is the App-level first-gesture path: it may unblock the browser,
+  // but it must not decide the player wants sound on.
+  await sound.unlockAudio({ unmute: false, testSound: null });
+  assert.equal(sound.getAudioSettings().muted, true, 'a silent auto-unlock must respect the mute');
+  sound.toggleMuted();
+});
+
+await check('a browser that refuses audio is reported as blocked, after a gesture', async () => {
+  // A fresh module instance whose context will never resume — an embedded
+  // preview pane, an iframe with no allow="autoplay", a muted tab.
+  installSoundStubs({ resumable: false });
+  const blocked = await import(`../src/audio/soundEngine.js?blocked=${Date.now()}`);
+  blocked.setVolume(0.6);
+
+  assert.equal(blocked.audioDiagnostics().reason, 'ok', 'still nothing to report before a gesture');
+
+  const after = await blocked.unlockAudio({ testSound: null });
+  assert.equal(after.reason, 'blocked', 'once a gesture has happened, a dead context is a real problem');
+  assert.notEqual(after.contextState, 'running');
+});
+
 console.log(`\nAll ${passed} checks passed.\n`);
