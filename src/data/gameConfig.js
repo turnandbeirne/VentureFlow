@@ -1983,8 +1983,8 @@ export const LOCAL_STORAGE_KEY = 'ventureflow-save-v1';
 // from the outside. Now they don't: read the stamp.
 //
 // Bump BUILD_ID whenever a build is handed over.
-export const BUILD_ID = '2026-08-28a';
-export const BUILD_NOTES = 'build stamp, audio diagnostics, music levels, turn timer, 4 players, new decks';
+export const BUILD_ID = '2026-08-28b';
+export const BUILD_NOTES = 'market history charts, set-all bot skill, build stamp, stale-save guard';
 
 export const GAME_NAME = 'VentureFlow';
 export const PARENT_BRAND = 'VentureMaker';

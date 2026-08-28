@@ -25,6 +25,7 @@ import {
   ASSETS,
 } from '../data/gameConfig';
 import { driftPrices } from './market';
+import { marketSnapshot, appendSnapshot } from './marketHistory';
 import { tickWeather, getStageInfo } from './weather';
 import { drawFortuneCard, applyCardEffect } from './decks';
 import { evaluateBadges } from './badges';
@@ -464,11 +465,17 @@ function finishMonthEnd(state, players, logEntries, month, scenario, leaderBefor
   const nextMonth = month + 1;
   const isGameOver = nextMonth > GAME_LENGTH_MONTHS;
 
+  // Record the month that just ended: the prices it was PLAYED at (pre-drift)
+  // and the income those units actually paid. Using post-drift prices here
+  // would label every month with next month's market.
+  const historyRow = marketSnapshot(month, startingPrices, weatherIncomeAmounts);
+
   let nextState = {
     ...state,
     players,
     assetPrices: prices,
     previousAssetPrices: startingPrices,
+    marketHistory: appendSnapshot(state.marketHistory, historyRow),
     weather: tick.weather,
     weatherIncomeAmounts,
     month: isGameOver ? state.month : nextMonth,

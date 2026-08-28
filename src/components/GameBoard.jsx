@@ -21,6 +21,7 @@ import AudioStatus from './AudioStatus';
 import Brand from './Brand';
 import LeaderboardModal from './LeaderboardModal';
 import RulebookModal from './RulebookModal';
+import MarketHistoryModal from './MarketHistoryModal';
 import SpeedControl from './SpeedControl';
 import TurnTimer from './TurnTimer';
 import StartupLaunchModal from './StartupLaunchModal';
@@ -47,6 +48,7 @@ export default function GameBoard({ game }) {
   const { speed } = usePlaySpeed();
   const [showLeaderboard, setShowLeaderboard] = useState(false);
   const [showRulebook, setShowRulebook] = useState(false);
+  const [showMarket, setShowMarket] = useState(false);
   const [selectedPlayerId, setSelectedPlayerId] = useState(null);
   const activePlayer = players[activePlayerIndex];
   // What the active player has bought during THIS turn — the shop uses it to
@@ -158,6 +160,19 @@ export default function GameBoard({ game }) {
               >
                 📖
               </button>
+              {/* Market history sits with the other reference tools: what
+                  things have cost month by month, and what they paid out. */}
+              <button
+                type="button"
+                className="vf-btn vf-btn--sm vf-btn--ghost"
+                title="Market history — prices and payouts by month"
+                onClick={() => {
+                  playSound('click');
+                  setShowMarket(true);
+                }}
+              >
+                📈
+              </button>
               <span className="vf-pill" title={difficulty.tagline}>
                 {difficulty.icon} {difficulty.name}
               </span>
@@ -253,6 +268,12 @@ export default function GameBoard({ game }) {
       )}
 
       <LeaderboardModal open={showLeaderboard} onClose={() => setShowLeaderboard(false)} />
+
+      <MarketHistoryModal
+        open={showMarket}
+        history={state.marketHistory}
+        onClose={() => setShowMarket(false)}
+      />
 
       <RulebookModal
         open={showRulebook}

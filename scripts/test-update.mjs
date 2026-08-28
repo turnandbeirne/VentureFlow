@@ -1478,4 +1478,119 @@ await check('a stale save is left intact until the player chooses', () => {
   assert.equal(persistence.hasSavedGame(), false);
 });
 
+console.log('\nMarket history');
+
+const mh = await import('../src/game/marketHistory.js');
+const { ASSETS: MH_ASSETS } = await import('../src/data/gameConfig.js');
+
+await check('a new game starts with month 1 already recorded', () => {
+  const g = createNewGame({ type: 'solo', aiCount: 1 }, ['Ada']);
+  assert.equal(g.marketHistory.length, 1);
+  assert.equal(g.marketHistory[0].month, 1);
+  for (const a of MH_ASSETS) {
+    assert.ok(g.marketHistory[0].price[a.id] > 0, `${a.id} needs an opening price`);
+    assert.ok(a.id in g.marketHistory[0].cashFlow, `${a.id} needs a cash-flow figure`);
+  }
+});
+
+await check('opening the market history draws NOTHING from the random streams', () => {
+  // The environment stream's draw count must never depend on a feature being
+  // present, or two players on the same Daily Challenge seed diverge. This is
+  // the guard: same seed, same opening prices, with history in place.
+  seedRng(4242);
+  const a = createNewGame({ type: 'solo', aiCount: 1 }, ['Ada']);
+  seedRng(4242);
+  const b = createNewGame({ type: 'solo', aiCount: 1 }, ['Ada']);
+  assert.deepEqual(a.assetPrices, b.assetPrices);
+  assert.deepEqual(a.weatherIncomeAmounts, b.weatherIncomeAmounts);
+  // And month 1's row must reuse the SAME roll the game itself uses, not a
+  // second one — that was the bug this guards against.
+  for (const asset of MH_ASSETS) {
+    assert.equal(a.marketHistory[0].price[asset.id], a.assetPrices[asset.id]);
+  }
+});
+
+await check('a month is recorded at the price it was PLAYED at, not next month\'s', () => {
+  let g = createNewGame({ type: 'solo', aiCount: 1 }, ['Ada']);
+  const month1Prices = { ...g.assetPrices };
+
+  function playAMonth(state) {
+    let s = state;
+    for (const seat of s.players) s = endTurn(s, seat.id).state;
+    return s;
+  }
+
+  g = playAMonth(g);
+  // Month 1's seeded row is REPLACED, not duplicated, by the row written when
+  // month 1 actually ends — same month, better data. So still one row.
+  assert.equal(g.marketHistory.length, 1, 'ending month 1 must not double up its row');
+  assert.equal(g.marketHistory[0].month, 1);
+
+  const month2Prices = { ...g.assetPrices };
+  const drifted = MH_ASSETS.some((a) => month2Prices[a.id] !== month1Prices[a.id]);
+  assert.ok(drifted, 'prices should have drifted, otherwise the check below proves nothing');
+
+  g = playAMonth(g);
+  assert.equal(g.marketHistory.length, 2, 'a second completed month adds a second row');
+  assert.deepEqual(g.marketHistory.map((r) => r.month), [1, 2]);
+
+  // The real assertion: each row keeps the prices its own month was played
+  // at, rather than being stamped with whatever the market did afterwards.
+  for (const asset of MH_ASSETS) {
+    assert.equal(g.marketHistory[0].price[asset.id], month1Prices[asset.id],
+      `${asset.id} month-1 row must hold month 1's price`);
+    assert.equal(g.marketHistory[1].price[asset.id], month2Prices[asset.id],
+      `${asset.id} month-2 row must hold month 2's price`);
+  }
+});
+
+await check('a replayed month never produces two rows', () => {
+  const base = [{ month: 1, price: { piggy: 50 }, cashFlow: { piggy: 0.2 } }];
+  const again = mh.appendSnapshot(base, { month: 1, price: { piggy: 55 }, cashFlow: { piggy: 0.3 } });
+  assert.equal(again.length, 1);
+  assert.equal(again[0].price.piggy, 55, 'the newer row wins');
+});
+
+await check('rows stay in month order however they arrive', () => {
+  let h = [];
+  for (const m of [3, 1, 2]) h = mh.appendSnapshot(h, { month: m, price: {}, cashFlow: {} });
+  assert.deepEqual(h.map((r) => r.month), [1, 2, 3]);
+});
+
+await check('the summary measures change from the START of the game', () => {
+  const h = [
+    { month: 1, price: { piggy: 100 }, cashFlow: { piggy: 1 } },
+    { month: 2, price: { piggy: 80 }, cashFlow: { piggy: 3 } },
+    { month: 3, price: { piggy: 150 }, cashFlow: { piggy: 2 } },
+  ];
+  const s = mh.assetSummary(h, 'piggy');
+  assert.equal(s.first, 100);
+  assert.equal(s.last, 150);
+  assert.equal(s.min, 80);
+  assert.equal(s.max, 150);
+  assert.equal(Math.round(s.changePct), 50, 'up 50% since month 1, not down from the peak');
+  assert.equal(s.avgCashFlow, 2);
+});
+
+await check('an old save without history is backfilled, not crashed', () => {
+  const g = createNewGame({ type: 'solo', aiCount: 1 }, ['Ada']);
+  delete g.marketHistory;
+  const restored = persistence.normalizeState(g);
+  assert.deepEqual(restored.marketHistory, [], 'empty and honest beats invented');
+  // And the chart helpers must survive that empty history rather than throw.
+  assert.deepEqual(mh.assetSeries(restored.marketHistory, 'piggy'), []);
+  assert.equal(mh.assetSummary(restored.marketHistory, 'piggy'), null);
+});
+
+console.log('\nSet-all-bots control');
+
+await check('every skill level the bulk control offers is a real one', () => {
+  const src = readFileSync(new URL('../src/components/SetupScreen.jsx', import.meta.url), 'utf8');
+  assert.ok(src.includes('updateAllBots'), 'the bulk setter must exist');
+  assert.ok(src.includes('allSkillLevelId'), 'the control must reflect the real shared state');
+  // It must report "Mixed" rather than lying about a value that is not true
+  // of every robot.
+  assert.match(src, /Mixed/, 'a mixed table must be labelled as mixed');
+});
+
 console.log(`\nAll ${passed} checks passed.\n`);

@@ -93,6 +93,11 @@ export function normalizeState(state) {
     aiTurnDone: !!state.aiTurnDone,
     pendingLaunch: state.pendingLaunch || null,
     turnTimer: state.turnTimer || null,
+    // Backfilled empty rather than reconstructed: the per-month prices of a
+    // game played before this existed are simply not recoverable, and a
+    // fabricated history would be worse than an honest short one. The chart
+    // starts filling from the next month-end.
+    marketHistory: state.marketHistory || [],
     // Deliberately cleared on load. The deadline is a wall-clock timestamp,
     // so a game resumed an hour later would otherwise open with the clock
     // already expired and instantly pass the player's turn. Resuming gives

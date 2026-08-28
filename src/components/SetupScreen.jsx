@@ -115,6 +115,25 @@ export default function SetupScreen({ onStart, onBack }) {
     });
   }
 
+  // Set one field on EVERY robot at once. With four seats and two dropdowns
+  // each, setting a skill level individually is eight interactions to express
+  // one intention ("make them all tough"); per-robot dropdowns stay right
+  // there for anyone who does want a mixed table.
+  // What the "set all" dropdown should read: the shared level if every robot
+  // in play agrees, otherwise "Mixed" — so the control reports the real state
+  // rather than silently claiming a value that isn't true of all of them.
+  const allSkillLevelId = (() => {
+    const inPlay = botConfigs.slice(0, aiCount);
+    if (!inPlay.length) return 'mixed';
+    const first = inPlay[0].skillLevelId;
+    return inPlay.every((c) => c.skillLevelId === first) ? first : 'mixed';
+  })();
+
+  function updateAllBots(field, value) {
+    playSound('click');
+    setBotConfigs((prev) => prev.map((c) => ({ ...c, [field]: value })));
+  }
+
   function updateBotConfig(index, field, value) {
     playSound('click');
     setBotConfigs((prev) => {
@@ -289,6 +308,25 @@ export default function SetupScreen({ onStart, onBack }) {
               </div>
               <div>
                 <span className="vf-field-label">Choose your robots</span>
+                <div className="vf-bot-picker__all">
+                  <span className="vf-bot-picker__all-label">Set all robots to</span>
+                  <select
+                    className="vf-select"
+                    value={allSkillLevelId}
+                    onChange={(e) => updateAllBots('skillLevelId', e.target.value)}
+                    aria-label="Skill level for every robot"
+                  >
+                    <option value="mixed" disabled>
+                      Mixed — set individually below
+                    </option>
+                    <option value="random">🎲 Random each</option>
+                    {SKILL_LEVELS.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.icon} {s.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
                 <div className="vf-bot-picker">
                   {Array.from({ length: aiCount }).map((_, i) => (
                     <div key={i} className="vf-bot-picker__row">

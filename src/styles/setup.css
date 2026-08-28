@@ -425,3 +425,23 @@
   line-height: 1.4;
   color: var(--vf-ink-soft);
 }
+
+/* "Set all robots to" ---------------------------------------------------------
+   One control for the common intention (a table that is uniformly easy or
+   uniformly brutal); the per-robot dropdowns below still allow a mixed table. */
+.vf-bot-picker__all {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.6rem;
+  padding: 0.5rem 0.65rem;
+  border-radius: 12px;
+  background: var(--vf-cream, #f7f1e4);
+}
+
+.vf-bot-picker__all-label {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--vf-ink-soft, #6b6357);
+}

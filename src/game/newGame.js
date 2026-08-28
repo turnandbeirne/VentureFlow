@@ -10,6 +10,7 @@ import {
 } from '../data/gameConfig';
 import { createPlayerRoster, rollMonthlyIncomeAmounts } from './players';
 import { createInitialPrices } from './market';
+import { marketSnapshot } from './marketHistory';
 import { createWeatherState } from './weather';
 import { getScenario, DEFAULT_SCENARIO_ID, scenarioStartingWeather } from './scenarios';
 
@@ -29,6 +30,13 @@ export function createNewGame(
   // createWeatherState); Survive the Crash overrides it to start mid-storm
   // instead — see game/scenarios.js.
   const weather = scenarioStartingWeather(scenario) || createWeatherState();
+  // Hoisted so month 1's market-history row can reuse the SAME rolled
+  // amounts. Calling rollMonthlyIncomeAmounts twice would draw twice from
+  // the environment stream and silently desync the Daily Challenge, whose
+  // whole promise is that everyone gets the same weather and prices — see
+  // game/rng.js.
+  const openingIncome = rollMonthlyIncomeAmounts(weather, severity.id);
+  const openingPrices = createInitialPrices();
   return {
     status: 'playing', // 'playing' | 'monthRecap' | 'gameover'
     mode,
@@ -47,9 +55,16 @@ export function createNewGame(
     // both are available before the first payday ever happens. See
     // players.js's rollMonthlyIncomeAmounts and turnEngine.js, which
     // rerolls this every month-end after.
-    weatherIncomeAmounts: rollMonthlyIncomeAmounts(weather, severity.id),
-    assetPrices: createInitialPrices(),
-    previousAssetPrices: createInitialPrices(),
+    weatherIncomeAmounts: openingIncome,
+    assetPrices: openingPrices,
+    previousAssetPrices: openingPrices,
+    // One row per month: what each asset cost and what one unit of it paid
+    // out that month. Seeded with month 1 so the Market History chart has a
+    // starting point before the first month-end ever runs. Appended to (never
+    // rewritten) by turnEngine.js's endMonth — see components/MarketHistoryModal.jsx.
+    marketHistory: [
+      marketSnapshot(1, openingPrices, openingIncome),
+    ],
     players: createPlayerRoster(mode, humanNames, difficulty, botConfigs, humanAvatars),
     activePlayerIndex: 0,
     log: [],

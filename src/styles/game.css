@@ -2357,3 +2357,149 @@
   color: var(--vf-ink-soft);
   opacity: 0.7;
 }
+
+/* Market History ------------------------------------------------------------
+   Small multiples, one panel per asset. See components/MarketHistoryModal.jsx
+   for why this is four charts rather than four lines on one pair of axes. */
+.vf-market {
+  width: min(940px, 94vw);
+  max-height: 88vh;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1rem 1.15rem 0.9rem;
+}
+
+.vf-market__header {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.vf-market__title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  margin-right: auto;
+}
+
+.vf-market__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 0.9rem;
+  overflow-y: auto;
+  padding-right: 0.25rem;
+}
+
+.vf-market__panel {
+  border: 2px solid var(--vf-line, #e6e0d5);
+  border-radius: 14px;
+  padding: 0.7rem 0.8rem 0.6rem;
+  background: var(--vf-white, #fffdf8);
+}
+
+.vf-market__panel-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.35rem;
+  /* Reserve two lines. "Lemonade Stands & More" wraps where the other three
+     names don't, and without this its chart starts lower than its neighbours',
+     so a row of small multiples no longer shares a baseline — which is exactly
+     the comparison the layout exists to support. */
+  min-height: 2.5rem;
+}
+
+.vf-market__panel-name {
+  font-weight: 700;
+  font-size: 0.95rem;
+}
+
+.vf-market__delta {
+  font-size: 0.75rem;
+  font-weight: 700;
+  white-space: nowrap;
+  flex: 0 0 auto;
+}
+
+.vf-market__delta.is-up { color: var(--vf-green-dark, #1a7f37); }
+.vf-market__delta.is-down { color: var(--vf-red-dark, #b42318); }
+
+.vf-market__svg {
+  width: 100%;
+  height: auto;
+  display: block;
+  touch-action: manipulation;
+}
+
+.vf-market__tick {
+  font-size: 9px;
+  fill: var(--vf-ink-soft, #6b6357);
+  font-weight: 600;
+}
+
+.vf-market__readout {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.45rem;
+  margin-top: 0.3rem;
+  font-size: 0.85rem;
+}
+
+.vf-market__readout-month {
+  font-weight: 700;
+  background: var(--vf-cream, #f7f1e4);
+  border-radius: 999px;
+  padding: 0.05rem 0.5rem;
+}
+
+.vf-market__readout-price { font-weight: 700; }
+.vf-market__readout-flow { color: var(--vf-ink-soft, #6b6357); }
+
+.vf-market__range {
+  margin-top: 0.2rem;
+  font-size: 0.72rem;
+  color: var(--vf-ink-soft, #6b6357);
+}
+
+.vf-market__empty {
+  margin: 0;
+  padding: 1.4rem 0.4rem;
+  text-align: center;
+  color: var(--vf-ink-soft, #6b6357);
+}
+
+.vf-market__tablewrap { overflow: auto; max-height: 60vh; }
+
+.vf-market__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8rem;
+}
+
+.vf-market__table th,
+.vf-market__table td {
+  border-bottom: 1px solid var(--vf-line, #e6e0d5);
+  padding: 0.3rem 0.45rem;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.vf-market__table thead th {
+  position: sticky;
+  top: 0;
+  background: var(--vf-white, #fffdf8);
+  font-weight: 700;
+}
+
+.vf-market__cellflow { color: var(--vf-ink-soft, #6b6357); }
+
+.vf-market__hint {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--vf-ink-soft, #6b6357);
+  background: var(--vf-cream, #f7f1e4);
+  border-radius: 10px;
+  padding: 0.5rem 0.7rem;
+}
