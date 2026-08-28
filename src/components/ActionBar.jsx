@@ -1,7 +1,6 @@
 import { useCallback } from 'react';
 import { BUSINESS_COST, BUSINESS_SKILL_COST, SKILL_COST } from '../data/gameConfig';
 import { useHoldRepeat } from '../hooks/useHoldRepeat';
-import LessonTip from './LessonTip';
 
 export default function ActionBar({ player, disabled, onStartBusiness, onLearnSkill, onDone }) {
   const canStartBusiness = !disabled && player.cash >= BUSINESS_COST && player.skillTokens >= BUSINESS_SKILL_COST;
@@ -21,18 +20,12 @@ export default function ActionBar({ player, disabled, onStartBusiness, onLearnSk
   return (
     <div>
       <div className="vf-action-bar">
-        <span className="vf-action-bar__item">
-          <button type="button" className="vf-btn vf-btn--warm" disabled={!canStartBusiness} onClick={onStartBusiness}>
-            🚀 Start Business (${BUSINESS_COST} + {BUSINESS_SKILL_COST} 💡)
-          </button>
-          <LessonTip conceptId="businessValuation" />
-        </span>
-        <span className="vf-action-bar__item">
-          <button type="button" className="vf-btn vf-btn--warm" disabled={!canLearnSkill} {...skillHold}>
-            📚 Learn Skill (${SKILL_COST})
-          </button>
-          <LessonTip conceptId="investInYourself" />
-        </span>
+        <button type="button" className="vf-btn vf-btn--warm" disabled={!canStartBusiness} onClick={onStartBusiness}>
+          🚀 Start Business (${BUSINESS_COST} + {BUSINESS_SKILL_COST} 💡)
+        </button>
+        <button type="button" className="vf-btn vf-btn--warm" disabled={!canLearnSkill} {...skillHold}>
+          📚 Learn Skill (${SKILL_COST})
+        </button>
       </div>
       <div className="vf-done-row" style={{ marginTop: '0.75rem' }}>
         <button type="button" className="vf-btn vf-btn--primary vf-btn--lg" disabled={disabled} onClick={onDone}>

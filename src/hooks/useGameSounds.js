@@ -10,14 +10,8 @@ import { SOUNDS } from '../audio/soundLibrary';
  * have a matching entry yet, this falls back to the generic 'buy'/'sell'
  * sound rather than staying silent.
  */
-function resolveSound(entry) {
-  const kind = entry?.kind;
+function resolveSound(kind) {
   if (!kind) return null;
-  // Weather carries its stage's mood along (see game/turnEngine.js) so it
-  // can pick a good-weather (birds) vs bad-weather (thunder) cue instead of
-  // one generic shimmer for every stage — same boom/peak/rebound = good,
-  // dip/bust = bad split as game/aiEngine.js's isGoodWeather().
-  if (kind === 'weather') return entry.mood === 'dip' || entry.mood === 'bust' ? 'weatherBad' : 'weatherGood';
   if (SOUNDS[kind]) return kind;
   if (kind.startsWith('buy_')) return 'buy';
   if (kind.startsWith('sell_')) return 'sell';
@@ -70,7 +64,7 @@ export function useGameSounds(log) {
     if (log.length > seenCountRef.current) {
       const newEntries = log.slice(seenCountRef.current);
       for (const entry of newEntries) {
-        const soundName = resolveSound(entry);
+        const soundName = resolveSound(entry.kind);
         if (soundName) playSound(soundName);
       }
       seenCountRef.current = log.length;

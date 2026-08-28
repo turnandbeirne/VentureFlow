@@ -1,13 +1,9 @@
 // ============================================================================
 // Sound engine — Web Audio playback + volume/mute state
 // ----------------------------------------------------------------------------
-// Most effects are synthesized on the fly from soundLibrary.js — no audio
-// files, nothing to license, keeps VentureFlow lightweight and working
-// offline once loaded (good for classroom wifi). A handful of the biggest
-// moments (fortune cards, badges, buyouts, a bot's laugh, "oops") also mix
-// in small royalty-free recorded clips (Mixkit License) for extra character
-// — under ~1.1MB total, decoded once per clip and cached (see
-// playSampleNote below), so they don't add meaningfully to load time.
+// Every effect is synthesized on the fly from soundLibrary.js, so there are
+// no audio files to download or license — this keeps VentureFlow lightweight
+// and works offline once loaded (good for classroom wifi).
 //
 // This module is framework-free by design (same philosophy as src/game/):
 // React components read/write it through useAudioSettings.js.
@@ -20,11 +16,6 @@ const DEFAULT_VOLUME = 0.6;
 let audioContext = null;
 let masterGain = null;
 let noiseBuffer = null;
-
-// Decoded-clip cache for the recorded sfx in soundLibrary.js's *_SAMPLES
-// pools — keyed by the imported file URL, so each clip is fetched and
-// decoded once no matter how many times it's picked over a game.
-const sampleBufferCache = new Map();
 
 let settings = loadSettings();
 const listeners = new Set();
@@ -147,38 +138,6 @@ function playNoiseNote(ctx, n, now) {
   src.stop(endAt + 0.02);
 }
 
-/** Fetch + decode a recorded clip once per URL, caching the (promised)
- * AudioBuffer so repeat plays of the same clip are instant after the first. */
-function getSampleBuffer(ctx, src) {
-  let entry = sampleBufferCache.get(src);
-  if (!entry) {
-    entry = fetch(src)
-      .then((res) => res.arrayBuffer())
-      .then((data) => ctx.decodeAudioData(data));
-    sampleBufferCache.set(src, entry);
-  }
-  return entry;
-}
-
-/** A short recorded clip (see soundLibrary.js's *_SAMPLES pools) rather than
- * a synthesized note. Unlike tone/noise notes, a sample doesn't support a
- * `start` offset — it's always the only note in its recipe, so it just
- * plays as soon as decoding resolves (instant once cached). A clip that
- * fails to load/decode silently no-ops rather than breaking the game. */
-function playSampleNote(ctx, n) {
-  getSampleBuffer(ctx, n.src)
-    .then((buffer) => {
-      const src = ctx.createBufferSource();
-      src.buffer = buffer;
-      const noteGain = ctx.createGain();
-      noteGain.gain.value = n.gain ?? 1;
-      src.connect(noteGain);
-      noteGain.connect(masterGain);
-      src.start();
-    })
-    .catch(() => {});
-}
-
 /**
  * Play a named effect from soundLibrary.js. Silently no-ops if audio is
  * unavailable. Most entries in SOUNDS are a static array of notes; a few
@@ -203,7 +162,6 @@ export function playSound(name) {
   const now = ctx.currentTime;
   for (const n of recipe) {
     if (n.kind === 'noise') playNoiseNote(ctx, n, now);
-    else if (n.kind === 'sample') playSampleNote(ctx, n);
     else playToneNote(ctx, n, now);
   }
 }

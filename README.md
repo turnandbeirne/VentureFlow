@@ -2191,3 +2191,71 @@ One limitation worth stating plainly: this sandbox's egress rules block
 from here. The table, its policies and its constraints were verified directly
 against the live database instead; the client code is a plain PostgREST GET
 and POST. Worth a single confirming try from a deployed build.
+
+## Fixed: the music played perfectly, and completely silently
+
+Reported as "audio no longer works". Sound effects were fine; the **music**
+was the break, and it had been broken for a while.
+
+`playMusicTrack()` drops the output gain to 0 before calling `play()`, and
+only ramps it back up inside `play()`'s own `.then()`. Browsers refuse that
+first `play()` until the page has seen a user gesture — which is *always* the
+case for the opening theme, because it starts on the very first screen before
+anyone has clicked anything. The rejection routed to
+`attemptResumeOnNextGesture()`, which retried `audio.play()` on the next
+click and succeeded. But nothing ever restored the volume.
+
+The result: the theme was genuinely playing, correctly, at gain 0. Forever.
+The in-game track recovered by accident (its `playMusicTrack('background')`
+call happens after a gesture, so its `play()` resolves and the `.then()`
+runs), which is why the symptom was "no music on the landing and setup
+screens" rather than total silence — and why it was easy to read as "audio is
+broken" generally.
+
+Measured before the fix, in a real browser: on the landing screen after the
+first click, `paused: false` — playing — with the music gain node at `0`.
+
+The retry now restores volume as well as playback, and any later
+`playMusicTrack()` call for the already-current track re-asserts the correct
+volume, so a stuck-at-zero gain can't survive a screen change either.
+
+There's a regression test for it (`scripts/test-update.mjs`) that stubs the
+one browser behaviour that matters — the first `play()` being refused until a
+gesture — and asserts the gain is above zero afterwards. Verified it isn't
+vacuous by putting the bug back: it fails with "after the first gesture the
+music must actually be audible", and passes again once restored.
+
+## Music levels: medium, ducked, then medium again
+
+The music now has a *level* on top of each track's own baseline gain, and it
+follows what's happening:
+
+| Moment | Level | Why |
+| --- | --- | --- |
+| Landing / setup | medium | Nothing to concentrate on; the song is the point. |
+| Month 1 on the board | medium | Still finding your feet — reading the board, learning the shop. |
+| Month 2 onward | mid-low | You're actually playing now. It steps back and stays there. |
+| Game over | medium | Back up for the finish. |
+
+`setMusicLevel()` fades rather than steps, and is a no-op when the level is
+already right, so `GameBoard` can derive it from the current month on every
+render without stuttering — which also means a game **resumed from a save**
+mid-way through opens at the correct level rather than at full volume.
+
+The level multiplies with the player's own volume setting rather than
+replacing it: someone who has turned the music down still gets the same
+relative duck and lift, and someone who muted it stays muted (there's a test
+for that too).
+
+Track baselines were rebalanced alongside this — the theme from 1.0 to 0.8 and
+the in-game instrumental from 0.35 to 0.5 — so that "medium" during month 1 is
+genuinely present and the drop afterwards is something you notice.
+
+Measured across a real session: 0.40 on the landing screen → 0.25 in month 1
+→ 0.11 from month 5 → 0.40 at game over.
+
+One related piece of tooling: the Node test loader (`scripts/`) now stands in
+for the bundler's asset imports, returning a URL string for `.mp3` and
+friends. Without it `audio/musicEngine.js` couldn't be imported into a test at
+all, which is part of why this bug went unnoticed — the module was untestable
+outside a browser.

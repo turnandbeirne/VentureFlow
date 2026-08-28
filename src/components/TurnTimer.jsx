@@ -47,7 +47,7 @@ export default function TurnTimer({ enabled, deadlineAt, player, onStart, onExte
     const msLeft = deadlineAt - now;
     if (msLeft <= TURN_WARNING_SECONDS * 1000 && msLeft > 0 && warnedForRef.current !== deadlineAt) {
       warnedForRef.current = deadlineAt;
-      playSound('timerWarning');
+      playSound('error');
     }
     if (msLeft <= 0 && expiredForRef.current !== deadlineAt) {
       expiredForRef.current = deadlineAt;

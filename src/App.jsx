@@ -23,18 +23,11 @@ export default function App() {
   // game comes back to the landing page. Deliberately local UI state rather
   // than anything in the game reducer — no game exists yet at this point.
   const [preGameScreen, setPreGameScreen] = useState('landing');
-  // "🗺️ View Game Board" on the Game Over screen flips this on to show the
-  // final board (read-only — see GameBoard.jsx's readOnly prop) instead of
-  // the leaderboard/recap screen; "← Back to Recap" flips it back. Local UI
-  // state, not game state — nothing about the finished game itself changes
-  // while toggling between the two views.
-  const [showBoardAfterGameOver, setShowBoardAfterGameOver] = useState(false);
 
   // Every path that ends a game returns to the front door rather than
   // dropping the player straight into a form.
   const newGame = useCallback(() => {
     setPreGameScreen('landing');
-    setShowBoardAfterGameOver(false);
     game.newGame();
   }, [game]);
 
@@ -55,19 +48,8 @@ export default function App() {
     <div data-theme={profile.selectedTheme}>
       {!state ? (
         renderPreGame()
-      ) : state.status === 'gameover' && !showBoardAfterGameOver ? (
-        <GameOverScreen
-          state={state}
-          onPlayAgain={newGame}
-          onRecordProfileResult={recordResult}
-          onViewBoard={() => setShowBoardAfterGameOver(true)}
-        />
       ) : state.status === 'gameover' ? (
-        <GameBoard
-          game={{ ...game, newGame }}
-          readOnly
-          onExitReadOnly={() => setShowBoardAfterGameOver(false)}
-        />
+        <GameOverScreen state={state} onPlayAgain={newGame} onRecordProfileResult={recordResult} />
       ) : (
         <GameBoard game={{ ...game, newGame }} />
       )}

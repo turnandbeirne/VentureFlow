@@ -11,7 +11,7 @@ import {
   getDifficulty,
 } from '../data/gameConfig';
 import { playSound } from '../audio/soundEngine';
-import { playMusicTrack } from '../audio/musicEngine';
+import { playMusicTrack, setMusicLevel } from '../audio/musicEngine';
 import { rollQuickPlaySetup } from '../game/quickPlay';
 import { useLeaderboard } from '../hooks/useLeaderboard';
 import { useProfile } from '../hooks/useProfile';
@@ -73,6 +73,7 @@ export default function LandingScreen({ onStart, onCustomize }) {
   const [showLeaderboard, setShowLeaderboard] = useState(false);
 
   useEffect(() => {
+    setMusicLevel('medium');
     playMusicTrack('theme');
   }, []);
 
@@ -120,17 +121,6 @@ export default function LandingScreen({ onStart, onCustomize }) {
               Quick Play rolls the scenario, difficulty and robot opponents for you — nothing to decide, straight into
               month 1.
             </p>
-            {/* A separate, simpler edition built for players under 8 — see
-                src/kids/KidsApp.jsx. It's a standalone static entry point
-                (main.jsx's tiny `/kids` route), not a mode of THIS app, so
-                it links out via a plain <a> rather than onStart. Kept
-                visually distinct (its own candy-bright class, not vf-btn)
-                so it reads as "a different, kid-sized game" rather than one
-                more option among Quick Play / Customize. */}
-            <a href="/kids" className="vf-kids-link" onClick={() => playSound('click')}>
-              <span className="vf-kids-link__icon">🧒</span>
-              Play the Kids Version
-            </a>
             {HOW_TO_PLAY_VIDEO_URL && (
               <a
                 className="vf-landing__video"

@@ -30,7 +30,7 @@ export function createNewGame(
   // instead — see game/scenarios.js.
   const weather = scenarioStartingWeather(scenario) || createWeatherState();
   return {
-    status: 'playing', // 'playing' | 'monthRecap' | 'exitOffer' | 'gameEnding' | 'gameover'
+    status: 'playing', // 'playing' | 'monthRecap' | 'gameover'
     mode,
     difficultyId: difficulty.id,
     // How hard the economy swings this game — see gameConfig.js's
@@ -56,14 +56,6 @@ export function createNewGame(
     chat: [], // bot personality chat feed — see game/chatEngine.js
     fortuneRecap: [],
     fortuneRecapIndex: 0,
-    // Set true by finishMonthEnd on the FINAL month, then cleared by
-    // acknowledgeFortuneCard once the last fortune card is dismissed — see
-    // turnEngine.js for the full 'monthRecap' -> 'gameEnding' -> 'gameover'
-    // sequencing this drives.
-    pendingGameOver: false,
-    // Per-asset price/cashflow history, one snapshot per completed month —
-    // see turnEngine.js's finishMonthEnd and components/AssetHistoryModal.jsx.
-    assetHistory: {},
     winnerId: null,
     // Set by the reducer when a HUMAN player starts a business, cleared
     // when they dismiss the celebration — see reducer.js's START_BUSINESS /

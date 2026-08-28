@@ -42,8 +42,10 @@ import {
 import { businessArt } from '../src/game/businessArt.js';
 
 let passed = 0;
-function check(label, fn) {
-  fn();
+async function check(label, fn) {
+  // Awaited so a check can be async (the music ones below have to wait for a
+  // real fade to finish). A synchronous body is unaffected.
+  await fn();
   passed += 1;
   console.log(`  ✓ ${label}`);
 }
@@ -85,13 +87,13 @@ check("the user's worked example: 2 R&D + 3 Ops + 1 Sales = 6 upgrades -> 12 cam
   assert.equal(marketingAllowance(biz), 12);
 });
 
-check('0 upgrades -> 2, 3 upgrades -> 6, 6 upgrades -> 12', () => {
+await check('0 upgrades -> 2, 3 upgrades -> 6, 6 upgrades -> 12', () => {
   assert.equal(marketingAllowance(freshBusiness()), 2);
   assert.equal(marketingAllowance(freshBusiness({ salesLevel: 3 })), 6);
   assert.equal(marketingAllowance(freshBusiness({ salesLevel: 3, opsLevel: 3 })), 12);
 });
 
-check('expired campaigns do NOT free up room (the exploit stays closed)', () => {
+await check('expired campaigns do NOT free up room (the exploit stays closed)', () => {
   let biz = freshBusiness();
   biz = applyUpgrade(biz, 'marketing', 1).business;
   biz = applyUpgrade(biz, 'marketing', 1).business;
@@ -101,7 +103,7 @@ check('expired campaigns do NOT free up room (the exploit stays closed)', () => 
   assert.equal(canUpgradeTrack(biz, 'marketing'), false);
 });
 
-check('buying other tracks unlocks exactly the promised number of campaigns', () => {
+await check('buying other tracks unlocks exactly the promised number of campaigns', () => {
   let biz = freshBusiness();
   biz = applyUpgrade(biz, 'marketing', 1).business;
   biz = applyUpgrade(biz, 'marketing', 1).business;
@@ -119,7 +121,7 @@ check('buying other tracks unlocks exactly the promised number of campaigns', ()
   assert.equal(marketingRemaining(stepped), MARKETING_CAMPAIGNS_PER_UPGRADE);
 });
 
-check('a save made before the cap existed is frozen, not retroactively punished', () => {
+await check('a save made before the cap existed is frozen, not retroactively punished', () => {
   // An old business with 9 stacked campaigns and no other upgrades: the new
   // rule blocks further campaigns but must not throw or go negative.
   const legacy = freshBusiness({ marketingCount: undefined, tempBoosts: Array.from({ length: 9 }, () => ({ amount: 5, expiresMonth: 99 })) });
@@ -129,7 +131,7 @@ check('a save made before the cap existed is frozen, not retroactively punished'
   assert.ok(upgradesNeededForNextCampaign(legacy) >= 1);
 });
 
-check('actions.upgradeBusiness allows the monthly upkeep campaign, then blocks with a helpful reason', () => {
+await check('actions.upgradeBusiness allows the monthly upkeep campaign, then blocks with a helpful reason', () => {
   const state = createNewGame({ type: 'solo', aiCount: 1 }, ['Tester']);
   let s = { ...state, players: state.players.map((p, i) => (i === 0 ? { ...p, cash: 99999, skillTokens: 9 } : p)) };
   s = startBusiness(s, 'p1').state;
@@ -154,7 +156,7 @@ check('actions.upgradeBusiness allows the monthly upkeep campaign, then blocks w
   assert.equal(nextMonth.ok, true, 'a new month must bring a new upkeep campaign');
 });
 
-check('the AI is bound by the same cap (it builds candidates through canUpgradeTrack)', () => {
+await check('the AI is bound by the same cap (it builds candidates through canUpgradeTrack)', () => {
   // Give a robot an enormous cash pile and a business, then run many turns.
   // Because aiEngine builds its upgrade candidates via canUpgradeTrack, no
   // amount of money can push it past the allowance.
@@ -174,7 +176,7 @@ check('the AI is bound by the same cap (it builds candidates through canUpgradeT
   }
 });
 
-check('a fully-built business can always still be tended (the decline deadlock)', () => {
+await check('a fully-built business can always still be tended (the decline deadlock)', () => {
   // Sales 3/3, Ops 3/3, R&D 2/2 — every permanent track maxed — and all 16
   // earned campaigns spent. Without the upkeep rule there would be no legal
   // purchase left, and this business would decline forever with no remedy.
@@ -187,7 +189,7 @@ check('a fully-built business can always still be tended (the decline deadlock)'
   assert.equal(canUpgradeTrack(maxed, 'marketing', 5), true, 'upkeep must keep the business tendable');
 });
 
-check('the upkeep campaign resets the decline clock but never spends allowance', () => {
+await check('the upkeep campaign resets the decline clock but never spends allowance', () => {
   let biz = freshBusiness({ salesLevel: 1, marketingCount: 2, lastTendedMonth: 1 });
   assert.equal(marketingRemaining(biz), 0);
   assert.equal(marketingUpkeepAvailable(biz, 9), true);
@@ -201,7 +203,7 @@ check('the upkeep campaign resets the decline clock but never spends allowance',
   assert.equal(biz.tempBoosts.length, 1, 'upkeep still pays a real boost');
 });
 
-check('upkeep is once per MONTH, so it cannot restore the stacking exploit', () => {
+await check('upkeep is once per MONTH, so it cannot restore the stacking exploit', () => {
   // The exploit was stacking an unbounded number of campaigns inside one
   // turn to spike revenue right before a buyout. Replay a whole turn's worth
   // of attempts in a single month against the real guard: exactly one gets
@@ -228,7 +230,7 @@ check('upkeep is once per MONTH, so it cannot restore the stacking exploit', () 
   }
 });
 
-check('a robot uses upkeep too, and still never exceeds its earned allowance', () => {
+await check('a robot uses upkeep too, and still never exceeds its earned allowance', () => {
   let s = createNewGame({ type: 'solo', aiCount: 1 }, ['Tester']);
   const botId = s.players[1].id;
   s = { ...s, players: s.players.map((p) => (p.id === botId ? { ...p, cash: 500000, skillTokens: 9 } : p)) };
@@ -251,7 +253,7 @@ check('a robot uses upkeep too, and still never exceeds its earned allowance', (
 // --- 2. Hold-to-repeat guard ----------------------------------------------
 console.log('\nHold-to-repeat guard on investment buttons');
 
-check('repeating an upgrade stops exactly at the cap instead of erroring', () => {
+await check('repeating an upgrade stops exactly at the cap instead of erroring', () => {
   // useHoldRepeat re-checks canFire() before EVERY tick; the button's
   // canFire is `!capped && affordable`, i.e. canUpgradeTrack + cash. Replay
   // that loop against the real functions.
@@ -268,7 +270,7 @@ check('repeating an upgrade stops exactly at the cap instead of erroring', () =>
   assert.equal(bought, MARKETING_FREE_CAMPAIGNS);
 });
 
-check('repeating Sales stops at its own level cap', () => {
+await check('repeating Sales stops at its own level cap', () => {
   let biz = freshBusiness();
   let bought = 0;
   while (canUpgradeTrack(biz, 'sales')) {
@@ -284,11 +286,11 @@ console.log('\nPiggy Bank interest');
 
 const piggy = ASSETS.find((a) => a.id === 'piggy');
 
-check('the Piggy Bank is flagged interest-bearing', () => {
+await check('the Piggy Bank is flagged interest-bearing', () => {
   assert.equal(piggy.interestBearing, true);
 });
 
-check('rolled rates always land in the normal or bonus band, and bonuses occur', () => {
+await check('rolled rates always land in the normal or bonus band, and bonuses occur', () => {
   let bonusMonths = 0;
   const weather = { stageId: 'sunnyBoom', monthsLeft: 2 };
   for (let i = 0; i < 3000; i++) {
@@ -307,13 +309,13 @@ check('rolled rates always land in the normal or bonus band, and bonuses occur',
   assert.ok(bonusMonths > 200 && bonusMonths < 600, `bonus months looked wrong: ${bonusMonths}`);
 });
 
-check('per-unit interest scales with the live price, not the base price', () => {
+await check('per-unit interest scales with the live price, not the base price', () => {
   const amounts = { interestRates: { piggy: 0.004 }, interestBonus: { piggy: false } };
   assert.equal(perUnitIncome(piggy, { price: 50, weatherIncomeAmounts: amounts }), 0.2);
   assert.equal(perUnitIncome(piggy, { price: 100, weatherIncomeAmounts: amounts }), 0.4);
 });
 
-check('interest reaches passive income (and so payday) for a saver', () => {
+await check('interest reaches passive income (and so payday) for a saver', () => {
   const amounts = { interestRates: { piggy: 0.005 }, interestBonus: { piggy: false } };
   const saver = {
     holdings: { piggy: 200, lemonade: 0, treehouse: 0, treasure: 0 },
@@ -331,12 +333,12 @@ check('interest reaches passive income (and so payday) for a saver', () => {
   assert.equal(breakdown.total, 50);
 });
 
-check('a player with no roll yet still sees a sane rate rather than 0%', () => {
+await check('a player with no roll yet still sees a sane rate rather than 0%', () => {
   const rate = interestRateFor(piggy, undefined);
   assert.ok(rate >= PIGGY_INTEREST_PCT_MIN && rate <= PIGGY_INTEREST_PCT_MAX);
 });
 
-check('interest stays small — a piggy-only strategy cannot outrun a business', () => {
+await check('interest stays small — a piggy-only strategy cannot outrun a business', () => {
   // Worst case for balance: the maximum bonus rate, every month.
   const monthlyOnAThousandDollars = 1000 * PIGGY_BONUS_PCT_MAX;
   assert.ok(monthlyOnAThousandDollars < 35, `too generous: $${monthlyOnAThousandDollars}/mo on $1,000`);
@@ -345,7 +347,7 @@ check('interest stays small — a piggy-only strategy cannot outrun a business',
 // --- 4. Business launch art ------------------------------------------------
 console.log('\nStartup launch art');
 
-check('all 500 business names resolve to art, and almost none fall back', () => {
+await check('all 500 business names resolve to art, and almost none fall back', () => {
   let fallbacks = 0;
   for (const name of BUSINESS_NAMES) {
     const art = businessArt(name);
@@ -355,14 +357,14 @@ check('all 500 business names resolve to art, and almost none fall back', () => 
   assert.equal(fallbacks, 0, `${fallbacks} names fell back to the generic storefront`);
 });
 
-check('specific trades beat generic words inside the same name', () => {
+await check('specific trades beat generic words inside the same name', () => {
   assert.equal(businessArt("Doodle's Zippy Cookie Company").hero, '🍪'); // not 'company'
   assert.equal(businessArt("Coach Fifi's Kayak Rental").hero, '🛶'); // not 'rental'
   assert.equal(businessArt('The Speedy Penguin Snowman Building').hero, '⛄'); // not 'building'
   assert.equal(businessArt("Auntie Betty's Bakery").hero, '🧁');
 });
 
-check('a human starting a business queues a launch celebration; a bot does not', () => {
+await check('a human starting a business queues a launch celebration; a bot does not', () => {
   let s = createNewGame({ type: 'solo', aiCount: 1 }, ['Tester']);
   s = { ...s, players: s.players.map((p) => ({ ...p, cash: 9999, skillTokens: 5 })) };
   const afterHuman = gameReducer(s, { type: 'START_BUSINESS', playerId: 'p1' });
@@ -387,7 +389,7 @@ console.log('\nBonus-interest month callout');
 const { seedRng } = await import('../src/game/rng.js');
 const { endTurn } = await import('../src/game/turnEngine.js');
 
-check('a bonus month is logged when someone holds the asset, and only then', () => {
+await check('a bonus month is logged when someone holds the asset, and only then', () => {
   // The ~12% bonus branch is environment-random, so rather than predicting
   // which seed produces one (month-end consumes several environment draws
   // before the interest roll — see turnEngine's beginMonthEnd), just play a
@@ -429,7 +431,7 @@ const { rollQuickPlaySetup } = await import('../src/game/quickPlay.js');
 const { runAiStep, aiMaxSteps } = await import('../src/game/aiEngine.js');
 const { SCENARIOS, DIFFICULTIES, MAX_AI_PLAYERS } = await import('../src/data/gameConfig.js');
 
-check('speeds are ordered slowest-to-fastest on every delay the slider controls', () => {
+await check('speeds are ordered slowest-to-fastest on every delay the slider controls', () => {
   const keys = ['aiStepMs', 'turnHandoffMs', 'recapAdvanceMs', 'spotlightMs'];
   for (const key of keys) {
     for (let i = 1; i < PLAY_SPEEDS.length; i++) {
@@ -446,7 +448,7 @@ check('speeds are ordered slowest-to-fastest on every delay the slider controls'
   }
 });
 
-check('the default sits mid-slider, one notch slower than the old pace', () => {
+await check('the default sits mid-slider, one notch slower than the old pace', () => {
   const index = playSpeedIndex(DEFAULT_PLAY_SPEED_ID);
   assert.ok(index > 0 && index < PLAY_SPEEDS.length - 1, 'the default must leave notches in both directions');
   // 'brisk' is documented as "closest to how the game used to play"; the
@@ -454,12 +456,12 @@ check('the default sits mid-slider, one notch slower than the old pace', () => {
   assert.ok(index < playSpeedIndex('brisk'), 'the default should be slower than the old pace');
 });
 
-check('an unknown or corrupt speed id falls back to the default', () => {
+await check('an unknown or corrupt speed id falls back to the default', () => {
   assert.equal(getPlaySpeedConfig('nonsense').id, DEFAULT_PLAY_SPEED_ID);
   assert.equal(getPlaySpeedConfig(undefined).id, DEFAULT_PLAY_SPEED_ID);
 });
 
-check('runAiStep takes exactly one action per call and reports when it is done', () => {
+await check('runAiStep takes exactly one action per call and reports when it is done', () => {
   let s = createNewGame({ type: 'solo', aiCount: 1 }, ['Tester']);
   const botId = s.players[1].id;
   s = { ...s, players: s.players.map((p) => (p.id === botId ? { ...p, cash: 4000, skillTokens: 3 } : p)) };
@@ -480,7 +482,7 @@ check('runAiStep takes exactly one action per call and reports when it is done',
   assert.equal(logEntries, steps, 'every action must produce exactly one log entry to watch');
 });
 
-check('stepping a robot turn reaches the same kind of end state as running it whole', () => {
+await check('stepping a robot turn reaches the same kind of end state as running it whole', () => {
   // Not asserting identical outcomes — both paths consume the shared RNG, so
   // the actual choices legitimately differ. What must hold is that the
   // stepped path terminates on its own and spends money like the whole-turn
@@ -513,7 +515,7 @@ check('stepping a robot turn reaches the same kind of end state as running it wh
   assert.ok(stepped.aiTurnSteps > 0 && stepped.aiTurnSteps <= aiMaxSteps(botOf(stepped)));
 });
 
-check('ending a turn clears the stepped-turn bookkeeping for the next player', () => {
+await check('ending a turn clears the stepped-turn bookkeeping for the next player', () => {
   let s = createNewGame({ type: 'solo', aiCount: 1 }, ['Tester']);
   s = { ...s, activePlayerIndex: 1, aiTurnSteps: 5, aiTurnDone: true };
   const after = gameReducer(s, { type: 'END_TURN', playerId: s.players[1].id });
@@ -521,12 +523,12 @@ check('ending a turn clears the stepped-turn bookkeeping for the next player', (
   assert.equal(after.aiTurnDone, false);
 });
 
-check('RUN_AI_STEP is a no-op on a human seat', () => {
+await check('RUN_AI_STEP is a no-op on a human seat', () => {
   const s = createNewGame({ type: 'solo', aiCount: 1 }, ['Tester']);
   assert.equal(gameReducer(s, { type: 'RUN_AI_STEP', playerId: 'p1' }), s);
 });
 
-check('Quick Play always rolls a valid, playable setup', () => {
+await check('Quick Play always rolls a valid, playable setup', () => {
   const scenarioIds = new Set(SCENARIOS.map((x) => x.id));
   const difficultyIds = new Set(DIFFICULTIES.map((x) => x.id));
   const seenScenarios = new Set();
@@ -549,7 +551,7 @@ check('Quick Play always rolls a valid, playable setup', () => {
   assert.equal(seenDifficulties.size, DIFFICULTIES.length, 'every difficulty should be reachable from Quick Play');
 });
 
-check('a Quick Play setup actually starts a game', () => {
+await check('a Quick Play setup actually starts a game', () => {
   const setup = rollQuickPlaySetup({ playerName: '  Michael  ', avatar: '🐼' });
   const started = gameReducer(null, {
     type: 'START_GAME',
@@ -606,7 +608,7 @@ function testPlayer(overrides = {}) {
 const PRICES = { piggy: 50, lemonade: 75, treehouse: 250, treasure: 100 };
 const cardById = (id) => [...OPPORTUNITY_DECK, ...SETBACK_DECK].find((c) => c.id === id);
 
-check('no card hands out flat cash for an asset the player does not own', () => {
+await check('no card hands out flat cash for an asset the player does not own', () => {
   // The specific bug: "Tree House Tourists, +$50" used to pay somebody who
   // had never bought a Tree House. Any card whose effects mention an asset
   // must express that through an ownership-scaled effect, not flat cash.
@@ -623,7 +625,7 @@ check('no card hands out flat cash for an asset the player does not own', () => 
   }
 });
 
-check('an asset card pays a holder, and explains itself to a non-holder', () => {
+await check('an asset card pays a holder, and explains itself to a non-holder', () => {
   const card = cardById('season-lease'); // per-unit Tree House payout
   const holder = testPlayer({ holdings: { piggy: 0, lemonade: 0, treehouse: 2, treasure: 0 } });
   const paid = applyCardEffect(holder, PRICES, card, 4);
@@ -637,7 +639,7 @@ check('an asset card pays a holder, and explains itself to a non-holder', () => 
   assert.notEqual(skipped.description.trim(), '', 'the log line must never be blank');
 });
 
-check('a bank failure takes actual units, never below zero, never from a non-saver', () => {
+await check('a bank failure takes actual units, never below zero, never from a non-saver', () => {
   const card = cardById('bank-fails');
   const saver = testPlayer({ holdings: { piggy: 20, lemonade: 0, treehouse: 0, treasure: 0 } });
   const hit = applyCardEffect(saver, PRICES, card, 4);
@@ -655,7 +657,7 @@ check('a bank failure takes actual units, never below zero, never from a non-sav
   assert.match(missed.description, /no effect/i);
 });
 
-check('a partnership split halves one business permanently, floored', () => {
+await check('a partnership split halves one business permanently, floored', () => {
   const card = cardById('partner-fallout');
   const owner = testPlayer({
     businesses: [
@@ -676,7 +678,7 @@ check('a partnership split halves one business permanently, floored', () => {
   assert.match(noBusiness.description, /no effect/i);
 });
 
-check('equipment failure zeroes business income for exactly one payday', () => {
+await check('equipment failure zeroes business income for exactly one payday', () => {
   const card = cardById('equipment-failure');
   const owner = testPlayer({ businesses: [{ id: 'b1', name: 'Co', income: 100 }] });
   // The card resolves during month 5's month-end, AFTER month 5's payday and
@@ -696,7 +698,7 @@ check('equipment failure zeroes business income for exactly one payday', () => {
   assert.equal(resumed.businessIncome, 100);
 });
 
-check('allowance modifiers stack and expire', () => {
+await check('allowance modifiers stack and expire', () => {
   const card = cardById('route-lost'); // -50% for 2 months
   const p = applyCardEffect(testPlayer(), PRICES, card, 3).player;
   assert.equal(allowanceModifierPercent(p, 4), -50);
@@ -707,7 +709,7 @@ check('allowance modifiers stack and expire', () => {
   assert.equal(allowanceModifierPercent(doubled, 4), -100, 'two overlapping modifiers stack');
 });
 
-check('a full month-end applies allowance and pause shocks to real cash', () => {
+await check('a full month-end applies allowance and pause shocks to real cash', () => {
   let s = createNewGame({ type: 'solo', aiCount: 1 }, ['Tester']);
   const allowance = s.monthlyAllowance;
   const month = s.month;
@@ -738,7 +740,7 @@ check('a full month-end applies allowance and pause shocks to real cash', () => 
   assert.equal(me.allowanceMods.length, 0, 'the expired modifier is pruned after payday');
 });
 
-check('weather now moves business revenue, scaled by the chosen severity', () => {
+await check('weather now moves business revenue, scaled by the chosen severity', () => {
   const storm = { stageId: 'stormyBust', monthsLeft: 2 };
   const gentle = rollMonthlyIncomeAmounts(storm, 'gentle');
   const severe = rollMonthlyIncomeAmounts(storm, 'severe');
@@ -761,7 +763,7 @@ check('weather now moves business revenue, scaled by the chosen severity', () =>
   assert.equal(passiveIncomeBreakdown(owner, context).businessIncome, 100);
 });
 
-check('severity scales price moves without ever flipping their direction', () => {
+await check('severity scales price moves without ever flipping their direction', () => {
   for (const stageId of Object.keys(WEATHER_STAGES)) {
     const drift = WEATHER_STAGES[stageId].marketDrift;
     for (const severity of WEATHER_SEVERITIES) {
@@ -782,7 +784,7 @@ check('severity scales price moves without ever flipping their direction', () =>
   assert.ok(severeTotal < gentleTotal, 'severe storms must drag prices down harder on average');
 });
 
-check('lemonade income is skewed low but can still surge', () => {
+await check('lemonade income is skewed low but can still surge', () => {
   const sunny = { stageId: 'sunnyBoom', monthsLeft: 2 };
   const [min, max] = ASSETS.find((a) => a.id === 'lemonade').weatherIncomeRange.sunnyBoom;
   const rolls = [];
@@ -797,7 +799,7 @@ check('lemonade income is skewed low but can still surge', () => {
   assert.ok(mean < 21, `still too generous: mean ${mean.toFixed(1)}`);
 });
 
-check('buyout offers ignore temporary marketing boosts', () => {
+await check('buyout offers ignore temporary marketing boosts', () => {
   // A business with a big live campaign must be valued the same as one
   // without — otherwise a campaign bought the turn before an offer inflates
   // the payout by twelve times the multiplier.
@@ -822,7 +824,7 @@ check('buyout offers ignore temporary marketing boosts', () => {
   assert.ok(sawOffer, 'no offer fired in 300 seeded attempts');
 });
 
-check('repeated trades collapse into one growing log line', () => {
+await check('repeated trades collapse into one growing log line', () => {
   let s = createNewGame({ type: 'solo', aiCount: 1 }, ['Tester']);
   s = { ...s, players: s.players.map((p, i) => (i === 0 ? { ...p, cash: 100000 } : p)) };
   const before = s.log.length;
@@ -848,7 +850,7 @@ check('repeated trades collapse into one growing log line', () => {
   assert.equal(otherSeat.log.length, s.log.length + 1);
 });
 
-check('the turn timer only runs for the seat on the clock', () => {
+await check('the turn timer only runs for the seat on the clock', () => {
   let s = createNewGame({ type: 'hotseat', humanCount: 2 }, ['A', 'B'], undefined, [], undefined, [], {
     turnTimer: true,
   });
@@ -873,7 +875,7 @@ check('the turn timer only runs for the seat on the clock', () => {
   assert.equal(extended.players[0].turnExtensionsLeft, TURN_EXTENSIONS_PER_PLAYER - 1);
 });
 
-check('extensions run out after the allowance, per player', () => {
+await check('extensions run out after the allowance, per player', () => {
   let s = createNewGame({ type: 'hotseat', humanCount: 2 }, ['A', 'B'], undefined, [], undefined, [], {
     turnTimer: true,
   });
@@ -888,7 +890,7 @@ check('extensions run out after the allowance, per player', () => {
   assert.equal(denied.players[1].turnExtensionsLeft, TURN_EXTENSIONS_PER_PLAYER);
 });
 
-check('ending a turn clears the clock for the next seat', () => {
+await check('ending a turn clears the clock for the next seat', () => {
   let s = createNewGame({ type: 'hotseat', humanCount: 2 }, ['A', 'B'], undefined, [], undefined, [], {
     turnTimer: true,
   });
@@ -898,7 +900,7 @@ check('ending a turn clears the clock for the next seat', () => {
   assert.equal(after.activePlayerIndex, 1);
 });
 
-check('a table seats up to MAX_PLAYERS in either mode', () => {
+await check('a table seats up to MAX_PLAYERS in either mode', () => {
   const hotseat = createNewGame({ type: 'hotseat', humanCount: MAX_PLAYERS }, ['A', 'B', 'C', 'D']);
   assert.equal(hotseat.players.length, MAX_PLAYERS);
   assert.equal(new Set(hotseat.players.map((p) => p.id)).size, MAX_PLAYERS);
@@ -910,7 +912,7 @@ check('a table seats up to MAX_PLAYERS in either mode', () => {
   for (const p of solo.players) assert.equal(p.turnExtensionsLeft, TURN_EXTENSIONS_PER_PLAYER);
 });
 
-check('END_TURN is idempotent and ignores a stale seat', () => {
+await check('END_TURN is idempotent and ignores a stale seat', () => {
   // A repeated dispatch — a double-click, or duplicate delivery once actions
   // are broadcast — used to run month-end twice: two paydays, two card
   // rounds, the calendar jumping two months.
@@ -926,7 +928,7 @@ check('END_TURN is idempotent and ignores a stale seat', () => {
   assert.equal(stale.activePlayerIndex, s.activePlayerIndex, 'an unknown seat must not reset the turn order');
 });
 
-check('a save from an older build loads and survives a month-end', () => {
+await check('a save from an older build loads and survives a month-end', () => {
   // The exact shape that used to crash: no netWorthHistory, no badgeEvents,
   // no soldBusinesses, no ledger, and a business with no marketingCount.
   const legacy = {
@@ -968,7 +970,7 @@ check('a save from an older build loads and survives a month-end', () => {
   assert.ok(resolved.state.players[0].netWorthHistory.length > 0, 'month-end completed and recorded history');
 });
 
-check('a legacy business does not get free campaigns back after pruning', () => {
+await check('a legacy business does not get free campaigns back after pruning', () => {
   const legacy = normalizeState({
     status: 'playing',
     month: 1,
@@ -1004,7 +1006,7 @@ check('a legacy business does not get free campaigns back after pruning', () => 
 
 const { reactToLogEntries } = await import('../src/game/chatEngine.js');
 
-check('bot chat does not repeat a line within the cooldown window', () => {
+await check('bot chat does not repeat a line within the cooldown window', () => {
   let s = createNewGame({ type: 'solo', aiCount: 2 }, ['Tester']);
   // Drive a long run of the same kind of event and collect what was said.
   const said = [];
@@ -1028,7 +1030,7 @@ check('bot chat does not repeat a line within the cooldown window', () => {
   assert.equal(violations, 0, `${violations} lines repeated inside the 6-turn cooldown`);
 });
 
-check('chat is generated from the seeded stream, not Math.random', () => {
+await check('chat is generated from the seeded stream, not Math.random', () => {
   // Strip comments first — the file explains at length WHY it doesn't use
   // Math.random, and that explanation shouldn't fail its own test.
   const source = readFileSync(new URL('../src/game/chatEngine.js', import.meta.url), 'utf8')
@@ -1052,7 +1054,7 @@ function fundedGame(cash = 100000) {
   return { ...s, players: s.players.map((p, i) => (i === 0 ? { ...p, cash } : p)) };
 }
 
-check('selling something bought this turn returns 10% less', () => {
+await check('selling something bought this turn returns 10% less', () => {
   let s = fundedGame();
   const price = s.assetPrices.piggy;
   const cashBefore = s.players[0].cash;
@@ -1069,7 +1071,7 @@ check('selling something bought this turn returns 10% less', () => {
   assert.match(sold.logEntry.message, /resale fee/);
 });
 
-check('units held since an earlier turn sell at full price', () => {
+await check('units held since an earlier turn sell at full price', () => {
   let s = fundedGame();
   const price = s.assetPrices.piggy;
   s = buyAsset(s, 'p1', 'piggy', 5).state;
@@ -1083,7 +1085,7 @@ check('units held since an earlier turn sell at full price', () => {
   assert.ok(!/resale fee/.test(sold.logEntry.message));
 });
 
-check('a mixed sale penalises only the units bought this turn', () => {
+await check('a mixed sale penalises only the units bought this turn', () => {
   let s = fundedGame();
   const price = s.assetPrices.piggy;
   s = buyAsset(s, 'p1', 'piggy', 6).state; // held from earlier
@@ -1097,7 +1099,7 @@ check('a mixed sale penalises only the units bought this turn', () => {
   assert.equal(back, expected);
 });
 
-check('the same units cannot be penalised twice', () => {
+await check('the same units cannot be penalised twice', () => {
   let s = fundedGame();
   const price = s.assetPrices.piggy;
   s = buyAsset(s, 'p1', 'piggy', 2).state;
@@ -1112,7 +1114,7 @@ check('the same units cannot be penalised twice', () => {
   assert.equal(net, -Math.round(price * SAME_TURN_SELL_PENALTY), 'exactly one unit of penalty, not two');
 });
 
-check('every asset has a varied sound pool, and the rare ones stay rare', () => {
+await check('every asset has a varied sound pool, and the rare ones stay rare', () => {
   for (const asset of ASSETS) {
     for (const prefix of ['buy_', 'sell_']) {
       const entry = SOUNDS[`${prefix}${asset.id}`];
@@ -1135,6 +1137,154 @@ check('every asset has a varied sound pool, and the rare ones stay rare', () => 
   // Punchy means SHORT — this fires on every repeat of a press-and-hold.
   const longest = Math.max(...SOUNDS.buttonPress.map((n) => n.start + n.duration));
   assert.ok(longest <= 0.12, `the button press is too long to repeat (${longest}s)`);
+});
+
+// --- 9. Music: the blocked-autoplay regression, and the level ramp ---------
+console.log('\nMusic levels and blocked autoplay');
+
+// musicEngine talks to the DOM, so it gets a small stand-in installed BEFORE
+// it's imported. The stubs model the one browser behaviour that actually
+// matters here: the first play() is refused until the page has seen a user
+// gesture. That refusal is what the regression hid behind.
+function installAudioStubs() {
+  let gestureHappened = false;
+  const listeners = new Map();
+  const gainNodes = [];
+
+  class FakeGain {
+    constructor() {
+      this.gain = { value: 0 };
+      gainNodes.push(this);
+    }
+    connect() {}
+  }
+  class FakeAudioContext {
+    constructor() {
+      this.state = 'running';
+      this.destination = {};
+    }
+    createMediaElementSource() {
+      return { connect() {} };
+    }
+    createGain() {
+      return new FakeGain();
+    }
+    resume() {
+      this.state = 'running';
+      return Promise.resolve();
+    }
+  }
+  class FakeAudio {
+    constructor() {
+      this.paused = true;
+      this.src = '';
+      this.currentTime = 0;
+      this.volume = 1;
+      this.loop = false;
+      this.preload = '';
+    }
+    play() {
+      if (!gestureHappened) return Promise.reject(new Error('NotAllowedError'));
+      this.paused = false;
+      return Promise.resolve();
+    }
+    pause() {
+      this.paused = true;
+    }
+  }
+
+  globalThis.Audio = FakeAudio;
+  globalThis.window = { AudioContext: FakeAudioContext };
+  globalThis.document = {
+    addEventListener: (type, fn) => listeners.set(type, fn),
+    removeEventListener: (type) => listeners.delete(type),
+  };
+
+  return {
+    gainNodes,
+    /** Simulate the first click on the page — the moment autoplay unblocks. */
+    fireGesture() {
+      gestureHappened = true;
+      const fn = listeners.get('pointerdown');
+      if (fn) fn();
+    },
+    musicGain: () => gainNodes[0],
+  };
+}
+
+const dom = installAudioStubs();
+const music = await import('../src/audio/musicEngine.js');
+// A track SWAP is two fades back to back (out, then in), so the settle has
+// to cover both or a reading lands mid-ramp. FADE_MS is 500.
+const settleFade = () => new Promise((resolve) => setTimeout(resolve, 1300));
+
+await check('the level table ducks and lifts, and rejects an unknown level', () => {
+  assert.ok(music.MUSIC_LEVELS.midLow < music.MUSIC_LEVELS.medium, 'midLow must be quieter than medium');
+  assert.ok(music.MUSIC_LEVELS.midLow > 0, 'ducked is not the same as silent');
+  music.setMusicLevel('midLow');
+  assert.equal(music.getMusicLevel(), 'midLow');
+  music.setMusicLevel('nonsense');
+  assert.equal(music.getMusicLevel(), 'midLow', 'an unknown level must be ignored, not applied');
+  music.setMusicLevel('medium');
+});
+
+await check('music blocked by autoplay comes back AUDIBLE, not silent', async () => {
+  // THE REGRESSION: playMusicTrack drops the output to 0 before calling
+  // play() and only restores it in play()'s own .then(). When the browser
+  // refuses that first play — which it always does before the page has seen
+  // a gesture, i.e. for the opening theme on the very first screen — the
+  // retry restored playback but never the volume. The track then played
+  // perfectly, and completely silently, for the rest of the session.
+  music.setMusicLevel('medium');
+  music.playMusicTrack('theme');
+  await settleFade();
+  assert.equal(dom.musicGain().gain.value, 0, 'blocked before a gesture, so nothing should be audible yet');
+
+  dom.fireGesture();
+  await settleFade();
+  assert.ok(dom.musicGain().gain.value > 0, 'after the first gesture the music must actually be audible');
+});
+
+await check('the level ramp: medium on the theme, ducked in play, medium at the end', async () => {
+  music.setMusicLevel('medium');
+  music.playMusicTrack('theme');
+  await settleFade();
+  const intro = dom.musicGain().gain.value;
+
+  // Month 1 on the board — still medium, but the in-game track is quieter
+  // than the theme by design.
+  music.playMusicTrack('background');
+  await settleFade();
+  const firstMonth = dom.musicGain().gain.value;
+
+  // Month 2 onward.
+  music.setMusicLevel('midLow');
+  await settleFade();
+  const laterMonths = dom.musicGain().gain.value;
+
+  // Game over.
+  music.setMusicLevel('medium');
+  music.playMusicTrack('theme');
+  await settleFade();
+  const gameOver = dom.musicGain().gain.value;
+
+  assert.ok(intro > 0, 'the intro must be audible');
+  assert.ok(laterMonths < firstMonth, 'the music must duck after the first month');
+  assert.ok(laterMonths > 0, 'ducked, not muted');
+  assert.ok(gameOver > laterMonths, 'and come back up at the end');
+  assert.ok(Math.abs(gameOver - intro) < 0.001, 'the end should match the opening level');
+});
+
+await check('a muted player stays muted at every level', async () => {
+  music.setMusicMuted(true);
+  music.setMusicLevel('medium');
+  music.playMusicTrack('background');
+  await settleFade();
+  assert.equal(dom.musicGain().gain.value, 0, 'mute must beat the level');
+  music.setMusicLevel('midLow');
+  await settleFade();
+  assert.equal(dom.musicGain().gain.value, 0);
+  music.setMusicMuted(false);
 });
 
 console.log(`\nAll ${passed} checks passed.\n`);

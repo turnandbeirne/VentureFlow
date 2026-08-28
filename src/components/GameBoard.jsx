@@ -1,12 +1,10 @@
 import { useEffect, useState } from 'react';
 import '../styles/game.css';
-import { getDifficulty, ASSETS } from '../data/gameConfig';
+import { getDifficulty } from '../data/gameConfig';
 import { usePlaySpeed } from '../hooks/usePlaySpeed';
-import { useTeachMode } from '../hooks/useTeachMode';
 import { turnOrdinal, currentTurnTally } from '../game/turnClock';
-import { totalUnitsOwned } from '../game/players';
 import { playSound } from '../audio/soundEngine';
-import { playMusicTrack } from '../audio/musicEngine';
+import { playMusicTrack, setMusicLevel } from '../audio/musicEngine';
 import WeatherBadge from './WeatherBadge';
 import WeatherCard from './WeatherCard';
 import MonthProgress from './MonthProgress';
@@ -25,13 +23,9 @@ import RulebookModal from './RulebookModal';
 import SpeedControl from './SpeedControl';
 import TurnTimer from './TurnTimer';
 import StartupLaunchModal from './StartupLaunchModal';
-import StartBusinessModal from './StartBusinessModal';
 import PlayerDetailModal from './PlayerDetailModal';
-import StatsHUD from './StatsHUD';
-import AssetHistoryModal from './AssetHistoryModal';
-import GameEndingRecap from './GameEndingRecap';
 
-export default function GameBoard({ game, readOnly = false, onExitReadOnly }) {
+export default function GameBoard({ game }) {
   const { state } = game;
   const {
     players,
@@ -50,29 +44,15 @@ export default function GameBoard({ game, readOnly = false, onExitReadOnly }) {
   // Read live so a mid-game change to the slider takes effect on the very
   // next beat — including the robot-recap auto-advance below.
   const { speed } = usePlaySpeed();
-  const { teachMode, toggle: toggleTeachMode } = useTeachMode();
   const [showLeaderboard, setShowLeaderboard] = useState(false);
   const [showRulebook, setShowRulebook] = useState(false);
   const [selectedPlayerId, setSelectedPlayerId] = useState(null);
-  // Which asset (if any) has its price/cashflow history chart open — see
-  // AssetHistoryModal.jsx, opened from a "📊 History" button on each
-  // AssetShop card.
-  const [selectedAssetId, setSelectedAssetId] = useState(null);
-  // Naming step between tapping "Start Business" and the launch
-  // celebration — see StartBusinessModal.jsx.
-  const [showStartBusiness, setShowStartBusiness] = useState(false);
   const activePlayer = players[activePlayerIndex];
   // What the active player has bought during THIS turn — the shop uses it to
   // warn that selling those units back carries the same-turn resale fee,
   // rather than letting the player discover it from the receipt. Declared
   // after `activePlayer`, which it reads.
   const sameTurnBuys = currentTurnTally(activePlayer?.turnBuys, turnOrdinal(state));
-  // "You," for the persistent stats strip below: the active player when
-  // it's a human's turn (so hotseat pass-and-play always shows whoever's
-  // actually holding the device), otherwise the first human in the roster
-  // (so solo mode still shows YOUR numbers while a robot plays, instead of
-  // the robot's) — see StatsHUD.jsx.
-  const hudPlayer = activePlayer?.type === 'human' ? activePlayer : players.find((p) => p.type === 'human') || null;
 
   // The soft instrumental plays for the whole time the board is up —
   // through every month, every turn, fortune-card recaps included — since
@@ -81,9 +61,20 @@ export default function GameBoard({ game, readOnly = false, onExitReadOnly }) {
   useEffect(() => {
     playMusicTrack('background');
   }, []);
+
+  // Month 1 is still setup-ish — you're reading the board, learning the
+  // shop, and the music can carry it. From month 2 on you're actually
+  // playing, so it steps back to a mid-low level and stays there for the
+  // rest of the game; the game-over screen brings it back up. Written as a
+  // plain derived call rather than a one-shot: setMusicLevel is a no-op when
+  // the level is already right, so re-running it on every month change (or
+  // any other re-render) costs nothing and keeps the level correct even for
+  // a game resumed from a save mid-way through.
+  useEffect(() => {
+    setMusicLevel(month <= 1 ? 'medium' : 'midLow');
+  }, [month]);
   const selectedPlayer = selectedPlayerId ? players.find((p) => p.id === selectedPlayerId) : null;
-  const selectedAsset = selectedAssetId ? ASSETS.find((a) => a.id === selectedAssetId) : null;
-  const isHumanTurn = !readOnly && status === 'playing' && activePlayer?.type === 'human';
+  const isHumanTurn = status === 'playing' && activePlayer?.type === 'human';
   const currentFortuneEntry = status === 'monthRecap' ? state.fortuneRecap[state.fortuneRecapIndex] : null;
   const currentFortunePlayer = currentFortuneEntry
     ? players.find((p) => p.id === currentFortuneEntry.playerId)
@@ -120,17 +111,6 @@ export default function GameBoard({ game, readOnly = false, onExitReadOnly }) {
     <div className="vf-page">
       <div className="vf-board-layout">
         <div className="vf-card vf-board">
-          <StatsHUD
-            player={hudPlayer}
-            prices={assetPrices}
-            allPlayers={players}
-            month={month}
-            weatherIncomeAmounts={weatherIncomeAmounts}
-            onOpenPortfolio={(playerId) => {
-              setSelectedPlayerId(playerId);
-            }}
-          />
-
           <div className="vf-header">
             <Brand size="sm" align="left" />
             <div className="vf-header__right">
@@ -151,27 +131,6 @@ export default function GameBoard({ game, readOnly = false, onExitReadOnly }) {
                 onExtend={() => game.extendTurn(activePlayer.id)}
                 onExpire={() => game.endTurn(activePlayer.id)}
               />
-              {/* Toggles the on-demand ❓ lesson tooltips scattered across
-                  the board (asset cards, weather, fortune cards, business
-                  actions/upgrades — see LessonTip.jsx). A device-level
-                  preference (hooks/useTeachMode.js), not part of the game
-                  itself, so it can be flipped on or off mid-game and stays
-                  set for next time. */}
-              <button
-                type="button"
-                className={`vf-btn vf-btn--sm ${teachMode ? 'vf-btn--go' : 'vf-btn--ghost'}`}
-                title={
-                  teachMode
-                    ? 'Teach Me mode is ON — tap Teach Me to hide the ❓ lesson tips'
-                    : 'Turn on Teach Me mode for ❓ lesson tips on cards, weather, and more'
-                }
-                onClick={() => {
-                  playSound('click');
-                  toggleTeachMode();
-                }}
-              >
-                🎓 Teach Me
-              </button>
               <button
                 type="button"
                 className="vf-btn vf-btn--sm vf-btn--ghost"
@@ -201,29 +160,16 @@ export default function GameBoard({ game, readOnly = false, onExitReadOnly }) {
                 {difficulty.icon} {difficulty.name}
               </span>
               <WeatherBadge weather={weather} />
-              {readOnly ? (
-                <button
-                  type="button"
-                  className="vf-btn vf-btn--sm vf-btn--ghost"
-                  onClick={() => {
-                    playSound('click');
-                    onExitReadOnly?.();
-                  }}
-                >
-                  ← Back to Recap
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  className="vf-btn vf-btn--sm vf-btn--ghost"
-                  onClick={() => {
-                    playSound('click');
-                    game.newGame();
-                  }}
-                >
-                  New Game
-                </button>
-              )}
+              <button
+                type="button"
+                className="vf-btn vf-btn--sm vf-btn--ghost"
+                onClick={() => {
+                  playSound('click');
+                  game.newGame();
+                }}
+              >
+                New Game
+              </button>
             </div>
           </div>
 
@@ -243,36 +189,15 @@ export default function GameBoard({ game, readOnly = false, onExitReadOnly }) {
           />
 
           <div className={`vf-turn-banner ${isHumanTurn ? '' : 'vf-turn-banner--ai'}`}>
-            <span className="vf-turn-banner__text">
-              {readOnly
-                ? '🏁 Final game board — here\'s how everything ended up'
-                : status === 'gameEnding'
-                ? '🏁 That\'s a wrap! Browse the recap, then head to the leaderboard.'
-                : status === 'exitOffer'
-                ? `💼 ${exitOfferPlayer?.name || 'Someone'} has a buyout offer to decide on...`
-                : status === 'monthRecap'
-                ? '📬 Reading this month\'s fortune cards...'
-                : isHumanTurn
-                ? `${activePlayer.avatar} ${
-                    activePlayer.name.toLowerCase() === 'you' ? 'Your' : `${activePlayer.name}'s`
-                  } turn — what will you do?`
-                : `🤖 ${activePlayer?.name} is thinking...`}
-            </span>
-            {/* A second "Done!" button, mirroring ActionBar's, so a human
-                who's ready to pass can end their turn from up here without
-                scrolling past the shop first — see ActionBar.jsx for the
-                original at the bottom of the board, which stays in place
-                for anyone who scrolls down anyway. Same enable condition,
-                same handler; this is a duplicate control, not a new one. */}
-            {isHumanTurn && (
-              <button
-                type="button"
-                className="vf-btn vf-btn--primary vf-btn--sm vf-turn-banner__end-btn"
-                onClick={() => game.endTurn(activePlayer.id)}
-              >
-                Done! Roll the weather 🎲
-              </button>
-            )}
+            {status === 'exitOffer'
+              ? `💼 ${exitOfferPlayer?.name || 'Someone'} has a buyout offer to decide on...`
+              : status === 'monthRecap'
+              ? '📬 Reading this month\'s fortune cards...'
+              : isHumanTurn
+              ? `${activePlayer.avatar} ${
+                  activePlayer.name.toLowerCase() === 'you' ? 'Your' : `${activePlayer.name}'s`
+                } turn — what will you do?`
+              : `🤖 ${activePlayer?.name} is thinking...`}
           </div>
 
           <AssetShop
@@ -286,36 +211,29 @@ export default function GameBoard({ game, readOnly = false, onExitReadOnly }) {
             disabled={!isHumanTurn}
             onBuy={(assetId) => game.buyAsset(activePlayer.id, assetId, 1)}
             onSell={(assetId) => game.sellAsset(activePlayer.id, assetId, 1)}
-            onViewHistory={(assetId) => setSelectedAssetId(assetId)}
           />
 
           <ActionBar
             player={activePlayer}
             disabled={!isHumanTurn}
-            onStartBusiness={() => {
-              playSound('click');
-              setShowStartBusiness(true);
-            }}
+            onStartBusiness={() => game.startBusiness(activePlayer.id)}
             onLearnSkill={() => game.learnSkill(activePlayer.id)}
             onDone={() => game.endTurn(activePlayer.id)}
           />
         </div>
 
-        {/* Sidebar: weather detail, the event log, and chat all stay in view
+        {/* Sidebar: weather detail, chat, and the event log all stay in view
             at once on wider screens (sticky) instead of requiring scrolling
             past the board below them — falls back to stacking under the
-            board on narrow screens, see game.css's .vf-board-layout.
-            EventLog sits above ChatPanel: what actually happened this
-            month is the thing you want to catch up on first, with the
-            robots' in-character banter as a lower-priority feed below it. */}
+            board on narrow screens, see game.css's .vf-board-layout. */}
         <div className="vf-board-sidebar">
           <WeatherCard
             weather={weather}
             weatherIncomeAmounts={weatherIncomeAmounts}
             weatherSeverityId={state.weatherSeverityId}
           />
-          <EventLog log={log} />
           <ChatPanel chat={chat} players={players} onSendChat={game.sendChat} />
+          <EventLog log={log} />
         </div>
       </div>
 
@@ -350,21 +268,6 @@ export default function GameBoard({ game, readOnly = false, onExitReadOnly }) {
         <StartupLaunchModal launch={state.pendingLaunch} onContinue={game.ackStartupLaunch} />
       )}
 
-      {/* Naming step, opened by ActionBar's Start Business button, above —
-          confirming here is what actually dispatches START_BUSINESS; the
-          launch celebration modal above then picks up from the resulting
-          state.pendingLaunch. */}
-      {showStartBusiness && activePlayer && (
-        <StartBusinessModal
-          existingNames={activePlayer.businesses.map((b) => b.name)}
-          onConfirm={(name) => {
-            game.startBusiness(activePlayer.id, name);
-            setShowStartBusiness(false);
-          }}
-          onCancel={() => setShowStartBusiness(false)}
-        />
-      )}
-
       {selectedPlayer && (
         <PlayerDetailModal
           player={selectedPlayer}
@@ -379,32 +282,6 @@ export default function GameBoard({ game, readOnly = false, onExitReadOnly }) {
           canUpgrade={isHumanTurn && selectedPlayer.id === activePlayer?.id}
           onUpgradeBusiness={(playerId, businessId, trackId) => game.upgradeBusiness(playerId, businessId, trackId)}
           onClose={() => setSelectedPlayerId(null)}
-        />
-      )}
-
-      {selectedAsset && (
-        <AssetHistoryModal
-          asset={selectedAsset}
-          history={state.assetHistory?.[selectedAsset.id]}
-          currentMonth={month}
-          currentPrice={assetPrices[selectedAsset.id]}
-          totalOwned={totalUnitsOwned(players, selectedAsset.id)}
-          weatherIncomeAmounts={weatherIncomeAmounts}
-          onClose={() => setSelectedAssetId(null)}
-        />
-      )}
-
-      {/* The full end-of-game recap — every fortune card each player drew
-          all game, plus clickable per-player net worth / passive cash flow
-          / earnings timelines. See turnEngine.js's acknowledgeFortuneCard
-          (sets this status instead of jumping straight to 'gameover') and
-          finalizeGameOver (what "Continue to Leaderboard" dispatches). No
-          auto-advance — this is meant to be browsed, not raced through. */}
-      {status === 'gameEnding' && (
-        <GameEndingRecap
-          players={players}
-          defaultPlayerId={hudPlayer?.id}
-          onContinue={() => game.finalizeGameOver()}
         />
       )}
 

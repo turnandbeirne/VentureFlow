@@ -1,6 +1,5 @@
 import { useCallback, useState } from 'react';
 import { ASSETS, BUSINESS_UPGRADE_TRACKS, WEATHER_STAGES, getAssetIncomeRange, getBotPersonality, getSkillLevel } from '../data/gameConfig';
-import LessonTip from './LessonTip';
 import {
   assetValue,
   businessValue,
@@ -102,7 +101,6 @@ function BusinessUpgrades({ business, month, cash, canUpgrade, onUpgrade }) {
         <span className="vf-biz-upgrades__chip">
           🔬 R&D {business.rndCount || 0}/2{pendingRnd > 0 && ` (${pendingRnd} pending)`}
         </span>
-        <LessonTip conceptId="reinvestment" />
       </div>
       {canUpgrade && (
         <>

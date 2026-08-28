@@ -8,7 +8,7 @@
 // ============================================================================
 import { createNewGame } from './newGame';
 import { buyAsset, sellAsset, startBusiness, learnSkill, upgradeBusiness } from './actions';
-import { endTurn, acknowledgeFortuneCard, resolveExitOfferDecision, finalizeGameOver } from './turnEngine';
+import { endTurn, acknowledgeFortuneCard, resolveExitOfferDecision } from './turnEngine';
 import { runAiTurn, runAiStep, aiMaxSteps } from './aiEngine';
 import {
   reactToLogEntries,
@@ -199,7 +199,7 @@ export function gameReducer(state, action) {
       return withResult(sellAsset(state, action.playerId, action.assetId, action.qty));
 
     case 'START_BUSINESS': {
-      const result = startBusiness(state, action.playerId, action.name);
+      const result = startBusiness(state, action.playerId);
       const next = withResult(result);
       if (!result.ok) return next;
       // A HUMAN player's new business gets a launch celebration (see
@@ -314,13 +314,6 @@ export function gameReducer(state, action) {
       }
       return nextState;
     }
-
-    // Ends the 'gameEnding' pause and shows the actual Game Over screen —
-    // dispatched automatically a few seconds in by useGame.js, or
-    // immediately by GameBoard.jsx's "See Final Results Now" button. See
-    // turnEngine.js's finalizeGameOver.
-    case 'FINALIZE_GAME_OVER':
-      return finalizeGameOver(state);
 
     case 'SEND_CHAT': {
       // The composer (ChatPanel.jsx) already validates before dispatching,

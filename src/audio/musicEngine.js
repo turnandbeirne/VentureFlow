@@ -23,13 +23,33 @@ const STORAGE_KEY = 'ventureflow-music-v1';
 const DEFAULT_VOLUME = 0.5;
 const FADE_MS = 500;
 
-// "theme" — the opening song, played at normal (full) relative loudness on
-// the setup screen and again at game over.
-// "background" — the instrumental, played softly under actual gameplay.
+// "theme" — the opening song: the landing/setup screens and game over.
+// "background" — the instrumental, under actual gameplay.
+//
+// Each track's `gain` is its own baseline loudness relative to the others.
+// On top of that sits a LEVEL (below), which is how loud the music should be
+// for what's happening right now.
 const TRACKS = {
-  theme: { url: themeUrl, gain: 1 },
-  background: { url: backgroundUrl, gain: 0.35 },
+  theme: { url: themeUrl, gain: 0.8 },
+  background: { url: backgroundUrl, gain: 0.5 },
 };
+
+// The music is meant to be present when there's nothing to concentrate on
+// and to get out of the way once there is. Three moments, two levels:
+//
+//   landing / setup / the first month  -> 'medium'  (the song is the point)
+//   month 2 onward                     -> 'midLow'  (you're playing now)
+//   game over                          -> 'medium'  (back up for the finish)
+//
+// Applied as a multiplier on the active track's own gain, and changed with
+// the same fade as a track swap, so it slides rather than steps.
+export const MUSIC_LEVELS = {
+  medium: 1,
+  midLow: 0.45,
+};
+
+const DEFAULT_LEVEL_ID = 'medium';
+let levelId = DEFAULT_LEVEL_ID;
 
 let audio = null;
 let currentTrackId = null;
@@ -84,10 +104,34 @@ function effectiveVolume() {
   return settings.muted ? 0 : settings.volume;
 }
 
+function levelMultiplier() {
+  return MUSIC_LEVELS[levelId] ?? MUSIC_LEVELS[DEFAULT_LEVEL_ID];
+}
+
 function targetVolumeFor(trackId) {
   const track = TRACKS[trackId];
   if (!track) return 0;
-  return effectiveVolume() * track.gain;
+  return effectiveVolume() * track.gain * levelMultiplier();
+}
+
+/**
+ * Set how present the music should be right now — 'medium' or 'midLow' (see
+ * MUSIC_LEVELS). Fades to the new level rather than jumping, and is a no-op
+ * if it's already there, so a component can call this on every render
+ * without causing a stutter.
+ *
+ * Separate from the user's own volume setting, which multiplies on top: a
+ * player who has turned the music down still gets the same relative duck
+ * and lift, and a player who muted it stays muted.
+ */
+export function setMusicLevel(nextLevelId) {
+  if (!MUSIC_LEVELS[nextLevelId] || nextLevelId === levelId) return;
+  levelId = nextLevelId;
+  if (audio && currentTrackId) fadeVolumeTo(targetVolumeFor(currentTrackId));
+}
+
+export function getMusicLevel() {
+  return levelId;
 }
 
 function ensureAudio() {
@@ -190,9 +234,21 @@ function attemptResumeOnNextGesture() {
     document.removeEventListener('touchstart', retry);
     resumeContext();
     if (audio && currentTrackId) {
-      audio.play().catch(() => {
-        // Still blocked somehow — give up quietly rather than looping forever.
-      });
+      audio
+        .play()
+        .then(() => {
+          // THE POINT OF THIS LINE: swapAndPlay() drops the output to 0
+          // before calling play(), and only ramps it back up in play()'s
+          // own .then(). When the browser blocks that first play() —
+          // which it ALWAYS does before the page has seen a gesture, i.e.
+          // for the opening theme on the very first screen — we land here
+          // instead, and the volume was never restored. The track then
+          // played correctly, and completely silently, forever.
+          fadeVolumeTo(targetVolumeFor(currentTrackId));
+        })
+        .catch(() => {
+          // Still blocked somehow — give up quietly rather than looping forever.
+        });
     }
   };
   document.addEventListener('pointerdown', retry, { once: true });
@@ -216,7 +272,10 @@ export function playMusicTrack(trackId) {
 
   if (currentTrackId === trackId) {
     // Already the active track — just make sure volume matches settings
-    // (e.g. this call followed a mute/volume change) and that it's playing.
+    // (e.g. this call followed a mute/volume or level change) and that it's
+    // playing. This is also the safety net for the blocked-autoplay case
+    // above: any later call for the same track re-asserts the right volume,
+    // so a stuck-at-zero gain can't survive a screen change.
     fadeVolumeTo(targetVolumeFor(trackId));
     if (el.paused) el.play().catch(() => attemptResumeOnNextGesture());
     return;
@@ -229,7 +288,11 @@ export function playMusicTrack(trackId) {
     setOutputVolume(0);
     el.play()
       .then(() => fadeVolumeTo(targetVolumeFor(trackId)))
-      .catch(() => attemptResumeOnNextGesture());
+      .catch(() => {
+        // Blocked by the autoplay policy. The retry below restores BOTH
+        // playback and volume — see attemptResumeOnNextGesture.
+        attemptResumeOnNextGesture();
+      });
   };
 
   if (!el.paused && !el.ended) {
