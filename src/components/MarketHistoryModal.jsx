@@ -173,8 +173,15 @@ export default function MarketHistoryModal({ open, history, onClose }) {
     onClose();
   }
 
-  const enoughData = rows.length >= 2;
-  const latestMonth = rows.length ? rows[rows.length - 1].month : 1;
+  // One real month is enough to draw: the player still gets today's price,
+  // today's payout and today's yield, which is most of the value. Only a
+  // genuinely empty history has nothing to show.
+  const enoughData = rows.length >= 1;
+  const firstRecorded = rows.length ? rows[0].month : 1;
+  // A game resumed from a build that predated this feature starts recording
+  // mid-game. Saying so is the difference between a chart that looks broken
+  // and one that is honestly young.
+  const partial = firstRecorded > 1;
 
   return (
     <div className="vf-modal-overlay" onClick={handleClose}>
@@ -198,10 +205,19 @@ export default function MarketHistoryModal({ open, history, onClose }) {
 
         {!enoughData ? (
           <p className="vf-market__empty">
-            The chart fills in as months go by — finish month {latestMonth} and there&rsquo;ll be a line to read.
-            It tracks what each thing costs and what it pays you, so you can tell a bargain from a bad month.
+            Nothing recorded yet — start a game and this fills in month by month. It tracks what each thing costs
+            and what it pays you, so you can tell a bargain from a bad month.
           </p>
-        ) : showTable ? (
+        ) : (
+          <>
+            {partial && (
+              <p className="vf-market__partial">
+                📌 This game started before price tracking existed, so it begins at month {firstRecorded}. Months 1–
+                {firstRecorded - 1} weren&rsquo;t recorded and can&rsquo;t be reconstructed — a new game tracks
+                everything from month 1.
+              </p>
+            )}
+            {showTable ? (
           <div className="vf-market__tablewrap vf-scroll">
             <table className="vf-market__table">
               <thead>
@@ -242,9 +258,13 @@ export default function MarketHistoryModal({ open, history, onClose }) {
                     <span className="vf-market__panel-name">
                       {asset.icon} {asset.name}
                     </span>
-                    <span className={`vf-market__delta ${up ? 'is-up' : 'is-down'}`}>
-                      {up ? '▲' : '▼'} {Math.abs(summary.changePct).toFixed(0)}% since month 1
-                    </span>
+                    {summary.months > 1 ? (
+                      <span className={`vf-market__delta ${up ? 'is-up' : 'is-down'}`}>
+                        {up ? '▲' : '▼'} {Math.abs(summary.changePct).toFixed(0)}% since month {firstRecorded}
+                      </span>
+                    ) : (
+                      <span className="vf-market__delta vf-market__delta--none">first reading</span>
+                    )}
                   </div>
 
                   <AssetChart asset={asset} series={series} selectedMonth={selectedMonth} onSelect={setSelectedMonth} />
@@ -271,6 +291,8 @@ export default function MarketHistoryModal({ open, history, onClose }) {
               );
             })}
           </div>
+            )}
+          </>
         )}
 
         <p className="vf-market__hint">

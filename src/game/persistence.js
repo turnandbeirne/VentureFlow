@@ -21,6 +21,7 @@
 // ============================================================================
 import { LOCAL_STORAGE_KEY, ASSETS, BUSINESS_COST, BUILD_ID } from '../data/gameConfig';
 import { snapshotRng, restoreRng } from './rng';
+import { marketSnapshot } from './marketHistory';
 
 // Bumped when a change needs a migration that normalizeState can't infer.
 // Not currently used to gate anything — it's here so a future breaking
@@ -93,11 +94,14 @@ export function normalizeState(state) {
     aiTurnDone: !!state.aiTurnDone,
     pendingLaunch: state.pendingLaunch || null,
     turnTimer: state.turnTimer || null,
-    // Backfilled empty rather than reconstructed: the per-month prices of a
-    // game played before this existed are simply not recoverable, and a
-    // fabricated history would be worse than an honest short one. The chart
-    // starts filling from the next month-end.
-    marketHistory: state.marketHistory || [],
+    // A game saved before this existed has no price history, and the months
+    // it already played are NOT recoverable — inventing them would be worse
+    // than an honest gap. But leaving it completely empty means the chart
+    // shows nothing at all for two more months, which reads as a broken
+    // feature rather than a young one. So: seed the CURRENT month from the
+    // live prices, which are real, and let the chart say where recording
+    // started. One true point beats both a blank panel and a fabricated line.
+    marketHistory: seedHistoryIfMissing(state),
     // Deliberately cleared on load. The deadline is a wall-clock timestamp,
     // so a game resumed an hour later would otherwise open with the clock
     // already expired and instantly pass the player's turn. Resuming gives
@@ -105,6 +109,18 @@ export function normalizeState(state) {
     // tab and came back".
     turnDeadlineAt: null,
   };
+}
+
+/**
+ * Month-1-of-the-rest-of-the-game seeding for a save that predates the market
+ * history. Only ever produces a row for the month the save is actually on,
+ * from prices that genuinely are that month's — no back-projection.
+ */
+function seedHistoryIfMissing(state) {
+  const existing = state.marketHistory;
+  if (Array.isArray(existing) && existing.length > 0) return existing;
+  if (!state.assetPrices || !state.month) return [];
+  return [marketSnapshot(state.month, state.assetPrices, state.weatherIncomeAmounts)];
 }
 
 export function saveGame(state) {

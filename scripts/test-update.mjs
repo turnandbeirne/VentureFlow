@@ -1572,14 +1572,57 @@ await check('the summary measures change from the START of the game', () => {
   assert.equal(s.avgCashFlow, 2);
 });
 
-await check('an old save without history is backfilled, not crashed', () => {
+await check('a game already in progress gets a real starting point, not a blank chart', () => {
+  // The case that would otherwise look like the feature was missing AGAIN:
+  // a save written before market history existed, resumed on a build that
+  // has it. It must show today's real prices immediately rather than an
+  // empty panel for two more months.
   const g = createNewGame({ type: 'solo', aiCount: 1 }, ['Ada']);
+  g.month = 6;
+  delete g.marketHistory;
+
+  const restored = persistence.normalizeState(g);
+  assert.equal(restored.marketHistory.length, 1, 'one seeded row, from the month it is actually on');
+  assert.equal(restored.marketHistory[0].month, 6, 'seeded at the CURRENT month, never back-projected to 1');
+  for (const asset of MH_ASSETS) {
+    assert.equal(restored.marketHistory[0].price[asset.id], g.assetPrices[asset.id],
+      'the seeded row uses the real live price, not an invented one');
+  }
+});
+
+await check('months the save never recorded are NOT fabricated', () => {
+  const g = createNewGame({ type: 'solo', aiCount: 1 }, ['Ada']);
+  g.month = 9;
   delete g.marketHistory;
   const restored = persistence.normalizeState(g);
-  assert.deepEqual(restored.marketHistory, [], 'empty and honest beats invented');
-  // And the chart helpers must survive that empty history rather than throw.
-  assert.deepEqual(mh.assetSeries(restored.marketHistory, 'piggy'), []);
-  assert.equal(mh.assetSummary(restored.marketHistory, 'piggy'), null);
+  const months = restored.marketHistory.map((r) => r.month);
+  assert.deepEqual(months, [9], 'months 1-8 are gone and must stay gone');
+});
+
+await check('a save that already has history is left completely alone', () => {
+  const g = createNewGame({ type: 'solo', aiCount: 1 }, ['Ada']);
+  const original = g.marketHistory;
+  const restored = persistence.normalizeState(g);
+  assert.equal(restored.marketHistory, original, 'no rewriting of a history that exists');
+});
+
+await check('the chart helpers survive a history with nothing in it', () => {
+  assert.deepEqual(mh.assetSeries([], 'piggy'), []);
+  assert.equal(mh.assetSummary([], 'piggy'), null);
+  assert.deepEqual(mh.assetSeries(undefined, 'piggy'), []);
+});
+
+await check('a one-point history reports a first reading, never a 0% change', () => {
+  const h = [{ month: 6, price: { piggy: 61 }, cashFlow: { piggy: 0.2 } }];
+  const sum = mh.assetSummary(h, 'piggy');
+  assert.equal(sum.months, 1);
+  assert.equal(sum.first, sum.last, 'nothing to compare against yet');
+  // The component keys off months > 1 to decide whether a delta is even
+  // meaningful — a 0% "change" from one reading is noise dressed as data.
+  const src = readFileSync(new URL('../src/components/MarketHistoryModal.jsx', import.meta.url), 'utf8');
+  assert.match(src, /summary\.months > 1/, 'the delta must be suppressed for a single reading');
+  assert.match(src, /first reading/, 'and labelled honestly instead');
+  assert.match(src, /since month \{firstRecorded\}/, 'the delta must cite the real first month, not always month 1');
 });
 
 console.log('\nSet-all-bots control');
