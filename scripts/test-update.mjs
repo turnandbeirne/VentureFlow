@@ -1393,4 +1393,89 @@ await check('a browser that refuses audio is reported as blocked, after a gestur
   assert.notEqual(after.contextState, 'running');
 });
 
+console.log('\nBuild stamp');
+
+const { BUILD_ID, BUILD_NOTES } = await import('../src/data/gameConfig.js');
+
+await check('the build carries a real, dated stamp', () => {
+  assert.match(BUILD_ID, /^\d{4}-\d{2}-\d{2}[a-z]$/, 'BUILD_ID must look like 2026-08-28a');
+  assert.ok(BUILD_NOTES.length > 10, 'BUILD_NOTES must say what changed');
+});
+
+await check('the stamp is actually shown to the player, not just exported', () => {
+  // The whole point of the stamp is answering "is the page I am looking at
+  // running the build I just installed?" — an export nobody renders cannot
+  // answer that. These three are the surfaces a player or I can reach:
+  // the boot console, the landing page footer, and the in-game rulebook.
+  const surfaces = [
+    'src/main.jsx',
+    'src/components/LandingScreen.jsx',
+    'src/components/RulebookModal.jsx',
+  ];
+  for (const file of surfaces) {
+    const src = readFileSync(new URL(`../${file}`, import.meta.url), 'utf8');
+    assert.ok(src.includes('BUILD_ID'), `${file} must display BUILD_ID`);
+    assert.match(src, /from '\.\.?\/(\.\.\/)?data\/gameConfig'/, `${file} must import it from gameConfig`);
+  }
+});
+
+console.log('\nStale-save guard');
+
+const { LOCAL_STORAGE_KEY } = await import('../src/data/gameConfig.js');
+const persistence = await import('../src/game/persistence.js');
+
+function writeSaveEnvelope(envelope) {
+  globalThis.localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(envelope));
+}
+
+await check('a save written by THIS build is not flagged', () => {
+  const game = createNewGame({ type: 'solo', aiCount: 1 }, ['Ada']);
+  persistence.saveGame(game);
+  const summary = persistence.savedGameSummary();
+  assert.equal(summary.buildId, BUILD_ID);
+  assert.equal(summary.stale, false, 'resuming your own in-progress game must stay seamless');
+});
+
+await check('a save from a different build IS flagged, with enough detail to decide', () => {
+  const game = createNewGame({ type: 'solo', aiCount: 2 }, ['Ada']);
+  game.month = 7;
+  writeSaveEnvelope({ version: 2, buildId: '2020-01-01a', savedAt: 1, state: game });
+
+  const summary = persistence.savedGameSummary();
+  assert.equal(summary.stale, true);
+  assert.equal(summary.buildId, '2020-01-01a');
+  assert.equal(summary.month, 7, 'the player needs to know how much game they would be throwing away');
+  assert.equal(summary.players, 3);
+});
+
+await check('a save from before the stamp existed counts as stale', () => {
+  // This is the case that produced the original bug report: an old game
+  // silently resumed on a new build and presented as the new build having
+  // lost its features.
+  const game = createNewGame({ type: 'solo', aiCount: 1 }, ['Ada']);
+  writeSaveEnvelope({ version: 2, savedAt: 1, state: game });
+  const summary = persistence.savedGameSummary();
+  assert.equal(summary.stale, true);
+  assert.equal(summary.buildId, null);
+});
+
+await check('no save at all is not a stale save', () => {
+  globalThis.localStorage.removeItem(LOCAL_STORAGE_KEY);
+  assert.equal(persistence.savedGameSummary(), null);
+});
+
+await check('a stale save is left intact until the player chooses', () => {
+  const game = createNewGame({ type: 'solo', aiCount: 1 }, ['Ada']);
+  writeSaveEnvelope({ version: 2, buildId: '2020-01-01a', savedAt: 1, state: game });
+
+  // Merely noticing it must not consume it — the player is still able to
+  // resume from the landing page.
+  persistence.savedGameSummary();
+  assert.ok(persistence.hasSavedGame(), 'the old game must survive being noticed');
+  assert.ok(persistence.loadGame(), 'and must still be loadable when they say Resume');
+
+  persistence.clearSavedGame();
+  assert.equal(persistence.hasSavedGame(), false);
+});
+
 console.log(`\nAll ${passed} checks passed.\n`);

@@ -2345,3 +2345,15 @@
     animation: none;
   }
 }
+
+/* Build stamp in the rulebook header ------------------------------------------ */
+.vf-rulebook__build {
+  /* Sit next to the title rather than getting centred by the header's
+     space-between, which would leave it stranded mid-row. */
+  margin-right: auto;
+  font-size: 0.62rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--vf-ink-soft);
+  opacity: 0.7;
+}

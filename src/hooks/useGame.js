@@ -1,6 +1,12 @@
-import { useEffect, useReducer, useRef, useCallback } from 'react';
+import { useEffect, useReducer, useRef, useCallback, useState } from 'react';
 import { gameReducer } from '../game/reducer';
-import { saveGame, loadGame, clearSavedGame, hasSavedGame } from '../game/persistence';
+import {
+  saveGame,
+  loadGame,
+  clearSavedGame,
+  hasSavedGame,
+  savedGameSummary,
+} from '../game/persistence';
 import { usePlaySpeed } from './usePlaySpeed';
 
 // A robot with a big cash pile can legitimately take a lot of moves in one
@@ -30,7 +36,22 @@ function stepDelayFor(baseMs, stepsTaken) {
  * it's never baked into a save.
  */
 export function useGame() {
-  const [state, dispatch] = useReducer(gameReducer, null, () => loadGame());
+  // Read ONCE, before anything can overwrite it. A save written by a
+  // different build is deliberately NOT auto-resumed: a game in progress
+  // carries its own settings — seat count, turn timer, weather severity,
+  // card deck — so dropping the player back into it after an update looks
+  // exactly like the update undid its own features. Instead the landing
+  // page offers the choice, and the save is left untouched until they make
+  // it (the persist effect below only writes when a game is actually open).
+  const [staleSave, setStaleSave] = useState(() => {
+    const summary = savedGameSummary();
+    return summary && summary.stale ? summary : null;
+  });
+
+  const [state, dispatch] = useReducer(gameReducer, null, () => {
+    const summary = savedGameSummary();
+    return summary && summary.stale ? null : loadGame();
+  });
   const aiTimeoutRef = useRef(null);
   const { speed } = usePlaySpeed();
 
@@ -134,9 +155,25 @@ export function useGame() {
     dispatch({ type: 'CLEAR_ERROR' });
   }, []);
 
+  // Pick the older game back up, knowing it keeps its original settings.
+  const resumeSavedGame = useCallback(() => {
+    const loaded = loadGame();
+    setStaleSave(null);
+    if (loaded) dispatch({ type: 'LOAD_GAME', state: loaded });
+  }, []);
+
+  // Throw the older game away and stay on the front door.
+  const discardSavedGame = useCallback(() => {
+    clearSavedGame();
+    setStaleSave(null);
+  }, []);
+
   return {
     state,
     hasSavedGame: hasSavedGame(),
+    staleSave,
+    resumeSavedGame,
+    discardSavedGame,
     startGame,
     newGame,
     buyAsset,

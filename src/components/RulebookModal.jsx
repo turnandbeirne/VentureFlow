@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { buildRulebook } from '../data/rulebook';
+import { BUILD_ID } from '../data/gameConfig';
 import { playSound } from '../audio/soundEngine';
 
 /** One rulebook block — a paragraph, a bulleted list, or a two-column
@@ -67,6 +68,7 @@ export default function RulebookModal({ open, difficultyId, scenarioId, weatherS
       <div className="vf-card vf-rulebook" onClick={(e) => e.stopPropagation()}>
         <div className="vf-rulebook__header">
           <span className="vf-rulebook__title">📖 Rulebook</span>
+          <span className="vf-rulebook__build">Build {BUILD_ID}</span>
           <button type="button" className="vf-btn vf-btn--sm vf-btn--ghost" onClick={handleClose}>
             Close
           </button>

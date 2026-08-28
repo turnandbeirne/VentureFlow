@@ -423,3 +423,52 @@
     width: 100%;
   }
 }
+
+/* Build stamp ---------------------------------------------------------------- */
+.vf-landing__build {
+  margin: 0;
+  align-self: center;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--vf-ink-soft);
+  opacity: 0.65;
+}
+
+/* Stale-save notice ----------------------------------------------------------
+   Shown when localStorage holds a game written by a DIFFERENT build. It is a
+   notice, not an error: nothing has gone wrong, the player just has to choose
+   between an old game's old settings and a fresh one on the current build. */
+.vf-landing__stale {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  flex-wrap: wrap;
+  margin-bottom: 1.25rem;
+  padding: 0.85rem 1.1rem;
+  border-left: 5px solid var(--vf-warm, #f5a623);
+}
+
+.vf-landing__stale-icon {
+  font-size: 1.6rem;
+  line-height: 1;
+}
+
+.vf-landing__stale-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  flex: 1 1 18rem;
+  min-width: 0;
+}
+
+.vf-landing__stale-copy span {
+  font-size: 0.85rem;
+  color: var(--vf-ink-soft);
+}
+
+.vf-landing__stale-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}

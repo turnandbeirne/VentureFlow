@@ -1970,6 +1970,22 @@ export const LOCAL_STORAGE_KEY = 'ventureflow-save-v1';
 // ---------------------------------------------------------------------------
 // Branding
 // ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// Build stamp
+// ---------------------------------------------------------------------------
+// Shown in small print on the landing screen and in the rulebook header, and
+// logged to the console on boot.
+//
+// This exists because "is the running app actually the build I just applied?"
+// turned out to be a real, recurring question — and an expensive one to
+// answer by hunting for individual features. A stale deploy, a cached
+// bundle, a partially-applied upload and a genuine bug all look identical
+// from the outside. Now they don't: read the stamp.
+//
+// Bump BUILD_ID whenever a build is handed over.
+export const BUILD_ID = '2026-08-28a';
+export const BUILD_NOTES = 'build stamp, audio diagnostics, music levels, turn timer, 4 players, new decks';
+
 export const GAME_NAME = 'VentureFlow';
 export const PARENT_BRAND = 'VentureMaker';
 export const BRAND_TAGLINE = `A ${PARENT_BRAND}™ game`;

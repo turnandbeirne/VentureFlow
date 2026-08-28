@@ -4,6 +4,7 @@ import '../styles/landing.css';
 import {
   GAME_LENGTH_MONTHS,
   HOW_TO_PLAY_VIDEO_URL,
+  BUILD_ID,
   BUSINESS_COST,
   SKILL_COST,
   BOT_PERSONALITIES,
@@ -64,7 +65,7 @@ const PITCH = [
  * `playMusicTrack` is a no-op when the same track is already playing — so
  * moving Landing → Customize → back doesn't restart the song mid-phrase.
  */
-export default function LandingScreen({ onStart, onCustomize }) {
+export default function LandingScreen({ onStart, onCustomize, staleSave, onResumeSave, onDiscardSave }) {
   const { entries } = useLeaderboard();
   // Only the unlocked-avatar list is needed here — the profile stores
   // cosmetics and lifetime totals, not a saved player name, so Quick Play
@@ -101,6 +102,42 @@ export default function LandingScreen({ onStart, onCustomize }) {
       </div>
 
       <div className="vf-landing__inner">
+        {staleSave ? (
+          <div className="vf-card vf-landing__stale" role="status">
+            <span className="vf-landing__stale-icon" aria-hidden="true">🕹️</span>
+            <div className="vf-landing__stale-copy">
+              <strong>You have a game in progress from an earlier build.</strong>
+              <span>
+                It started on build {staleSave.buildId || 'an older version'} and is on month {staleSave.month}. A game
+                keeps the settings it began with, so anything added since then won&rsquo;t appear until you start a new
+                one.
+              </span>
+            </div>
+            <div className="vf-landing__stale-actions">
+              <button
+                type="button"
+                className="vf-btn vf-btn--sm vf-btn--ghost"
+                onClick={() => {
+                  playSound('click');
+                  onResumeSave?.();
+                }}
+              >
+                Resume it
+              </button>
+              <button
+                type="button"
+                className="vf-btn vf-btn--sm vf-btn--warm"
+                onClick={() => {
+                  playSound('click');
+                  onDiscardSave?.();
+                }}
+              >
+                Discard &amp; start fresh
+              </button>
+            </div>
+          </div>
+        ) : null}
+
         <header className="vf-landing__hero">
           <div className="vf-landing__hero-art">
             <HeroGraphic />
@@ -210,6 +247,8 @@ export default function LandingScreen({ onStart, onCustomize }) {
         </section>
 
         <VentureMakerLink className="vf-landing__vm" />
+
+        <p className="vf-landing__build">Build {BUILD_ID}</p>
       </div>
 
       <RulebookModal open={showRulebook} onClose={() => setShowRulebook(false)} />

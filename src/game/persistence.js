@@ -19,7 +19,7 @@
 //    Normalizing once, in one place, is both safer and easier to keep
 //    honest as fields keep being added.
 // ============================================================================
-import { LOCAL_STORAGE_KEY, ASSETS, BUSINESS_COST } from '../data/gameConfig';
+import { LOCAL_STORAGE_KEY, ASSETS, BUSINESS_COST, BUILD_ID } from '../data/gameConfig';
 import { snapshotRng, restoreRng } from './rng';
 
 // Bumped when a change needs a migration that normalizeState can't infer.
@@ -106,7 +106,18 @@ export function saveGame(state) {
   try {
     localStorage.setItem(
       LOCAL_STORAGE_KEY,
-      JSON.stringify({ version: SAVE_VERSION, savedAt: Date.now(), rng: snapshotRng(), state })
+      JSON.stringify({
+        version: SAVE_VERSION,
+        // Which build wrote this save. A game already in progress keeps
+        // running under the rules it started with — its player count, turn
+        // timer, weather severity and deck are all baked into the state —
+        // so installing a new build and silently resuming looks exactly
+        // like the new build lost its features. See savedGameSummary().
+        buildId: BUILD_ID,
+        savedAt: Date.now(),
+        rng: snapshotRng(),
+        state,
+      })
     );
     return true;
   } catch (err) {
@@ -151,5 +162,33 @@ export function hasSavedGame() {
     return !!localStorage.getItem(LOCAL_STORAGE_KEY);
   } catch {
     return false;
+  }
+}
+
+/**
+ * What's in the save, without loading it: which build wrote it, when, and
+ * how far in it got. `stale` is the one that matters — a save from another
+ * build must not be auto-resumed, because a game carries its own settings
+ * and would present as a new build missing its new features.
+ *
+ * A save with no `buildId` predates the stamp, which makes it old by
+ * definition, so it counts as stale too.
+ */
+export function savedGameSummary() {
+  try {
+    const raw = localStorage.getItem(LOCAL_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed?.state?.players) return null;
+    const buildId = parsed.buildId || null;
+    return {
+      buildId,
+      stale: buildId !== BUILD_ID,
+      savedAt: parsed.savedAt || null,
+      month: parsed.state.month || 1,
+      players: parsed.state.players.length,
+    };
+  } catch {
+    return null;
   }
 }

@@ -64,7 +64,15 @@ export default function App() {
     if (preGameScreen === 'setup') {
       return <SetupScreen onStart={game.startGame} onBack={() => setPreGameScreen('landing')} />;
     }
-    return <LandingScreen onStart={game.startGame} onCustomize={() => setPreGameScreen('setup')} />;
+    return (
+      <LandingScreen
+        onStart={game.startGame}
+        onCustomize={() => setPreGameScreen('setup')}
+        staleSave={game.staleSave}
+        onResumeSave={game.resumeSavedGame}
+        onDiscardSave={game.discardSavedGame}
+      />
+    );
   }
 
   return (

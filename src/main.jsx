@@ -9,6 +9,12 @@ import '@fontsource/fredoka/700.css'
 import '@fontsource/dancing-script/600.css'
 import './index.css'
 import App from './App.jsx'
+import { BUILD_ID, BUILD_NOTES } from './data/gameConfig'
+
+// Print the build stamp to the console on boot. If a build ever *looks* like
+// it is missing recent work, this is the fastest way to tell whether the page
+// is actually running the newest bundle or a stale cached/deployed one.
+console.info(`%cVentureFlow build ${BUILD_ID}`, 'font-weight:bold', `— ${BUILD_NOTES}`)
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
