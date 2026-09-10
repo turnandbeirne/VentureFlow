@@ -63,6 +63,15 @@ function meetsRequirement(profile, requirement) {
       return profile.bestNetWorth >= requirement.value;
     case 'passiveIncome':
       return profile.bestPassiveIncome >= requirement.value;
+    // Lifetime totals (accumulate every game, win or lose — see
+    // defaultProfile's comment) rather than a single-game best, so these
+    // reward playing a certain STYLE over many games rather than one great
+    // run — a trader who never starts a business and a builder who never
+    // sells one both have something to chase either way.
+    case 'businessesStarted':
+      return (profile.totalBusinessesStarted || 0) >= requirement.value;
+    case 'businessesSold':
+      return (profile.totalBusinessesSold || 0) >= requirement.value;
     default:
       return false;
   }

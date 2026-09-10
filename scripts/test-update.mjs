@@ -1124,6 +1124,13 @@ await check('every asset has a varied sound pool, and the rare ones stay rare', 
         const recipe = entry();
         assert.ok(Array.isArray(recipe) && recipe.length > 0, 'every variant must produce notes');
         for (const n of recipe) {
+          // Recorded clips (kind: 'sample', see soundLibrary.js) carry a src
+          // and a gain but no start/duration — soundEngine just plays them.
+          if (n.kind === 'sample') {
+            assert.ok(typeof n.src === 'string' && n.src.length > 0, 'a sample needs a src');
+            assert.ok(n.gain > 0 && n.gain <= 1, `gain out of range: ${n.gain}`);
+            continue;
+          }
           assert.ok(typeof n.start === 'number' && n.start >= 0, 'a note needs a valid start');
           assert.ok(typeof n.duration === 'number' && n.duration > 0, 'a note needs a real duration');
           assert.ok(n.gain > 0 && n.gain <= 1, `gain out of range: ${n.gain}`);

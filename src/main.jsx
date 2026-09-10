@@ -15,9 +15,23 @@ import { BUILD_ID, BUILD_NOTES } from './data/gameConfig'
 // it is missing recent work, this is the fastest way to tell whether the page
 // is actually running the newest bundle or a stale cached/deployed one.
 console.info(`%cVentureFlow build ${BUILD_ID}`, 'font-weight:bold', `— ${BUILD_NOTES}`)
+import KidsApp from './kids/KidsApp.jsx'
+import RecapViewer from './components/RecapViewer.jsx'
+
+// Same one-line, no-dependency "route" pattern for two static entry points:
+// `/kids` mounts the standalone Kids Version, `/recap` mounts the read-only
+// shareable-recap page a game-over "Share Link"/"Email" opens (see
+// game/recapShare.js + components/RecapViewer.jsx — the actual recap data
+// lives in the URL's fragment, never sent here as a path segment). Neither
+// pulls in a routing library for what's a single static entry point each —
+// see src/kids/KidsApp.jsx's header comment for the reasoning. Every other
+// path renders <App /> exactly as before.
+const path = window.location.pathname.replace(/\/+$/, '');
+const isKidsRoute = path === '/kids';
+const isRecapRoute = path === '/recap';
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
-    <App />
+    {isKidsRoute ? <KidsApp /> : isRecapRoute ? <RecapViewer /> : <App />}
   </StrictMode>,
 )

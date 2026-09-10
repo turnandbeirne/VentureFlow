@@ -1,4 +1,5 @@
 import { playSound } from '../audio/soundEngine';
+import { downloadTextFile, slugForFilename } from '../game/downloadFile';
 
 /**
  * The full cash-flow history for one player — every inflow (payday,
@@ -35,6 +36,27 @@ export default function LedgerModal({ open, onClose, player }) {
   const totalIn = entries.filter((e) => e.type === 'in').reduce((sum, e) => sum + e.amount, 0);
   const totalOut = entries.filter((e) => e.type === 'out').reduce((sum, e) => sum + e.amount, 0);
 
+  // A plain-text copy of just this player's rows above — handy mid-game
+  // (not only at game over) for e.g. a classroom checking in on how each
+  // student's money has moved so far. Built inline rather than reusing
+  // game/gameRecord.js's buildLedgerReport (which covers every player at
+  // once) since the format here is intentionally this one player's rows
+  // only, matching what's actually on screen.
+  function handleDownload(e) {
+    e?.stopPropagation();
+    playSound('click');
+    const lines = [`VentureFlow — ${player.name}'s Cash Ledger`, '='.repeat(40), '', `Total in:  +$${totalIn.toLocaleString()}`, `Total out: -$${totalOut.toLocaleString()}`, ''];
+    if (entries.length === 0) {
+      lines.push('(no cash has moved yet)');
+    } else {
+      entries.forEach((entry) => {
+        const sign = entry.type === 'in' ? '+' : '-';
+        lines.push(`Mo.${String(entry.month).padStart(2, '0')}  ${sign}$${entry.amount.toLocaleString()}  ${entry.source}${entry.detail ? ` — ${entry.detail}` : ''}`);
+      });
+    }
+    downloadTextFile(`ventureflow-ledger-${slugForFilename(player.name)}-${new Date().toISOString().slice(0, 10)}.txt`, lines.join('\n'));
+  }
+
   return (
     <div className="vf-modal-overlay" onClick={handleClose}>
       <div className="vf-card vf-ledger" onClick={(e) => e.stopPropagation()}>
@@ -42,9 +64,14 @@ export default function LedgerModal({ open, onClose, player }) {
           <span>
             📒 {player.avatar} {player.name}'s Cash Ledger
           </span>
-          <button type="button" className="vf-btn vf-btn--sm vf-btn--ghost" onClick={handleClose}>
-            Close
-          </button>
+          <span className="vf-ledger__header-actions">
+            <button type="button" className="vf-btn vf-btn--sm vf-btn--ghost" onClick={handleDownload} title="Download this ledger as a text file">
+              ⬇️ Download
+            </button>
+            <button type="button" className="vf-btn vf-btn--sm vf-btn--ghost" onClick={handleClose}>
+              Close
+            </button>
+          </span>
         </div>
 
         <p className="vf-ledger__blurb">Every dollar in and out, month by month, from day one to right now.</p>
