@@ -42,7 +42,7 @@ export default function App() {
   const [arenaResult, setArenaResult] = useState(null);
   useEffect(() => {
     if (arena?.active && arena.isHost && !state && arena.status === 'waiting') arena.startIfHost();
-  }, [arena?.active, arena?.isHost, arena?.status, state]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [arena?.active, arena?.isHost, arena?.status, arena?.pollCount, state]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (arena?.active && arena.isHost && state?.status === 'gameover' && arena.seats) {
       reportArenaResults(state, arena.seats, (p) => netWorth(p, state.assetPrices)).then((r) => r && setArenaResult(r));
