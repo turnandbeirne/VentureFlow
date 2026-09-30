@@ -133,7 +133,7 @@ export function createPlayer({
  * randomly — a human-picked duplicate is left alone, since that's a
  * deliberate choice.
  */
-function resolveBotConfig(config, usedPersonalityIds) {
+export function resolveBotConfig(config, usedPersonalityIds) {
   const requestedPersonalityId = config?.personalityId;
   let personality;
   if (requestedPersonalityId && requestedPersonalityId !== 'random') {
@@ -204,6 +204,44 @@ export function createPlayerRoster(
           skillLevelId,
         })
       );
+    }
+  } else if (mode.type === 'online') {
+    // VentureArena table: an explicit seat list, humans and robots in one
+    // order, so players[i] always corresponds to mode.seats[i] and every
+    // browser at the table builds the identical roster — see src/arena/.
+    const usedPersonalityIds = new Set();
+    let humanIndex = 0;
+    let aiIndex = 0;
+    for (const seat of mode.seats || []) {
+      if (seat.type === 'ai') {
+        aiIndex += 1;
+        const { personality, skillLevelId } = resolveBotConfig(seat, usedPersonalityIds);
+        players.push(
+          createPlayer({
+            id: `ai${aiIndex}`,
+            name: personality.name,
+            avatar: personality.avatar,
+            type: 'ai',
+            startingCash,
+            startingSkillTokens,
+            personalityId: personality.id,
+            strategyId: personality.strategyId,
+            skillLevelId,
+          })
+        );
+      } else {
+        humanIndex += 1;
+        players.push(
+          createPlayer({
+            id: `p${humanIndex}`,
+            name: seat.name || `Player ${humanIndex}`,
+            avatar: seat.avatar || PLAYER_AVATARS[humanIndex - 1] || '🙂',
+            type: 'human',
+            startingCash,
+            startingSkillTokens,
+          })
+        );
+      }
     }
   } else if (mode.type === 'hotseat') {
     for (let i = 0; i < mode.humanCount; i++) {

@@ -9,6 +9,9 @@ import LandingScreen from './components/LandingScreen';
 import SetupScreen from './components/SetupScreen';
 import GameBoard from './components/GameBoard';
 import GameOverScreen from './components/GameOverScreen';
+import ArenaBanner, { ArenaInvite } from './arena/ArenaBanner';
+import { getArena, reportArenaResults } from './arena/arenaBridge';
+import { netWorth } from './game/players';
 
 export default function App() {
   const game = useGame();
@@ -31,6 +34,20 @@ export default function App() {
   // state, not game state — nothing about the finished game itself changes
   // while toggling between the two views.
   const [showBoardAfterGameOver, setShowBoardAfterGameOver] = useState(false);
+
+  // VentureArena table: the host's browser creates the shared game once the
+  // move feed is confirmed empty; everyone else just receives it. When the
+  // game is over the host posts the standings back to the arena.
+  const arena = game.arena;
+  const [arenaResult, setArenaResult] = useState(null);
+  useEffect(() => {
+    if (arena?.active && arena.isHost && !state && arena.status === 'waiting') arena.startIfHost();
+  }, [arena?.active, arena?.isHost, arena?.status, state]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (arena?.active && arena.isHost && state?.status === 'gameover' && arena.seats) {
+      reportArenaResults(state, arena.seats, (p) => netWorth(p, state.assetPrices)).then((r) => r && setArenaResult(r));
+    }
+  }, [arena?.active, arena?.isHost, state?.status]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Every path that ends a game returns to the front door rather than
   // dropping the player straight into a form.
@@ -68,10 +85,21 @@ export default function App() {
   useChatSounds(state?.chat);
 
   function renderPreGame() {
+    if (getArena()) {
+      return (
+        <div style={{ padding: 24, textAlign: 'center', color: '#f6f1e7' }}>
+          <h2>Setting the table…</h2>
+          <p>{arena?.status === 'offline' ? 'Reconnecting to the arena…' : arena?.isHost ? 'Dealing everyone in.' : 'Waiting for the host to start. This page updates on its own.'}</p>
+          <p><a href={arena?.arena?.tableUrl} style={{ color: '#e8b64a' }}>Back to the arena table</a></p>
+        </div>
+      );
+    }
     if (preGameScreen === 'setup') {
       return <SetupScreen onStart={game.startGame} onBack={() => setPreGameScreen('landing')} />;
     }
     return (
+      <>
+      <ArenaInvite />
       <LandingScreen
         onStart={game.startGame}
         onCustomize={() => setPreGameScreen('setup')}
@@ -79,11 +107,13 @@ export default function App() {
         onResumeSave={game.resumeSavedGame}
         onDiscardSave={game.discardSavedGame}
       />
+      </>
     );
   }
 
   return (
     <div data-theme={profile.selectedTheme}>
+      <ArenaBanner sync={arena} result={arenaResult} />
       {!state ? (
         renderPreGame()
       ) : state.status === 'gameover' && !showBoardAfterGameOver ? (

@@ -93,7 +93,15 @@ export default function GameBoard({ game, readOnly = false, onExitReadOnly }) {
   }, [month]);
   const selectedPlayer = selectedPlayerId ? players.find((p) => p.id === selectedPlayerId) : null;
   const selectedAsset = selectedAssetId ? ASSETS.find((a) => a.id === selectedAssetId) : null;
-  const isHumanTurn = !readOnly && status === 'playing' && activePlayer?.type === 'human';
+  // At a VentureArena table each browser controls one seat: the action
+  // buttons are live only when the active player IS this browser's player.
+  const localPlayerId = game.localPlayerId || null;
+  // An arena observer (no seat) watches the table read-only.
+  const spectator = !!game.arena?.active && !localPlayerId;
+  const isHumanTurn =
+    !readOnly && !spectator && status === 'playing' && activePlayer?.type === 'human' && (!localPlayerId || activePlayer.id === localPlayerId);
+  const isRemoteHumanTurn =
+    !readOnly && status === 'playing' && activePlayer?.type === 'human' && (spectator || (!!localPlayerId && activePlayer.id !== localPlayerId));
   const currentFortuneEntry = status === 'monthRecap' ? state.fortuneRecap[state.fortuneRecapIndex] : null;
   const currentFortunePlayer = currentFortuneEntry
     ? players.find((p) => p.id === currentFortuneEntry.playerId)
@@ -276,6 +284,8 @@ export default function GameBoard({ game, readOnly = false, onExitReadOnly }) {
                 ? `💼 ${exitOfferPlayer?.name || 'Someone'} has a buyout offer to decide on...`
                 : status === 'monthRecap'
                 ? '📬 Reading this month\'s fortune cards...'
+                : isRemoteHumanTurn
+                ? `${activePlayer?.avatar} Waiting for ${activePlayer?.name}…`
                 : isHumanTurn
                 ? `${activePlayer.avatar} ${
                     activePlayer.name.toLowerCase() === 'you' ? 'Your' : `${activePlayer.name}'s`
@@ -288,6 +298,16 @@ export default function GameBoard({ game, readOnly = false, onExitReadOnly }) {
                 original at the bottom of the board, which stays in place
                 for anyone who scrolls down anyway. Same enable condition,
                 same handler; this is a duplicate control, not a new one. */}
+            {isRemoteHumanTurn && game.arena?.isHost && Date.now() - (game.arena.lastMoveAt || 0) > 3 * 60 * 1000 && (
+              <button
+                type="button"
+                className="vf-btn vf-btn--sm"
+                title="No move for a while. Let a robot play this seat so the table keeps moving."
+                onClick={() => game.convertSeatToAi(activePlayer.id)}
+              >
+                🤖 Hand this seat to a robot
+              </button>
+            )}
             {isHumanTurn && (
               <button
                 type="button"

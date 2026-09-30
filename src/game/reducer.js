@@ -19,6 +19,7 @@ import {
 } from './chatEngine';
 import { isOffensiveName } from './nameFilter';
 import { seedRng } from './rng';
+import { resolveBotConfig } from './players';
 import { maybeAttachLesson } from './lessons';
 import { seedForDate } from './dailyChallenge';
 import { getAssetConfig } from './market';
@@ -172,6 +173,11 @@ export function gameReducer(state, action) {
       // today's challenge — see game/dailyChallenge.js.
       if (action.dailyChallengeDate) {
         seedRng(seedForDate(action.dailyChallengeDate));
+      } else if (action.seed != null) {
+        // A VentureArena online table: every browser reseeds from the same
+        // number before building the same roster, so weather, prices and
+        // cards match across the table — see src/arena/useArenaSync.js.
+        seedRng(action.seed);
       }
       const built = createNewGame(
         action.mode,
@@ -376,6 +382,24 @@ export function gameReducer(state, action) {
           i === index ? { ...p, turnExtensionsLeft: p.turnExtensionsLeft - 1 } : p
         ),
       };
+    }
+
+    case 'CONVERT_SEAT_TO_AI': {
+      // An absent human at an online table hands their seat to a robot:
+      // cash, holdings, businesses and badges are untouched, only who plays
+      // the seat changes. Deterministic (goes through the seeded stream) so
+      // every browser at the table picks the same robot.
+      const idx = state.players.findIndex((p) => p.id === action.playerId);
+      if (idx < 0 || state.players[idx].type !== 'human') return state;
+      const used = new Set(state.players.filter((p) => p.type === 'ai').map((p) => p.personalityId));
+      const { personality, skillLevelId } = resolveBotConfig({ personalityId: 'random', skillLevelId: 'random' }, used);
+      const players = state.players.map((p, i) =>
+        i === idx
+          ? { ...p, type: 'ai', personalityId: personality.id, strategyId: personality.strategyId, skillLevelId, name: `${p.name} (${personality.name})` }
+          : p
+      );
+      const next = { ...state, players, aiTurnSteps: 0, aiTurnDone: false, turnDeadlineAt: null };
+      return appendLog(next, [{ icon: '🤖', message: `${state.players[idx].name} stepped away — ${personality.name} is playing the seat now.`, kind: 'takeover' }]);
     }
 
     case 'CLEAR_ERROR':

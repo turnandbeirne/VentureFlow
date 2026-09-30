@@ -8,6 +8,8 @@ import {
   savedGameSummary,
 } from '../game/persistence';
 import { usePlaySpeed } from './usePlaySpeed';
+import { useArenaSync } from '../arena/useArenaSync';
+import { getArena } from '../arena/arenaBridge';
 
 // A robot with a big cash pile can legitimately take a lot of moves in one
 // turn (a shark's cap is 32). Pacing every one of them at the full step
@@ -48,21 +50,31 @@ export function useGame() {
     return summary && summary.stale ? summary : null;
   });
 
-  const [state, dispatch] = useReducer(gameReducer, null, () => {
+  const [state, localDispatch] = useReducer(gameReducer, null, () => {
+    // A VentureArena table never resumes a local save: its state is rebuilt
+    // from the table's shared move list — see src/arena/useArenaSync.js.
+    if (getArena()) return null;
     const summary = savedGameSummary();
     return summary && summary.stale ? null : loadGame();
   });
+  // At an arena table, actions go to the table first and come back in order;
+  // otherwise this is exactly the reducer's own dispatch.
+  const arena = useArenaSync(localDispatch, state);
+  const dispatch = arena.dispatch;
   const aiTimeoutRef = useRef(null);
   const { speed } = usePlaySpeed();
 
   // Persist whenever state changes (and there's an active game).
   useEffect(() => {
-    if (state) saveGame(state);
-  }, [state]);
+    if (state && !arena.active) saveGame(state);
+  }, [state, arena.active]);
 
   // Drive the active robot's turn: one decision per beat, then hand off.
   useEffect(() => {
     if (!state || state.status !== 'playing') return;
+    // At an arena table only the host's browser plays the robots' turns
+    // (their moves reach everyone through the shared move list).
+    if (arena.active && !arena.isHost) return;
     const activePlayer = state.players[state.activePlayerIndex];
     if (!activePlayer || activePlayer.type !== 'ai') return;
 
@@ -79,7 +91,7 @@ export function useGame() {
     }, delay);
 
     return () => clearTimeout(aiTimeoutRef.current);
-  }, [state, speed]);
+  }, [state, speed, arena.active, arena.isHost, dispatch]);
 
   // The 'gameEnding' pause (the final month's "that's a wrap" recap, between
   // the last fortune card and the actual Game Over screen — see
@@ -101,86 +113,94 @@ export function useGame() {
       turnTimer: !!options.turnTimer,
       weatherSeverityId: options.weatherSeverityId,
     });
-  }, []);
+  }, [dispatch]);
 
   const newGame = useCallback(() => {
+    if (arena.active) { window.location.href = arena.arena.tableUrl; return; }
     clearSavedGame();
     dispatch({ type: 'NEW_GAME' });
-  }, []);
+  }, [dispatch, arena]);
 
   const buyAsset = useCallback((playerId, assetId, qty = 1) => {
     dispatch({ type: 'BUY_ASSET', playerId, assetId, qty });
-  }, []);
+  }, [dispatch]);
 
   const sellAsset = useCallback((playerId, assetId, qty = 1) => {
     dispatch({ type: 'SELL_ASSET', playerId, assetId, qty });
-  }, []);
+  }, [dispatch]);
 
   const startBusiness = useCallback((playerId, name) => {
     dispatch({ type: 'START_BUSINESS', playerId, name });
-  }, []);
+  }, [dispatch]);
 
   const learnSkill = useCallback((playerId) => {
     dispatch({ type: 'LEARN_SKILL', playerId });
-  }, []);
+  }, [dispatch]);
 
   const upgradeBusiness = useCallback((playerId, businessId, trackId) => {
     dispatch({ type: 'UPGRADE_BUSINESS', playerId, businessId, trackId });
-  }, []);
+  }, [dispatch]);
 
   const endTurn = useCallback((playerId) => {
     dispatch({ type: 'END_TURN', playerId });
-  }, []);
+  }, [dispatch]);
 
   const startTurnTimer = useCallback((deadlineAt) => {
     dispatch({ type: 'START_TURN_TIMER', deadlineAt });
-  }, []);
+  }, [dispatch]);
 
   const extendTurn = useCallback((playerId) => {
     // Date.now() is read HERE, in the UI layer, and passed in — the reducer
     // stays a pure function of (state, action). See reducer.js's timer cases.
     dispatch({ type: 'EXTEND_TURN', playerId, now: Date.now() });
-  }, []);
+  }, [dispatch]);
 
   const ackStartupLaunch = useCallback(() => {
     dispatch({ type: 'ACK_STARTUP_LAUNCH' });
-  }, []);
+  }, [dispatch]);
 
   const ackFortuneCard = useCallback(() => {
     dispatch({ type: 'ACK_FORTUNE_CARD' });
-  }, []);
+  }, [dispatch]);
 
   const finalizeGameOver = useCallback(() => {
     dispatch({ type: 'FINALIZE_GAME_OVER' });
-  }, []);
+  }, [dispatch]);
 
   const resolveExitOffer = useCallback((playerId, accept) => {
     dispatch({ type: 'RESOLVE_EXIT_OFFER', playerId, accept });
-  }, []);
+  }, [dispatch]);
 
   const sendChat = useCallback((playerId, message, targetPlayerId) => {
     dispatch({ type: 'SEND_CHAT', playerId, message, targetPlayerId });
-  }, []);
+  }, [dispatch]);
 
   const clearError = useCallback(() => {
     dispatch({ type: 'CLEAR_ERROR' });
-  }, []);
+  }, [dispatch]);
 
   // Pick the older game back up, knowing it keeps its original settings.
   const resumeSavedGame = useCallback(() => {
     const loaded = loadGame();
     setStaleSave(null);
     if (loaded) dispatch({ type: 'LOAD_GAME', state: loaded });
-  }, []);
+  }, [dispatch]);
 
   // Throw the older game away and stay on the front door.
   const discardSavedGame = useCallback(() => {
     clearSavedGame();
     setStaleSave(null);
-  }, []);
+  }, [dispatch]);
+
+  const convertSeatToAi = useCallback((playerId) => {
+    dispatch({ type: 'CONVERT_SEAT_TO_AI', playerId });
+  }, [dispatch]);
 
   return {
     state,
+    arena,
+    localPlayerId: arena.localPlayerId,
+    convertSeatToAi,
     hasSavedGame: hasSavedGame(),
     staleSave,
     resumeSavedGame,
