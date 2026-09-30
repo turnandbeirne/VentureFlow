@@ -38,6 +38,8 @@ export function useArenaSync(localDispatch, state) {
   const [status, setStatus] = useState(active ? 'connecting' : 'off');
   const [lastMoveAt, setLastMoveAt] = useState(Date.now());
   const [error, setError] = useState(null);
+  const [pollCount, setPollCount] = useState(0);
+  const startingRef = useRef(0);   // timestamp of the last START_GAME attempt
 
   const applyIncoming = useCallback(async () => {
     if (!arena || busyRef.current) return;
@@ -53,6 +55,7 @@ export function useArenaSync(localDispatch, state) {
       }
       setStatus(seqRef.current === 0 ? 'waiting' : 'synced');
       setError(null);
+      setPollCount((n) => n + 1);
     } catch (e) {
       setStatus('offline');
       setError(e.message);
@@ -101,6 +104,8 @@ export function useArenaSync(localDispatch, state) {
   // The host creates the game once; everyone else just receives it.
   const startIfHost = useCallback(() => {
     if (!arena || !arena.isHost || seqRef.current > 0) return;
+    if (Date.now() - startingRef.current < 4000) return;   // one attempt at a time; retried on a later poll if it failed
+    startingRef.current = Date.now();
     const seats = arenaSeats(arena);
     const s = arena.settings;
     void send({
@@ -132,6 +137,7 @@ export function useArenaSync(localDispatch, state) {
     localPlayerId,
     seats,
     startIfHost,
+    pollCount,
     seq: seqRef.current,
   };
 }
