@@ -192,15 +192,21 @@ export function useGame() {
     setStaleSave(null);
   }, [dispatch]);
 
-  const convertSeatToAi = useCallback((playerId) => {
-    dispatch({ type: 'CONVERT_SEAT_TO_AI', playerId });
+  const convertSeatToAi = useCallback((playerId, reason = 'away') => {
+    dispatch({ type: 'CONVERT_SEAT_TO_AI', playerId, reason });
+  }, [dispatch]);
+
+  const kickVote = useCallback((targetId, voterId) => {
+    dispatch({ type: 'KICK_VOTE', playerId: targetId, voterId });
   }, [dispatch]);
 
   return {
     state,
     arena,
     localPlayerId: arena.localPlayerId,
+    pendingTrade: arena.pendingTrade || null,
     convertSeatToAi,
+    kickVote,
     hasSavedGame: hasSavedGame(),
     staleSave,
     resumeSavedGame,

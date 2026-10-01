@@ -97,7 +97,7 @@ let reported = false;
  * Host only: post everyone's final standings to the arena when the game is over.
  * Returns { ok, nextUrl }.
  */
-export async function reportArenaResults(state, seats, netWorthOf) {
+export async function reportArenaResults(state, seats, netWorthOf, passiveOf = null) {
   const arena = getArena();
   if (!arena || reported) return null;
   reported = true;
@@ -109,8 +109,18 @@ export async function reportArenaResults(state, seats, netWorthOf) {
     player_id: humansById.get(p.id),
     placement: i + 1,
     score: netWorthOf(p),
-    skill_tags: ['cash flow', ...(p.businesses?.length ? ['business building'] : [])],
-    telemetry: { cash: p.cash, businesses: (p.businesses || []).length, badges: (p.badges || []).length, tookOver: p.type === 'ai' },
+    skill_tags: ['cash flow', ...(p.businesses?.length ? ['business building'] : []), ...(Object.keys(p.holdings || {}).filter((k) => p.holdings[k] > 0).length >= 3 ? ['diversification'] : [])],
+    telemetry: {
+      netWorth: netWorthOf(p), cash: Math.round(p.cash), passive: Math.round(passiveOf ? passiveOf(p) : 0),
+      businesses: (p.businesses || []).length, badges: (p.badges || []).length,
+      holdings: p.holdings || {}, units: Object.values(p.holdings || {}).reduce((a, b) => a + b, 0),
+      spent: Object.values(p.purchaseStats || {}).reduce((a, x) => a + (x.spent || 0), 0),
+      goodCards: (p.fortuneCardHistory || []).filter((c) => c.deckId === 'opportunity').length,
+      badCards: (p.fortuneCardHistory || []).filter((c) => c.deckId !== 'opportunity').length,
+      tookOver: p.type === 'ai', takeoverReason: p.takeoverReason || null, finishedBy: p.finishedBy || null,
+      scenarioId: state.scenarioId, difficultyId: state.difficultyId, weatherSeverityId: state.weatherSeverityId, months: state.month,
+      goalMonth: p.scenarioGoalMonth ?? null,
+    },
   }));
   try {
     const res = await fetch(arena.reportUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token: arena.token, results }) });

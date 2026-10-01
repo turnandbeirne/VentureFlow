@@ -6,6 +6,14 @@ import { useTeachMode } from '../hooks/useTeachMode';
 import { turnOrdinal, currentTurnTally } from '../game/turnClock';
 import { totalUnitsOwned } from '../game/players';
 import { playSound } from '../audio/soundEngine';
+import { ARENA_STALL_WARN_MS, ARENA_STALL_NOTICE_MS, ARENA_STALL_MS } from '../arena/arenaConfig';
+
+// Arena table timing: how long everyone else sees a card they don't own, how
+// long the owner has before their own browser continues for them, and when
+// the host's browser steps in if the owner's browser is gone.
+const ARENA_PEEK_MS = 2600;
+const ARENA_OWNER_ACK_MS = 15000;
+const ARENA_HOST_BACKUP_ACK_MS = 25000;
 import { playMusicTrack, setMusicLevel } from '../audio/musicEngine';
 import WeatherBadge from './WeatherBadge';
 import WeatherCard from './WeatherCard';
@@ -106,7 +114,32 @@ export default function GameBoard({ game, readOnly = false, onExitReadOnly }) {
   const currentFortunePlayer = currentFortuneEntry
     ? players.find((p) => p.id === currentFortuneEntry.playerId)
     : null;
-  const showModalForHuman = currentFortuneEntry && currentFortunePlayer?.type === 'human';
+  // At an arena table only the card's OWNER gets the blocking modal and the
+  // "Got it!" that advances the table; everyone else gets a 2.5s peek at the
+  // card (and a robot's card is advanced by the host's browser alone).
+  const arenaActive = !!game.arena?.active;
+  const isHostBrowser = !!game.arena?.isHost;
+  const isMyFortune = !!currentFortuneEntry && !!localPlayerId && currentFortuneEntry.playerId === localPlayerId;
+  const showModalForHuman = currentFortuneEntry && currentFortunePlayer?.type === 'human' && (!arenaActive || isMyFortune);
+  const fortuneKey = currentFortuneEntry ? `${state.month}:${state.fortuneRecapIndex}:${currentFortuneEntry.playerId}` : null;
+  const [peek, setPeek] = useState(null);   // { key, entry, kind } shown briefly to non-owners
+  useEffect(() => {
+    if (!arenaActive || !currentFortuneEntry || isMyFortune) return undefined;
+    setPeek({ key: fortuneKey, entry: currentFortuneEntry, kind: 'fortune' });
+    const t = setTimeout(() => setPeek((p) => (p && p.key === fortuneKey ? null : p)), ARENA_PEEK_MS);
+    return () => clearTimeout(t);
+  }, [arenaActive, fortuneKey, isMyFortune]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Same for the startup-launch celebration: the founder gets the modal,
+  // the rest of the table a peek.
+  const launch = state.pendingLaunch || null;
+  const isMyLaunch = !!launch && !!localPlayerId && launch.playerId === localPlayerId;
+  const launchKey = launch ? `${state.month}:${launch.businessId}` : null;
+  useEffect(() => {
+    if (!arenaActive || !launch || isMyLaunch) return undefined;
+    setPeek({ key: launchKey, entry: launch, kind: 'launch' });
+    const t = setTimeout(() => setPeek((p) => (p && p.key === launchKey ? null : p)), ARENA_PEEK_MS);
+    return () => clearTimeout(t);
+  }, [arenaActive, launchKey, isMyLaunch]); // eslint-disable-line react-hooks/exhaustive-deps
   const pendingExitOffer = status === 'exitOffer' ? state.pendingExitOffer : null;
   const exitOfferPlayer = pendingExitOffer ? players.find((p) => p.id === pendingExitOffer.playerId) : null;
 
@@ -116,7 +149,19 @@ export default function GameBoard({ game, readOnly = false, onExitReadOnly }) {
     if (status !== 'monthRecap') return;
     if (!currentFortuneEntry) return;
     if (currentFortunePlayer?.type === 'ai') {
-      const t = setTimeout(() => game.ackFortuneCard(), speed.recapAdvanceMs);
+      // Online: only the host's browser advances robot cards (one ACK, not
+      // one per browser), and it holds them long enough for everyone's peek.
+      if (arenaActive && !isHostBrowser) return undefined;
+      const t = setTimeout(() => game.ackFortuneCard(), arenaActive ? Math.max(speed.recapAdvanceMs, ARENA_PEEK_MS) : speed.recapAdvanceMs);
+      return () => clearTimeout(t);
+    }
+    if (arenaActive && currentFortunePlayer?.type === 'human') {
+      // A human who walked away must not stall the table: their own browser
+      // auto-continues after a grace period, and the host's browser backs
+      // that up a little later in case theirs is closed.
+      const mine = currentFortuneEntry.playerId === localPlayerId;
+      if (!mine && !isHostBrowser) return undefined;
+      const t = setTimeout(() => game.ackFortuneCard(), mine ? ARENA_OWNER_ACK_MS : ARENA_HOST_BACKUP_ACK_MS);
       return () => clearTimeout(t);
     }
     // Depends on the STABLE useCallback, not the whole `game` object: App
@@ -125,7 +170,39 @@ export default function GameBoard({ game, readOnly = false, onExitReadOnly }) {
     // nothing currently re-renders App during a recap — but at the fastest
     // speed (200ms) any future ticking state in App would restart the timer
     // faster than it could fire and hang the game on the recap screen.
-  }, [status, currentFortuneEntry, currentFortunePlayer, game.ackFortuneCard, speed]);
+  }, [status, currentFortuneEntry, currentFortunePlayer, game.ackFortuneCard, speed, arenaActive, isHostBrowser, localPlayerId]);
+
+  // Stall ladder (arena tables): how long since the table's last move while
+  // a live human holds the turn. Ticks every 5s so the banners advance.
+  const [, setStallTick] = useState(0);
+  useEffect(() => {
+    if (!arenaActive) return undefined;
+    const t = setInterval(() => setStallTick((n) => n + 1), 5000);
+    return () => clearInterval(t);
+  }, [arenaActive]);
+  const idleMs = arenaActive && status === 'playing' && activePlayer?.type === 'human' ? Date.now() - (game.arena.lastMoveAt || Date.now()) : 0;
+  const stallStage = idleMs >= ARENA_STALL_MS ? 3 : idleMs >= ARENA_STALL_NOTICE_MS ? 2 : idleMs >= ARENA_STALL_WARN_MS ? 1 : 0;
+  const stalledIsMe = stallStage > 0 && isHumanTurn;
+  const votesAgainstActive = (state.kickVotes && activePlayer && state.kickVotes[activePlayer.id]) || [];
+  const otherHumans = activePlayer ? players.filter((p) => p.type === 'human' && p.id !== activePlayer.id) : [];
+  const iVoted = !!localPlayerId && votesAgainstActive.includes(localPlayerId);
+  const myPlayer = localPlayerId ? players.find((p) => p.id === localPlayerId) : null;
+  const [resignArmed, setResignArmed] = useState(false);
+  const [showOptions, setShowOptions] = useState(() => { try { return localStorage.getItem('vf_show_options') === '1'; } catch { return false; } });
+  useEffect(() => {
+    if (!resignArmed) return undefined;
+    const t = setTimeout(() => setResignArmed(false), 6000);
+    return () => clearTimeout(t);
+  }, [resignArmed]);
+  const secs = (ms) => Math.max(0, Math.ceil(ms / 1000));
+
+  // A launch celebration nobody dismisses must not stall the table either.
+  useEffect(() => {
+    if (!arenaActive || !launch) return undefined;
+    if (!isMyLaunch && !isHostBrowser) return undefined;
+    const t = setTimeout(() => game.ackStartupLaunch(), isMyLaunch ? ARENA_OWNER_ACK_MS : ARENA_HOST_BACKUP_ACK_MS);
+    return () => clearTimeout(t);
+  }, [arenaActive, launchKey, isMyLaunch, isHostBrowser, game.ackStartupLaunch]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Auto-dismiss error toasts.
   useEffect(() => {
@@ -149,17 +226,9 @@ export default function GameBoard({ game, readOnly = false, onExitReadOnly }) {
             }}
           />
 
-          <div className="vf-header">
+          <div className="vf-header vf-header--compact">
             <Brand size="sm" align="left" />
             <div className="vf-header__right">
-              <VolumeControl />
-              <MusicControl />
-              <AudioStatus />
-              {/* Play speed lives in the board header, not just on setup,
-                  because the whole point is being able to slow the table
-                  down the moment it starts moving faster than you can
-                  follow — mid-turn if need be. */}
-              <SpeedControl />
               {/* Only renders when this game was started with the timer on
                   and it's a human's live turn — see TurnTimer.jsx. */}
               <TurnTimer
@@ -170,94 +239,53 @@ export default function GameBoard({ game, readOnly = false, onExitReadOnly }) {
                 onExtend={() => game.extendTurn(activePlayer.id)}
                 onExpire={() => game.endTurn(activePlayer.id)}
               />
-              {/* Toggles the on-demand ❓ lesson tooltips scattered across
-                  the board (asset cards, weather, fortune cards, business
-                  actions/upgrades — see LessonTip.jsx). A device-level
-                  preference (hooks/useTeachMode.js), not part of the game
-                  itself, so it can be flipped on or off mid-game and stays
-                  set for next time. */}
-              <button
-                type="button"
-                className={`vf-btn vf-btn--sm ${teachMode ? 'vf-btn--go' : 'vf-btn--ghost'}`}
-                title={
-                  teachMode
-                    ? 'Teach Me mode is ON — tap Teach Me to hide the ❓ lesson tips'
-                    : 'Turn on Teach Me mode for ❓ lesson tips on cards, weather, and more'
-                }
-                onClick={() => {
-                  playSound('click');
-                  toggleTeachMode();
-                }}
-              >
-                🎓 Teach Me
-              </button>
-              <button
-                type="button"
-                className="vf-btn vf-btn--sm vf-btn--ghost"
-                title="Leaderboard"
-                onClick={() => {
-                  playSound('click');
-                  setShowLeaderboard(true);
-                }}
-              >
-                🏆
-              </button>
-              {/* Sits right next to the leaderboard so the rules are always
-                  one tap away, on every screen size, at any point in a game
-                  — see components/RulebookModal.jsx. */}
-              <button
-                type="button"
-                className="vf-btn vf-btn--sm vf-btn--ghost"
-                title="Rulebook — how everything works"
-                onClick={() => {
-                  playSound('click');
-                  setShowRulebook(true);
-                }}
-              >
-                📖
-              </button>
-              {/* Market history sits with the other reference tools: what
-                  things have cost month by month, and what they paid out. */}
-              <button
-                type="button"
-                className="vf-btn vf-btn--sm vf-btn--ghost"
-                title="Market history — prices and payouts by month"
-                onClick={() => {
-                  playSound('click');
-                  setShowMarket(true);
-                }}
-              >
-                📈
-              </button>
               <span className="vf-pill" title={difficulty.tagline}>
                 {difficulty.icon} {difficulty.name}
               </span>
               <WeatherBadge weather={weather} />
-              {readOnly ? (
-                <button
-                  type="button"
-                  className="vf-btn vf-btn--sm vf-btn--ghost"
-                  onClick={() => {
-                    playSound('click');
-                    onExitReadOnly?.();
-                  }}
-                >
-                  ← Back to Recap
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  className="vf-btn vf-btn--sm vf-btn--ghost"
-                  onClick={() => {
-                    playSound('click');
-                    game.newGame();
-                  }}
-                >
-                  New Game
-                </button>
+              <button type="button" className="vf-btn vf-btn--sm vf-btn--ghost" title="Leaderboard" onClick={() => { playSound('click'); setShowLeaderboard(true); }}>🏆</button>
+              {/* Everything people rarely touch mid-game lives behind one
+                  Options toggle so the board itself gets the screen. */}
+              <button
+                type="button"
+                className={`vf-btn vf-btn--sm ${showOptions ? 'vf-btn--go' : 'vf-btn--ghost'}`}
+                title="Sound, speed, Teach Me, rulebook, market history, new game"
+                aria-expanded={showOptions}
+                onClick={() => { playSound('click'); setShowOptions((v) => { try { localStorage.setItem('vf_show_options', v ? '0' : '1'); } catch { /* ignore */ } return !v; }); }}
+              >
+                ⚙️ {showOptions ? 'Hide' : 'Options'}
+              </button>
+              {readOnly && (
+                <button type="button" className="vf-btn vf-btn--sm vf-btn--ghost" onClick={() => { playSound('click'); onExitReadOnly?.(); }}>← Back to Recap</button>
               )}
             </div>
           </div>
+          {showOptions && (
+            <div className="vf-header__options">
+              <VolumeControl />
+              <MusicControl />
+              <AudioStatus />
+              {/* Play speed lives on the board, not just on setup, because
+                  the whole point is being able to slow the table down the
+                  moment it starts moving faster than you can follow. */}
+              <SpeedControl />
+              {/* Toggles the on-demand ❓ lesson tooltips — a device-level
+                  preference (hooks/useTeachMode.js), not part of the game. */}
+              <button
+                type="button"
+                className={`vf-btn vf-btn--sm ${teachMode ? 'vf-btn--go' : 'vf-btn--ghost'}`}
+                title={teachMode ? 'Teach Me mode is ON — tap to hide the ❓ lesson tips' : 'Turn on Teach Me mode for ❓ lesson tips on cards, weather, and more'}
+                onClick={() => { playSound('click'); toggleTeachMode(); }}
+              >
+                🎓 Teach Me
+              </button>
+              <button type="button" className="vf-btn vf-btn--sm vf-btn--ghost" title="Rulebook — how everything works" onClick={() => { playSound('click'); setShowRulebook(true); }}>📖 Rules</button>
+              <button type="button" className="vf-btn vf-btn--sm vf-btn--ghost" title="Market history — prices and payouts by month" onClick={() => { playSound('click'); setShowMarket(true); }}>📈 Market</button>
+              {!readOnly && (
+                <button type="button" className="vf-btn vf-btn--sm vf-btn--ghost" onClick={() => { playSound('click'); game.newGame(); }}>{arenaActive ? '🏟️ Back to table' : 'New Game'}</button>
+              )}
+            </div>
+          )}
 
           <MonthProgress month={month} totalMonths={totalMonths} />
 
@@ -298,15 +326,23 @@ export default function GameBoard({ game, readOnly = false, onExitReadOnly }) {
                 original at the bottom of the board, which stays in place
                 for anyone who scrolls down anyway. Same enable condition,
                 same handler; this is a duplicate control, not a new one. */}
-            {isRemoteHumanTurn && game.arena?.isHost && Date.now() - (game.arena.lastMoveAt || 0) > 3 * 60 * 1000 && (
-              <button
-                type="button"
-                className="vf-btn vf-btn--sm"
-                title="No move for a while. Let a robot play this seat so the table keeps moving."
-                onClick={() => game.convertSeatToAi(activePlayer.id)}
-              >
-                🤖 Hand this seat to a robot
-              </button>
+            {isRemoteHumanTurn && stallStage >= 2 && localPlayerId && (
+              <span className="vf-stall-note">
+                {stallStage === 2
+                  ? `${activePlayer.name} has been idle ${secs(idleMs)}s. In ${secs(ARENA_STALL_MS - idleMs)}s the table can let a robot finish their game.`
+                  : `${activePlayer.name} has been idle ${secs(idleMs)}s.`}
+                {stallStage === 3 && !iVoted && (
+                  <button type="button" className="vf-btn vf-btn--sm" title="Unanimous among the other live players hands this seat to a robot; any move by them cancels the votes." onClick={() => game.kickVote(activePlayer.id, localPlayerId)}>
+                    🗳️ Vote: robot finishes for {activePlayer.name} ({votesAgainstActive.length}/{otherHumans.length})
+                  </button>
+                )}
+                {stallStage === 3 && iVoted && <span className="vf-stall-note__count">🗳️ You voted · {votesAgainstActive.length} of {otherHumans.length}</span>}
+                {stallStage === 3 && game.arena?.isHost && (
+                  <button type="button" className="vf-btn vf-btn--sm vf-btn--ghost" title="Host decision: a robot finishes this seat's game now." onClick={() => game.convertSeatToAi(activePlayer.id, 'host')}>
+                    🤖 Host: replace now
+                  </button>
+                )}
+              </span>
             )}
             {isHumanTurn && (
               <button
@@ -315,6 +351,23 @@ export default function GameBoard({ game, readOnly = false, onExitReadOnly }) {
                 onClick={() => game.endTurn(activePlayer.id)}
               >
                 Done! Roll the weather 🎲
+              </button>
+            )}
+            {stalledIsMe && (
+              <span className={`vf-stall-note ${stallStage >= 2 ? 'vf-stall-note--urgent' : ''}`}>
+                {stallStage === 1 && 'Still there? The table is waiting on you.'}
+                {stallStage === 2 && `Heads up: if you don't act in ${secs(ARENA_STALL_MS - idleMs)}s the other players can let a robot finish your game.`}
+                {stallStage === 3 && `The table can now vote to replace you (${votesAgainstActive.length} of ${otherHumans.length} votes). Any move keeps your seat.`}
+              </span>
+            )}
+            {arenaActive && myPlayer && myPlayer.type === 'human' && status !== 'gameover' && (
+              <button
+                type="button"
+                className={`vf-btn vf-btn--sm ${resignArmed ? 'vf-btn--danger' : 'vf-btn--ghost'}`}
+                title="Leave the table: a robot finishes your game with your cash and businesses; the result still counts."
+                onClick={() => { if (resignArmed) { game.convertSeatToAi(localPlayerId, 'resigned'); setResignArmed(false); } else setResignArmed(true); }}
+              >
+                {resignArmed ? '🏳️ Click again to resign' : '🏳️ Resign'}
               </button>
             )}
           </div>
@@ -328,8 +381,10 @@ export default function GameBoard({ game, readOnly = false, onExitReadOnly }) {
             weatherIncomeAmounts={weatherIncomeAmounts}
             sameTurnBuys={sameTurnBuys}
             disabled={!isHumanTurn}
-            onBuy={(assetId) => game.buyAsset(activePlayer.id, assetId, 1)}
-            onSell={(assetId) => game.sellAsset(activePlayer.id, assetId, 1)}
+            onBuy={(assetId, qty = 1) => game.buyAsset(activePlayer.id, assetId, qty)}
+            onSell={(assetId, qty = 1) => game.sellAsset(activePlayer.id, assetId, qty)}
+            pendingTrade={game.pendingTrade}
+            viewer={arenaActive && myPlayer && activePlayer && myPlayer.id !== activePlayer.id ? myPlayer : null}
             onViewHistory={(assetId) => setSelectedAssetId(assetId)}
           />
 
@@ -359,7 +414,7 @@ export default function GameBoard({ game, readOnly = false, onExitReadOnly }) {
             weatherSeverityId={state.weatherSeverityId}
           />
           <EventLog log={log} />
-          <ChatPanel chat={chat} players={players} onSendChat={game.sendChat} />
+          <ChatPanel chat={chat} players={players} onSendChat={game.sendChat} localPlayerId={localPlayerId} spectator={spectator} />
         </div>
       </div>
 
@@ -396,8 +451,26 @@ export default function GameBoard({ game, readOnly = false, onExitReadOnly }) {
       {/* Launch celebration for a business a human just started. Rendered
           last so it sits above the portfolio modal the player almost
           certainly has open behind it. */}
-      {state.pendingLaunch && (
+      {state.pendingLaunch && (!arenaActive || isMyLaunch) && (
         <StartupLaunchModal launch={state.pendingLaunch} onContinue={game.ackStartupLaunch} />
+      )}
+
+      {peek && (
+        <div className="vf-arena-peek" role="status" aria-live="polite" onClick={() => setPeek(null)}>
+          {peek.kind === 'fortune' ? (
+            <>
+              <div className="vf-arena-peek__who">{peek.entry.avatar} {peek.entry.playerName}'s fortune card</div>
+              <div className="vf-arena-peek__title">{peek.entry.card.icon} {peek.entry.card.title}</div>
+              <div className={`vf-arena-peek__effect ${peek.entry.deckId === 'opportunity' ? 'vf-arena-peek__effect--good' : 'vf-arena-peek__effect--bad'}`}>{peek.entry.description}</div>
+            </>
+          ) : (
+            <>
+              <div className="vf-arena-peek__who">{peek.entry.avatar} {peek.entry.playerName} launched a business</div>
+              <div className="vf-arena-peek__title">🚀 {peek.entry.businessName}</div>
+              <div className="vf-arena-peek__effect vf-arena-peek__effect--good">+${peek.entry.income}/mo passive income</div>
+            </>
+          )}
+        </div>
       )}
 
       {/* Naming step, opened by ActionBar's Start Business button, above —
@@ -407,6 +480,7 @@ export default function GameBoard({ game, readOnly = false, onExitReadOnly }) {
       {showStartBusiness && activePlayer && (
         <StartBusinessModal
           existingNames={activePlayer.businesses.map((b) => b.name)}
+          playerName={activePlayer.name}
           onConfirm={(name) => {
             game.startBusiness(activePlayer.id, name);
             setShowStartBusiness(false);
@@ -453,7 +527,7 @@ export default function GameBoard({ game, readOnly = false, onExitReadOnly }) {
       {status === 'gameEnding' && (
         <GameEndingRecap
           players={players}
-          defaultPlayerId={hudPlayer?.id}
+          defaultPlayerId={localPlayerId || hudPlayer?.id}
           onContinue={() => game.finalizeGameOver()}
         />
       )}

@@ -41,19 +41,45 @@ function sampleNames(pool, used, n) {
  * back to its own random whimsical pick exactly as it always has, so
  * "I don't care, surprise me" costs zero extra taps.
  */
-export default function StartBusinessModal({ existingNames = [], onConfirm, onCancel }) {
-  const [suggestions, setSuggestions] = useState(() => sampleNames(BUSINESS_NAMES, existingNames, SUGGESTION_COUNT));
+/** The pool is shaped "<Owner>'s <Trade>"; this swaps the owner for the
+ * player so one suggestion always carries their own name ("Michael's Pickle
+ * Shop"). Plain Math.random for the same reason as sampleNames. */
+function namedForPlayer(playerName, used) {
+  if (!playerName) return null;
+  const owner = playerName.replace(/\s*\(.*\)\s*$/, '').trim();
+  const possessive = /s$/i.test(owner) ? `${owner}'` : `${owner}'s`;
+  const usedSet = new Set(used);
+  for (let tries = 0; tries < 12; tries++) {
+    const base = BUSINESS_NAMES[Math.floor(Math.random() * BUSINESS_NAMES.length)];
+    const m = base.match(/'s? (.+)$/);
+    if (!m) continue;
+    const candidate = `${possessive} ${m[1]}`;
+    if (!usedSet.has(candidate)) return candidate;
+  }
+  return `${possessive} Startup`;
+}
+
+function buildSuggestions(playerName, existingNames) {
+  const mine = namedForPlayer(playerName, existingNames);
+  const rest = sampleNames(BUSINESS_NAMES, existingNames, mine ? SUGGESTION_COUNT - 1 : SUGGESTION_COUNT);
+  return mine ? [mine, ...rest] : rest;
+}
+
+export default function StartBusinessModal({ existingNames = [], playerName = '', onConfirm, onCancel }) {
+  const [suggestions, setSuggestions] = useState(() => buildSuggestions(playerName, existingNames));
   const [selected, setSelected] = useState(suggestions[0] || '');
-  const [customName, setCustomName] = useState('');
+  // The player-named suggestion starts in the text box so it's one tap to edit.
+  const [customName, setCustomName] = useState(() => (playerName ? suggestions[0] || '' : ''));
 
   const previewName = customName.trim() || selected;
   const preview = useMemo(() => businessArt(previewName), [previewName]);
 
   function reroll() {
     playSound('click');
-    const next = sampleNames(BUSINESS_NAMES, existingNames, SUGGESTION_COUNT);
+    const next = buildSuggestions(playerName, existingNames);
     setSuggestions(next);
     setSelected(next[0] || '');
+    setCustomName('');
   }
 
   function pick(name) {

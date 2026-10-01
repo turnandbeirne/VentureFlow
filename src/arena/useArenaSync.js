@@ -5,7 +5,7 @@
 // was opened from the arena — see arenaBridge.js.
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { getArena, arenaSeats, playerIdForArenaUser } from './arenaBridge';
-import { ARENA_MOVE_URL, ARENA_MOVES_REST, ARENA_PUBLISHABLE_KEY, ARENA_POLL_MS } from './arenaConfig';
+import { ARENA_MOVE_URL, ARENA_MOVES_REST, ARENA_PUBLISHABLE_KEY, ARENA_POLL_MS, ARENA_TRADE_BATCH_MS } from './arenaConfig';
 
 // Actions that only matter to this browser and never go to the table.
 const LOCAL_ONLY = new Set(['CLEAR_ERROR', 'NEW_GAME', 'LOAD_GAME']);
@@ -92,13 +92,46 @@ export function useArenaSync(localDispatch, state) {
     [arena, applyIncoming]
   );
 
+  // Trades are coalesced: a press-and-hold fires BUY_ASSET many times a
+  // second, and sending each one as its own round trip is what made bulk
+  // buying crawl online. Same asset + same direction within a short window
+  // becomes ONE action with a summed qty, clamped to what the player can
+  // actually afford/sell at flush time so the table never sees a failing move.
+  const stateRef = useRef(state); stateRef.current = state;
+  const tradeRef = useRef(null);      // { playerId, assetId, type, qty }
+  const tradeTimer = useRef(null);
+  const [pendingTrade, setPendingTrade] = useState(null);
+  const flushTrade = useCallback(async () => {
+    const t = tradeRef.current; tradeRef.current = null; tradeTimer.current = null; setPendingTrade(null);
+    if (!t) return;
+    const st = stateRef.current; const player = st?.players?.find((p) => p.id === t.playerId); const price = st?.assetPrices?.[t.assetId] || 0;
+    let qty = t.qty;
+    if (player) qty = t.type === 'BUY_ASSET' ? Math.min(qty, price > 0 ? Math.floor(player.cash / price) : 0) : Math.min(qty, player.holdings?.[t.assetId] || 0);
+    if (qty <= 0) return;
+    const ok = await send({ type: t.type, playerId: t.playerId, assetId: t.assetId, qty });
+    if (!ok) await send({ type: t.type, playerId: t.playerId, assetId: t.assetId, qty });   // one retry after a 409 re-sync
+  }, [send]);
+  const queueTrade = useCallback((action) => {
+    const cur = tradeRef.current;
+    const same = cur && cur.playerId === action.playerId && cur.assetId === action.assetId && cur.type === action.type;
+    if (cur && !same) { if (tradeTimer.current) clearTimeout(tradeTimer.current); void flushTrade(); }
+    const qty = (same ? cur.qty : 0) + (action.qty || 1);
+    tradeRef.current = { playerId: action.playerId, assetId: action.assetId, type: action.type, qty };
+    setPendingTrade({ assetId: action.assetId, type: action.type, qty });
+    if (tradeTimer.current) clearTimeout(tradeTimer.current);
+    tradeTimer.current = setTimeout(flushTrade, ARENA_TRADE_BATCH_MS);
+  }, [flushTrade]);
+
   const dispatch = useCallback(
     (action) => {
       if (!active || LOCAL_ONLY.has(action.type)) return localDispatch(action);
+      if (action.type === 'BUY_ASSET' || action.type === 'SELL_ASSET') { queueTrade(action); return undefined; }
+      // anything else (end turn, start business…) goes after any trade still queued
+      if (tradeRef.current) { if (tradeTimer.current) clearTimeout(tradeTimer.current); void flushTrade().then(() => send(action)); return undefined; }
       void send(action);
       return undefined;
     },
-    [active, localDispatch, send]
+    [active, localDispatch, send, queueTrade, flushTrade]
   );
 
   // The host creates the game once; everyone else just receives it.
@@ -138,6 +171,7 @@ export function useArenaSync(localDispatch, state) {
     seats,
     startIfHost,
     pollCount,
+    pendingTrade,
     seq: seqRef.current,
   };
 }

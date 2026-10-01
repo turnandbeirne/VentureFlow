@@ -162,7 +162,19 @@ function withResult(result) {
   return appendLog({ ...result.state, lastError: null }, entries);
 }
 
+const CURE_ACTIONS = new Set(['BUY_ASSET', 'SELL_ASSET', 'START_BUSINESS', 'LEARN_SKILL', 'UPGRADE_BUSINESS', 'END_TURN', 'EXTEND_TURN', 'RESOLVE_EXIT_OFFER', 'SEND_CHAT']);
+
 export function gameReducer(state, action) {
+  // A stalled player who acts again is "cured": votes against them are dropped.
+  if (state && state.kickVotes && action && action.playerId && CURE_ACTIONS.has(action.type) && state.kickVotes[action.playerId]) {
+    const kickVotes = { ...state.kickVotes };
+    delete kickVotes[action.playerId];
+    state = { ...state, kickVotes };
+  }
+  return gameReducerInner(state, action);
+}
+
+function gameReducerInner(state, action) {
   switch (action.type) {
     case 'START_GAME': {
       // A Daily Challenge run reseeds the shared RNG (game/rng.js) from
@@ -385,21 +397,27 @@ export function gameReducer(state, action) {
     }
 
     case 'CONVERT_SEAT_TO_AI': {
-      // An absent human at an online table hands their seat to a robot:
-      // cash, holdings, businesses and badges are untouched, only who plays
-      // the seat changes. Deterministic (goes through the seeded stream) so
-      // every browser at the table picks the same robot.
-      const idx = state.players.findIndex((p) => p.id === action.playerId);
-      if (idx < 0 || state.players[idx].type !== 'human') return state;
-      const used = new Set(state.players.filter((p) => p.type === 'ai').map((p) => p.personalityId));
-      const { personality, skillLevelId } = resolveBotConfig({ personalityId: 'random', skillLevelId: 'random' }, used);
-      const players = state.players.map((p, i) =>
-        i === idx
-          ? { ...p, type: 'ai', personalityId: personality.id, strategyId: personality.strategyId, skillLevelId, name: `${p.name} (${personality.name})` }
-          : p
-      );
-      const next = { ...state, players, aiTurnSteps: 0, aiTurnDone: false, turnDeadlineAt: null };
-      return appendLog(next, [{ icon: '🤖', message: `${state.players[idx].name} stepped away — ${personality.name} is playing the seat now.`, kind: 'takeover' }]);
+      // An absent (or resigned, or voted-out) human at an online table hands
+      // their seat to a robot: cash, holdings, businesses and badges are
+      // untouched, only who plays the seat changes. Deterministic (goes
+      // through the seeded stream) so every browser picks the same robot.
+      return convertSeatToAi(state, action.playerId, action.reason || 'away');
+    }
+
+    case 'KICK_VOTE': {
+      // One live player's vote to let a robot finish a stalled player's
+      // game. Unanimous among the OTHER human players converts the seat;
+      // any action by the target clears the votes against them (the cure).
+      const target = state.players.find((p) => p.id === action.playerId);
+      const voter = state.players.find((p) => p.id === action.voterId);
+      if (!target || !voter || target.type !== 'human' || voter.type !== 'human' || target.id === voter.id) return state;
+      const votes = { ...(state.kickVotes || {}) };
+      const list = Array.from(new Set([...(votes[target.id] || []), voter.id]));
+      votes[target.id] = list;
+      const others = state.players.filter((p) => p.type === 'human' && p.id !== target.id).map((p) => p.id);
+      if (others.every((id) => list.includes(id))) return convertSeatToAi({ ...state, kickVotes: votes }, target.id, 'vote');
+      const next = { ...state, kickVotes: votes };
+      return appendLog(next, [{ icon: '🗳️', message: `${voter.name} voted to let a robot finish ${target.name}'s game (${list.length} of ${others.length}).`, kind: 'takeover' }]);
     }
 
     case 'CLEAR_ERROR':
@@ -408,4 +426,23 @@ export function gameReducer(state, action) {
     default:
       return state;
   }
+}
+
+// Hand a human seat to a robot. `reason`: 'resigned' | 'vote' | 'host' | 'away'.
+function convertSeatToAi(state, playerId, reason) {
+  const idx = state.players.findIndex((p) => p.id === playerId);
+  if (idx < 0 || state.players[idx].type !== 'human') return state;
+  const used = new Set(state.players.filter((p) => p.type === 'ai').map((p) => p.personalityId));
+  const { personality, skillLevelId } = resolveBotConfig({ personalityId: 'random', skillLevelId: 'random' }, used);
+  const original = state.players[idx].name;
+  const players = state.players.map((p, i) =>
+    i === idx
+      ? { ...p, type: 'ai', personalityId: personality.id, strategyId: personality.strategyId, skillLevelId, name: `${original} (finished by: ${personality.name}, bot)`, originalName: original, finishedBy: personality.name, takeoverReason: reason }
+      : p
+  );
+  const kickVotes = { ...(state.kickVotes || {}) };
+  delete kickVotes[playerId];
+  const next = { ...state, players, kickVotes, aiTurnSteps: 0, aiTurnDone: false, turnDeadlineAt: null };
+  const why = reason === 'resigned' ? 'resigned' : reason === 'vote' ? 'was voted out by the table' : reason === 'host' ? 'was replaced by the host' : 'stepped away';
+  return appendLog(next, [{ icon: '🤖', message: `${original} ${why} — ${personality.name} is finishing the game for them.`, kind: 'takeover' }]);
 }

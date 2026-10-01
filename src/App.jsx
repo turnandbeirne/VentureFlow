@@ -11,6 +11,7 @@ import GameBoard from './components/GameBoard';
 import GameOverScreen from './components/GameOverScreen';
 import ArenaBanner, { ArenaInvite } from './arena/ArenaBanner';
 import { getArena, reportArenaResults } from './arena/arenaBridge';
+import { passiveIncome } from './game/players';
 import { netWorth } from './game/players';
 
 export default function App() {
@@ -45,7 +46,7 @@ export default function App() {
   }, [arena?.active, arena?.isHost, arena?.status, arena?.pollCount, state]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (arena?.active && arena.isHost && state?.status === 'gameover' && arena.seats) {
-      reportArenaResults(state, arena.seats, (p) => netWorth(p, state.assetPrices)).then((r) => r && setArenaResult(r));
+      reportArenaResults(state, arena.seats, (p) => netWorth(p, state.assetPrices), (p) => passiveIncome(p, { allPlayers: state.players, prices: state.assetPrices, month: state.month, weatherIncomeAmounts: state.weatherIncomeAmounts })).then((r) => r && setArenaResult(r));
     }
   }, [arena?.active, arena?.isHost, state?.status]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -122,6 +123,9 @@ export default function App() {
           onPlayAgain={newGame}
           onRecordProfileResult={recordResult}
           onViewBoard={() => setShowBoardAfterGameOver(true)}
+          localPlayerId={game.localPlayerId}
+          arena={arena?.active ? arena.arena : null}
+          arenaResult={arenaResult}
         />
       ) : state.status === 'gameover' ? (
         <GameBoard

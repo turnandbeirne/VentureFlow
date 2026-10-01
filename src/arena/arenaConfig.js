@@ -9,4 +9,13 @@ export const ARENA_MOVES_REST = `${ARENA_SUPABASE_URL}/rest/v1/vf_moves`;
 export const ARENA_POLL_MS = 1500;
 // After this long without a move on a human's turn, the host may hand the
 // seat to a robot (CONVERT_SEAT_TO_AI) so the table is never stuck.
-export const ARENA_STALL_MS = 3 * 60 * 1000;
+// Stall ladder on a live human's turn, measured from the table's last move:
+// a nudge for the player, then notice that the table may replace them, then
+// (after the cure window) the other players may vote and the host may act.
+export const ARENA_STALL_WARN_MS = 40 * 1000;
+export const ARENA_STALL_NOTICE_MS = 60 * 1000;
+export const ARENA_STALL_CURE_MS = 20 * 1000;   // vote opens at NOTICE + CURE
+export const ARENA_STALL_MS = ARENA_STALL_NOTICE_MS + ARENA_STALL_CURE_MS;
+
+// Trades fired within this window (a press-and-hold) are sent as one move.
+export const ARENA_TRADE_BATCH_MS = 220;

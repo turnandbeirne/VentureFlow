@@ -51,8 +51,10 @@ export function ChatEntryRow({ entry, players = [] }) {
  * game/chatEngine.js's reactToHumanChat for the small chance a targeted
  * (or random) bot chimes back in character anyway, so it doesn't feel like
  * shouting into a void. */
-function ChatComposer({ players, onSendChat }) {
-  const humans = players.filter((p) => p.type === 'human');
+function ChatComposer({ players, onSendChat, localPlayerId = null }) {
+  // Hot-seat: any human at this screen can speak, so there's a picker.
+  // Online (VentureArena): this browser owns ONE seat and speaks only as it.
+  const humans = localPlayerId ? players.filter((p) => p.id === localPlayerId) : players.filter((p) => p.type === 'human');
   const [fromId, setFromId] = useState(humans[0]?.id || '');
   const [toId, setToId] = useState('');
   const [message, setMessage] = useState('');
@@ -127,8 +129,10 @@ function ChatComposer({ players, onSendChat }) {
 // gets generated. Robots do most of the talking (teasing, questioning,
 // challenging, complimenting — and occasionally serenading everyone with a
 // fart noise), but the composer below lets a human player join in too.
-export default function ChatPanel({ chat, players, onSendChat }) {
+export default function ChatPanel({ chat, players, onSendChat, localPlayerId = null, spectator = false }) {
   const recent = [...(chat || [])].slice(-30).reverse();
+  const me = localPlayerId ? players.find((p) => p.id === localPlayerId) : null;
+  const canChat = !spectator && (!localPlayerId || (me && me.type === 'human'));
 
   return (
     <div>
@@ -145,7 +149,11 @@ export default function ChatPanel({ chat, players, onSendChat }) {
             <ChatEntryRow key={entry.id} entry={entry} players={players} />
           ))}
         </div>
-        <ChatComposer players={players} onSendChat={onSendChat} />
+        {canChat ? (
+          <ChatComposer players={players} onSendChat={onSendChat} localPlayerId={localPlayerId} />
+        ) : (
+          <div className="vf-log__empty">{spectator ? "You're watching — table talk happens back in the arena." : 'A robot is finishing this seat; chat is closed for it.'}</div>
+        )}
       </div>
     </div>
   );

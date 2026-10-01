@@ -32,7 +32,7 @@ import WealthPile from './WealthPile';
 // game keeps working fully offline aside from this one opt-in action.
 const RECAP_EMAIL_ENDPOINT = 'https://iwpysmrmunirsvdrecmw.supabase.co/functions/v1/send-recap-email';
 
-export default function GameOverScreen({ state, onPlayAgain, onRecordProfileResult, onViewBoard }) {
+export default function GameOverScreen({ state, onPlayAgain, onRecordProfileResult, onViewBoard, localPlayerId = null, arena = null, arenaResult = null }) {
   const { players, assetPrices, winnerId, mode, difficultyId, scenarioId, dailyChallengeDate, month } = state;
   const ranked = [...players].sort((a, b) => netWorth(b, assetPrices) - netWorth(a, assetPrices));
   const winner = players.find((p) => p.id === winnerId) || ranked[0];
@@ -72,10 +72,18 @@ export default function GameOverScreen({ state, onPlayAgain, onRecordProfileResu
   // exactly what makes it possible to see at a glance how much a specific
   // holding (lemonade's price swings, a business's upgrades, etc.) actually
   // contributed, instead of only ever seeing the final net-worth total.
-  const [selectedPlayerId, setSelectedPlayerId] = useState(null);
+  // At an arena table the screen opens on YOUR seat: your own breakdown is
+  // the one already expanded, and the insights are about your game. Other
+  // players' records are one tap away in the standings.
+  const me = localPlayerId ? players.find((p) => p.id === localPlayerId) : null;
+  const [selectedPlayerId, setSelectedPlayerId] = useState(me ? me.id : null);
   const selectedPlayer = selectedPlayerId ? players.find((p) => p.id === selectedPlayerId) : null;
+  const myRank = me ? ranked.findIndex((p) => p.id === me.id) + 1 : 0;
+  const myPassive = me ? passiveIncome(me, { allPlayers: players, prices: assetPrices, month, weatherIncomeAmounts: state.weatherIncomeAmounts }) : 0;
+  const myCards = me ? (me.fortuneCardHistory || []) : [];
+  const arenaBackUrl = arena ? (arenaResult?.nextUrl || arena.debriefUrl) : null;
 
-  const insights = buildInsights(winner, assetPrices);
+  const insights = buildInsights(me || winner, assetPrices);
 
   // Whichever human player did best this game "counts" toward the lifetime
   // profile (see game/profile.js) — the natural choice in solo mode (only
@@ -310,6 +318,27 @@ export default function GameOverScreen({ state, onPlayAgain, onRecordProfileResu
           {winner.avatar} {winner.name} {winner.name.toLowerCase() === 'you' ? 'win' : 'wins'} with $
           {netWorth(winner, assetPrices).toLocaleString()}!
         </div>
+
+        {me && (
+          <div className="vf-gameover__mine">
+            <div className="vf-gameover__mine-title">{me.avatar} Your report card · {myRank === 1 ? '🥇 1st' : myRank === 2 ? '🥈 2nd' : myRank === 3 ? '🥉 3rd' : `${myRank}th`} of {ranked.length}</div>
+            <div className="vf-gameover__mine-grid">
+              <div><span className="vf-gameover__mine-k">Net worth</span><span className="vf-gameover__mine-v">${netWorth(me, assetPrices).toLocaleString()}</span></div>
+              <div><span className="vf-gameover__mine-k">Cash</span><span className="vf-gameover__mine-v">${Math.round(me.cash).toLocaleString()}</span></div>
+              <div><span className="vf-gameover__mine-k">Passive / month</span><span className="vf-gameover__mine-v">${Math.round(myPassive).toLocaleString()}</span></div>
+              <div><span className="vf-gameover__mine-k">Businesses</span><span className="vf-gameover__mine-v">{(me.businesses || []).length}</span></div>
+              <div><span className="vf-gameover__mine-k">Fortune cards</span><span className="vf-gameover__mine-v">{myCards.filter((c) => c.deckId === 'opportunity').length} good · {myCards.filter((c) => c.deckId !== 'opportunity').length} bad</span></div>
+              <div><span className="vf-gameover__mine-k">Badges</span><span className="vf-gameover__mine-v">{(me.badges || []).length}</span></div>
+            </div>
+            {arenaBackUrl && (
+              <a className="vf-btn vf-btn--primary vf-btn--lg vf-gameover__arena-btn" href={arenaBackUrl}>
+                🏟️ Back to VentureArena — debrief, ratings &amp; your history →
+              </a>
+            )}
+            {arena && !arenaResult && <div className="vf-gameover__mine-note">{arena.isHost ? 'Sending the standings to the arena…' : 'The host\'s game sends the standings to the arena; your debrief is waiting there.'}</div>}
+            {arenaResult && !arenaResult.ok && <div className="vf-gameover__mine-note">Could not send results ({arenaResult.error}); the host can finalize from the table page.</div>}
+          </div>
+        )}
 
         <div className="vf-gameover__scenario-pill">
           <span className="vf-pill">

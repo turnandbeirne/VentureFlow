@@ -46,11 +46,19 @@ function crowdingLabel(totalOwned) {
   return 'Market: very crowded';
 }
 
-function AssetCard({ asset, price, previousPrice, owned, cash, totalOwned, weather, weatherIncomeAmounts, boughtThisTurn = 0, onBuy, onSell, disabled, onViewHistory }) {
+function AssetCard({ asset, price, previousPrice, owned, cash, totalOwned, weather, weatherIncomeAmounts, boughtThisTurn = 0, onBuy, onSell, onBuyMany, onSellMany, pending = null, viewerOwned = null, viewerLabel = '', disabled, onViewHistory }) {
   const trendUp = price >= previousPrice;
   const trendPct = previousPrice ? Math.round(((price - previousPrice) / previousPrice) * 100) : 0;
-  const canBuy = !disabled && cash >= price;
-  const canSell = !disabled && owned > 0;
+  // Online, trades already queued but not yet confirmed by the table count
+  // against cash/holdings here so a hold stops where the money does.
+  const pendingBuy = pending && pending.type === 'BUY_ASSET' ? pending.qty : 0;
+  const pendingSell = pending && pending.type === 'SELL_ASSET' ? pending.qty : 0;
+  const effectiveCash = cash - pendingBuy * price;
+  const effectiveOwned = owned + pendingBuy - pendingSell;
+  const canBuy = !disabled && effectiveCash >= price;
+  const canSell = !disabled && effectiveOwned > 0;
+  const maxBuy = price > 0 ? Math.floor(effectiveCash / price) : 0;
+  const [bulk, setBulk] = useState(false);
 
   // Buy/Sell support press-and-hold: hold past a second and it starts
   // auto-repeating, accelerating the longer it's held, so scooping up (or
@@ -176,16 +184,40 @@ function AssetCard({ asset, price, previousPrice, owned, cash, totalOwned, weath
           ↩️ {boughtThisTurn} bought this turn · sells back {Math.round(SAME_TURN_SELL_PENALTY * 100)}% lower
         </span>
       )}
+      {viewerOwned !== null && (
+        <div className="vf-asset-card__mine" title="What you hold, for comparison with the player whose turn it is">
+          {viewerLabel} you hold {viewerOwned}
+        </div>
+      )}
       <div className="vf-asset-card__actions">
         <button type="button" className="vf-btn vf-btn--go vf-btn--press" disabled={!canBuy} {...buyHold}>
-          Buy
+          Buy{pendingBuy > 0 && <span className="vf-btn__pending">+{pendingBuy}</span>}
           {buyPress > 0 && <span key={buyPress} className="vf-btn__ring" aria-hidden="true" />}
         </button>
         <button type="button" className="vf-btn vf-btn--danger vf-btn--press" disabled={!canSell} {...sellHold}>
-          Sell
+          Sell{pendingSell > 0 && <span className="vf-btn__pending">−{pendingSell}</span>}
           {sellPress > 0 && <span key={sellPress} className="vf-btn__ring" aria-hidden="true" />}
         </button>
+        {!disabled && (
+          <button type="button" className={`vf-btn vf-btn--sm vf-asset-card__bulk-toggle ${bulk ? 'vf-btn--go' : 'vf-btn--ghost'}`} title="Buy or sell in bulk" onClick={() => setBulk((v) => !v)}>
+            ×N
+          </button>
+        )}
       </div>
+      {bulk && !disabled && (
+        <div className="vf-asset-card__bulk">
+          <span className="vf-asset-card__bulk-label">Buy</span>
+          {[5, 10, 25].map((n) => (
+            <button key={`b${n}`} type="button" className="vf-btn vf-btn--sm vf-btn--go" disabled={maxBuy < n} onClick={() => { playSound('buttonPress'); onBuyMany(n); }}>{n}</button>
+          ))}
+          <button type="button" className="vf-btn vf-btn--sm vf-btn--go" disabled={maxBuy < 1} title={`${maxBuy} affordable`} onClick={() => { playSound('buttonPress'); onBuyMany(maxBuy); }}>Max ({maxBuy})</button>
+          <span className="vf-asset-card__bulk-label">Sell</span>
+          {[5, 10, 25].map((n) => (
+            <button key={`s${n}`} type="button" className="vf-btn vf-btn--sm vf-btn--danger" disabled={effectiveOwned < n} onClick={() => { playSound('buttonPress'); onSellMany(n); }}>{n}</button>
+          ))}
+          <button type="button" className="vf-btn vf-btn--sm vf-btn--danger" disabled={effectiveOwned < 1} onClick={() => { playSound('buttonPress'); onSellMany(effectiveOwned); }}>All ({effectiveOwned})</button>
+        </div>
+      )}
     </div>
   );
 }
@@ -202,6 +234,8 @@ export default function AssetShop({
   onBuy,
   onSell,
   onViewHistory,
+  pendingTrade = null,
+  viewer = null,          // the browser's own player when it is NOT their turn (online)
 }) {
   return (
     <div>
@@ -209,9 +243,14 @@ export default function AssetShop({
         <span>🛒</span>
         <span>Buy things that grow</span>
         <LessonTip conceptId="diversification" />
-        <span className="vf-section-title__hint">Hold Buy/Sell to go faster</span>
+        <span className="vf-section-title__hint">Hold Buy/Sell to go faster · ×N for bulk</span>
       </div>
-      <div className="vf-shop-grid">
+      {viewer && (
+        <div className="vf-shop-viewing" style={{ borderColor: 'var(--vf-spotlight, #e8b64a)' }}>
+          Showing {player.avatar} {player.name}'s shop and holdings (their turn). Your own counts are marked on each card.
+        </div>
+      )}
+      <div className={`vf-shop-grid ${viewer ? 'vf-shop-grid--other' : ''}`}>
         {ASSETS.map((asset) => (
           <AssetCard
             key={asset.id}
@@ -225,8 +264,13 @@ export default function AssetShop({
             weatherIncomeAmounts={weatherIncomeAmounts}
             boughtThisTurn={sameTurnBuys[asset.id] || 0}
             disabled={disabled}
-            onBuy={() => onBuy(asset.id)}
-            onSell={() => onSell(asset.id)}
+            onBuy={() => onBuy(asset.id, 1)}
+            onSell={() => onSell(asset.id, 1)}
+            onBuyMany={(n) => onBuy(asset.id, n)}
+            onSellMany={(n) => onSell(asset.id, n)}
+            pending={pendingTrade && pendingTrade.assetId === asset.id ? pendingTrade : null}
+            viewerOwned={viewer ? viewer.holdings[asset.id] || 0 : null}
+            viewerLabel={viewer ? viewer.avatar : ''}
             onViewHistory={onViewHistory}
           />
         ))}
