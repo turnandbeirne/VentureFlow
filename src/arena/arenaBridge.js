@@ -59,12 +59,25 @@ export function clearArena() {
   cached = undefined;
 }
 
-/** The seat list the online roster is built from: arena humans first (by seat), then robots to fill 4 chairs. */
+/**
+ * The seat list the online roster is built from: arena humans first (by
+ * seat), then the robot chairs the host configured at the table
+ * (settings.bots, each { personalityId, skillLevelId } — 'random' rolls one),
+ * then random robots to fill 4 chairs when the table was set to fill.
+ */
 export function arenaSeats(arena) {
   const total = 4;
+  const s = arena.settings || {};
   const seats = arena.humans.map((p, i) => ({ type: 'human', name: p.username, arenaId: p.id, avatar: ['🦊', '🦉', '🐸', '🐙'][i] }));
-  const aiCount = Math.max(0, Math.min(total - seats.length, Number(arena.settings.aiCount ?? total - seats.length)));
-  for (let i = 0; i < aiCount; i++) seats.push({ type: 'ai', personalityId: 'random', skillLevelId: 'random' });
+  const configured = Array.isArray(s.bots) ? s.bots : [];
+  for (const b of configured) {
+    if (seats.length >= total) break;
+    seats.push({ type: 'ai', personalityId: b?.personalityId || 'random', skillLevelId: b?.skillLevelId || 'random' });
+  }
+  // Older tables carry aiCount only; fill from that (or to 4) when asked.
+  const fill = s.fillWithRobots !== false;
+  const target = Array.isArray(s.bots) ? total : Math.min(total, seats.length + Number(s.aiCount ?? total - seats.length));
+  while (fill && seats.length < target) seats.push({ type: 'ai', personalityId: 'random', skillLevelId: 'random' });
   return seats;
 }
 

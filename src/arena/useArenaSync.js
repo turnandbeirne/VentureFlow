@@ -113,10 +113,10 @@ export function useArenaSync(localDispatch, state) {
       mode: { type: 'online', seats, tableId: arena.tableId },
       humanNames: seats.filter((x) => x.type === 'human').map((x) => x.name),
       difficultyId: s.difficultyId || 'medium',
-      botConfigs: [],
+      botConfigs: seats.filter((x) => x.type === 'ai').map((x) => ({ personalityId: x.personalityId, skillLevelId: x.skillLevelId })),
       scenarioId: s.scenarioId || 'classic',
       humanAvatars: seats.filter((x) => x.type === 'human').map((x) => x.avatar),
-      turnTimer: true,
+      turnTimer: s.turnTimer !== false,
       weatherSeverityId: s.weatherSeverityId || 'normal',
       seed: Number(s.seed) || 1,
     });
